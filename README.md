@@ -22,25 +22,8 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Installation
 
-### From Source
-
 ```bash
-git clone https://github.com/llmsim/llmsim.git
-cd llmsim
-cargo install --path .
-```
-
-### Docker
-
-```bash
-docker build -t llmsim .
-docker run -p 8080:8080 llmsim
-```
-
-### Docker Compose
-
-```bash
-docker-compose up
+cargo install --git https://github.com/llmsim/llmsim.git
 ```
 
 ## Usage
