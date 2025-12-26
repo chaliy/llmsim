@@ -5,9 +5,11 @@ use super::state::AppState;
 use crate::{
     create_generator,
     openai::{
-        ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, Model, ModelsResponse, Usage,
+        ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
+        MessageContent, Model, ModelsResponse, OutputTokensDetails, ResponsesErrorResponse,
+        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
     },
-    ErrorInjector, LatencyProfile, TokenStreamBuilder,
+    ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
 };
 use axum::{
     body::Body,
@@ -28,7 +30,7 @@ pub async fn health() -> impl IntoResponse {
     }))
 }
 
-/// POST /v1/chat/completions
+/// POST /openai/v1/chat/completions
 pub async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ChatCompletionRequest>,
@@ -147,12 +149,12 @@ pub async fn chat_completions(
     }
 }
 
-/// GET /v1/stats - Get server statistics
+/// GET /llmsim/stats - Get server statistics
 pub async fn get_stats(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(state.stats.snapshot())
 }
 
-/// GET /v1/models
+/// GET /openai/v1/models
 pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let models: Vec<Model> = state
         .config
@@ -176,7 +178,7 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoRespons
     Json(ModelsResponse::new(models))
 }
 
-/// GET /v1/models/:model_id
+/// GET /openai/v1/models/:model_id
 pub async fn get_model(
     State(state): State<Arc<AppState>>,
     Path(model_id): Path<String>,
@@ -198,6 +200,206 @@ pub async fn get_model(
             model_id
         )))
     }
+}
+
+/// POST /openai/v1/responses
+pub async fn create_response(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<ResponsesRequest>,
+) -> Result<Response, AppError> {
+    let request_start = Instant::now();
+
+    tracing::info!(
+        model = %request.model,
+        stream = request.stream,
+        "Responses API request"
+    );
+
+    // Record request start in stats
+    state
+        .stats
+        .record_request_start(&request.model, request.stream);
+
+    // Check for error injection
+    let error_injector = ErrorInjector::new(state.config.error_config());
+    if let Some(error) = error_injector.maybe_inject() {
+        tracing::warn!("Injecting error: {:?}", error);
+
+        let status = match error.status_code() {
+            429 => StatusCode::TOO_MANY_REQUESTS,
+            500 => StatusCode::INTERNAL_SERVER_ERROR,
+            503 => StatusCode::SERVICE_UNAVAILABLE,
+            504 => StatusCode::GATEWAY_TIMEOUT,
+            400 => StatusCode::BAD_REQUEST,
+            401 => StatusCode::UNAUTHORIZED,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+
+        // Record error in stats
+        state.stats.record_error(error.status_code());
+
+        let error_response = ResponsesErrorResponse {
+            error: crate::openai::ResponsesError::new(
+                error.to_error_response().error.error_type,
+                error.to_error_response().error.message,
+            ),
+        };
+
+        let mut response = Json(error_response).into_response();
+        *response.status_mut() = status;
+
+        if let Some(retry_after) = error.retry_after() {
+            response.headers_mut().insert(
+                header::RETRY_AFTER,
+                retry_after.to_string().parse().unwrap(),
+            );
+        }
+
+        return Ok(response);
+    }
+
+    // Get latency profile (use model-specific if not configured)
+    let latency =
+        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
+            state.config.latency_profile()
+        } else {
+            LatencyProfile::from_model(&request.model)
+        };
+
+    // Extract text from input for response generation
+    let input_text = extract_input_text(&request.input, &request.instructions);
+
+    // Generate response using the configured generator
+    // Create a minimal ChatCompletionRequest for the generator
+    let chat_request = crate::openai::ChatCompletionRequest {
+        model: request.model.clone(),
+        messages: vec![crate::openai::Message::user(&input_text)],
+        temperature: request.temperature,
+        top_p: request.top_p,
+        n: None,
+        stream: request.stream,
+        stop: None,
+        max_tokens: request.max_output_tokens,
+        max_completion_tokens: request.max_output_tokens,
+        presence_penalty: None,
+        frequency_penalty: None,
+        logit_bias: None,
+        user: None,
+        tools: None,
+        tool_choice: None,
+        response_format: None,
+        seed: None,
+    };
+
+    let generator = create_generator(
+        &state.config.response.generator,
+        state.config.response.target_tokens,
+    );
+    let content = generator.generate(&chat_request);
+
+    // Count tokens
+    let input_tokens =
+        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
+    let output_tokens =
+        crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
+
+    let usage = ResponsesUsage {
+        input_tokens: input_tokens as u32,
+        output_tokens: output_tokens as u32,
+        total_tokens: (input_tokens + output_tokens) as u32,
+        output_tokens_details: Some(OutputTokensDetails {
+            reasoning_tokens: 0,
+        }),
+    };
+
+    if request.stream {
+        // Streaming response
+        // Clone stats for the streaming completion callback
+        let stats = state.stats.clone();
+        let input_tok = usage.input_tokens;
+        let output_tok = usage.output_tokens;
+
+        let stream = ResponsesTokenStreamBuilder::new(&request.model, content)
+            .latency(latency)
+            .usage(usage)
+            .on_complete(move || {
+                stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
+            })
+            .build();
+
+        let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header(header::CONNECTION, "keep-alive")
+            .body(body)
+            .unwrap())
+    } else {
+        // Non-streaming response - simulate time to generate
+        let delay = latency.sample_ttft();
+        if !delay.is_zero() {
+            tokio::time::sleep(delay).await;
+        }
+
+        // Record request completion
+        state.stats.record_request_end(
+            request_start.elapsed(),
+            usage.input_tokens,
+            usage.output_tokens,
+        );
+
+        let response = ResponsesResponse::new(request.model.clone(), content, usage);
+        Ok(Json(response).into_response())
+    }
+}
+
+/// Extract text content from ResponsesInput for processing
+fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> String {
+    let mut parts = Vec::new();
+
+    // Add instructions if present
+    if let Some(instr) = instructions {
+        parts.push(instr.clone());
+    }
+
+    match input {
+        ResponsesInput::Text(text) => {
+            parts.push(text.clone());
+        }
+        ResponsesInput::Items(items) => {
+            for item in items {
+                if let InputItem::Message { role, content } = item {
+                    let role_str = match role {
+                        InputRole::User => "user",
+                        InputRole::Assistant => "assistant",
+                        InputRole::System => "system",
+                        InputRole::Developer => "developer",
+                    };
+
+                    let content_str = match content {
+                        MessageContent::Text(text) => text.clone(),
+                        MessageContent::Parts(content_parts) => content_parts
+                            .iter()
+                            .filter_map(|p| {
+                                if let crate::openai::ContentPart::InputText { text } = p {
+                                    Some(text.clone())
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                    };
+
+                    parts.push(format!("{}: {}", role_str, content_str));
+                }
+            }
+        }
+    }
+
+    parts.join("\n")
 }
 
 /// Count tokens in a chat request

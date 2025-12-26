@@ -107,6 +107,23 @@ Using `llmsim serve` allows for future expansion:
 - `llmsim mock` (future) - Run with mock configuration
 - `llmsim record` (future) - Proxy and record real API calls
 
+## API Endpoints
+
+### OpenAI Chat Completions API
+- `POST /v1/chat/completions` - Create a chat completion
+- `POST /openai/chat/completions` - Alias for compatibility
+
+### OpenAI Models API
+- `GET /v1/models` - List available models
+- `GET /v1/models/:model_id` - Get model details
+- `GET /openai/models` - Alias for compatibility
+- `GET /openai/models/:model_id` - Alias for compatibility
+
+### OpenAI Responses API
+- `POST /v1/responses` - Create a response (streaming and non-streaming)
+
+See `specs/responses-api.md` for detailed Responses API specification.
+
 ### Module Organization
 
 - **Public modules** (`openai`, `generator`, `latency`, `stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
