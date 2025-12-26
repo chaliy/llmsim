@@ -11,7 +11,16 @@
 //! - Error injection for testing error handling
 //! - Multiple response generators (lorem, echo, fixed, random)
 //!
-//! ## Example
+//! ## Usage
+//!
+//! ### As a CLI
+//!
+//! ```bash
+//! # Start the server
+//! llmsim serve --port 8080 --latency-profile gpt5
+//! ```
+//!
+//! ### As a Library
 //!
 //! ```rust,no_run
 //! use llmsim::{
@@ -24,18 +33,22 @@
 //! let generator = LoremGenerator::new(100);
 //!
 //! // Create a latency profile
-//! let latency = LatencyProfile::gpt4();
+//! let latency = LatencyProfile::gpt5();
 //!
 //! // Count tokens
-//! let tokens = llmsim::tokens::count_tokens("Hello, world!", "gpt-4").unwrap();
+//! let tokens = llmsim::tokens::count_tokens("Hello, world!", "gpt-5").unwrap();
 //! ```
 
+// Core library modules
 pub mod errors;
 pub mod generator;
 pub mod latency;
 pub mod openai;
 pub mod stream;
 pub mod tokens;
+
+// CLI module (for `llmsim serve` command)
+pub mod cli;
 
 // Re-export commonly used types
 pub use errors::{ErrorConfig, ErrorInjector, SimulatedError};

@@ -1,7 +1,7 @@
 // HTTP Handlers Module
 // Implements OpenAI-compatible API endpoints.
 
-use crate::state::AppState;
+use super::state::AppState;
 use axum::{
     body::Body,
     extract::{Path, State},
@@ -9,14 +9,14 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use futures::StreamExt;
-use llmsim::{
+use crate::{
     create_generator,
     openai::{
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, Model, ModelsResponse, Usage,
     },
     ErrorInjector, LatencyProfile, TokenStreamBuilder,
 };
+use futures::StreamExt;
 use std::sync::Arc;
 
 /// Health check endpoint
@@ -85,7 +85,7 @@ pub async fn chat_completions(
     // Count tokens
     let prompt_tokens = count_request_tokens(&request);
     let completion_tokens =
-        llmsim::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
+        crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let usage = Usage {
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
@@ -174,7 +174,7 @@ fn count_request_tokens(request: &ChatCompletionRequest) -> usize {
     for message in &request.messages {
         if let Some(content) = &message.content {
             total +=
-                llmsim::count_tokens_default(content).unwrap_or(content.split_whitespace().count());
+                crate::count_tokens_default(content).unwrap_or(content.split_whitespace().count());
         }
         // Add overhead for message formatting
         total += 4;
@@ -217,8 +217,8 @@ impl IntoResponse for AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::Config;
-    use llmsim::openai::Message;
+    use crate::cli::config::Config;
+    use crate::openai::Message;
 
     fn test_state() -> Arc<AppState> {
         Arc::new(AppState {

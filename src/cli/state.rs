@@ -1,6 +1,6 @@
 // Application State Module
 
-use crate::config::Config;
+use super::config::Config;
 
 /// Shared application state
 pub struct AppState {

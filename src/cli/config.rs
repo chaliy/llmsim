@@ -1,7 +1,7 @@
 // Server Configuration Module
 // Handles configuration from files and environment variables.
 
-use llmsim::{ErrorConfig, LatencyProfile};
+use crate::{ErrorConfig, LatencyProfile};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 

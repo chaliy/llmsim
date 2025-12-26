@@ -10,27 +10,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
-COPY crates/llmsim/Cargo.toml ./crates/llmsim/
-COPY crates/llmsim-server/Cargo.toml ./crates/llmsim-server/
 
 # Create dummy source files for dependency caching
-RUN mkdir -p crates/llmsim/src crates/llmsim-server/src \
-    && echo "pub fn dummy() {}" > crates/llmsim/src/lib.rs \
-    && echo "fn main() {}" > crates/llmsim-server/src/main.rs
+RUN mkdir -p src/cli src/openai \
+    && echo "pub fn dummy() {}" > src/lib.rs \
+    && echo "fn main() {}" > src/main.rs \
+    && echo "pub mod config; pub mod handlers; pub mod state; pub use config::{Config, ConfigError}; pub use state::AppState; pub async fn run_server(_config: Config) -> Result<(), Box<dyn std::error::Error>> { Ok(()) }" > src/cli/mod.rs \
+    && echo "pub struct Config; pub enum ConfigError {}" > src/cli/config.rs \
+    && echo "" > src/cli/handlers.rs \
+    && echo "pub struct AppState;" > src/cli/state.rs \
+    && echo "" > src/openai/mod.rs
 
 # Build dependencies (this layer is cached)
-RUN cargo build --release --package llmsim-server
+RUN cargo build --release
 
 # Remove dummy source files
-RUN rm -rf crates/llmsim/src crates/llmsim-server/src
+RUN rm -rf src
 
 # Copy actual source code
-COPY crates/llmsim/src ./crates/llmsim/src
-COPY crates/llmsim-server/src ./crates/llmsim-server/src
+COPY src ./src
 
 # Build the actual application
-RUN touch crates/llmsim/src/lib.rs crates/llmsim-server/src/main.rs \
-    && cargo build --release --package llmsim-server
+RUN touch src/lib.rs src/main.rs \
+    && cargo build --release
 
 # Runtime stage
 FROM debian:bookworm-slim
@@ -43,7 +45,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy the binary
-COPY --from=builder /app/target/release/llmsim-server /usr/local/bin/
+COPY --from=builder /app/target/release/llmsim /usr/local/bin/
 
 # Create non-root user
 RUN useradd -m -s /bin/bash llmsim
@@ -55,4 +57,4 @@ ENV LLMSIM_PORT=8080
 
 EXPOSE 8080
 
-ENTRYPOINT ["llmsim-server"]
+ENTRYPOINT ["llmsim", "serve"]
