@@ -189,7 +189,8 @@ impl LatencyProfile {
         let sample = if self.ttft_stddev_ms > 0 {
             let normal = Normal::new(self.ttft_mean_ms as f64, self.ttft_stddev_ms as f64)
                 .unwrap_or_else(|_| Normal::new(self.ttft_mean_ms as f64, 1.0).unwrap());
-            normal.sample(&mut rng).max(0.0) as u64
+            // Ensure minimum of 1ms when mean is non-zero
+            normal.sample(&mut rng).max(1.0) as u64
         } else {
             self.ttft_mean_ms
         };
@@ -207,7 +208,8 @@ impl LatencyProfile {
         let sample = if self.tbt_stddev_ms > 0 {
             let normal = Normal::new(self.tbt_mean_ms as f64, self.tbt_stddev_ms as f64)
                 .unwrap_or_else(|_| Normal::new(self.tbt_mean_ms as f64, 1.0).unwrap());
-            normal.sample(&mut rng).max(0.0) as u64
+            // Ensure minimum of 1ms when mean is non-zero
+            normal.sample(&mut rng).max(1.0) as u64
         } else {
             self.tbt_mean_ms
         };
