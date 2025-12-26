@@ -6,8 +6,7 @@ use serde::{Deserialize, Serialize};
 use std::path::Path;
 
 /// Server configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     #[serde(default)]
     pub server: ServerConfig,
@@ -20,7 +19,6 @@ pub struct Config {
     #[serde(default)]
     pub models: ModelsConfig,
 }
-
 
 impl Config {
     /// Load configuration from a YAML file
@@ -39,26 +37,35 @@ impl Config {
     pub fn latency_profile(&self) -> LatencyProfile {
         if let Some(ref profile) = self.latency.profile {
             match profile.to_lowercase().as_str() {
+                // GPT-5 family
+                "gpt5" | "gpt-5" => LatencyProfile::gpt5(),
+                "gpt5-mini" | "gpt-5-mini" => LatencyProfile::gpt5_mini(),
+                "gpt5-nano" | "gpt-5-nano" => LatencyProfile::gpt5_nano(),
+                // O-series reasoning models
+                "o1" | "o3" | "o-series" => LatencyProfile::o_series(),
+                // GPT-4 family
                 "gpt4" | "gpt-4" => LatencyProfile::gpt4(),
                 "gpt4o" | "gpt-4o" => LatencyProfile::gpt4o(),
-                "gpt35" | "gpt-3.5-turbo" => LatencyProfile::gpt35_turbo(),
+                // Claude family
                 "claude-opus" | "opus" => LatencyProfile::claude_opus(),
                 "claude-sonnet" | "sonnet" => LatencyProfile::claude_sonnet(),
                 "claude-haiku" | "haiku" => LatencyProfile::claude_haiku(),
+                // Gemini
                 "gemini" | "gemini-pro" => LatencyProfile::gemini_pro(),
+                // Special profiles
                 "instant" => LatencyProfile::instant(),
                 "fast" => LatencyProfile::fast(),
-                _ => LatencyProfile::gpt4(),
+                _ => LatencyProfile::gpt5(),
             }
         } else if self.latency.ttft_mean_ms.is_some() || self.latency.tbt_mean_ms.is_some() {
             LatencyProfile::new(
-                self.latency.ttft_mean_ms.unwrap_or(800),
-                self.latency.ttft_stddev_ms.unwrap_or(200),
-                self.latency.tbt_mean_ms.unwrap_or(50),
-                self.latency.tbt_stddev_ms.unwrap_or(15),
+                self.latency.ttft_mean_ms.unwrap_or(600),
+                self.latency.ttft_stddev_ms.unwrap_or(150),
+                self.latency.tbt_mean_ms.unwrap_or(40),
+                self.latency.tbt_stddev_ms.unwrap_or(12),
             )
         } else {
-            LatencyProfile::gpt4()
+            LatencyProfile::gpt5()
         }
     }
 
@@ -175,14 +182,31 @@ pub struct ModelsConfig {
 
 fn default_models() -> Vec<String> {
     vec![
+        // GPT-5 family
+        "gpt-5".to_string(),
+        "gpt-5-mini".to_string(),
+        "gpt-5-nano".to_string(),
+        "gpt-5.1".to_string(),
+        "gpt-5.1-mini".to_string(),
+        "gpt-5.1-nano".to_string(),
+        "gpt-5.2".to_string(),
+        // O-series reasoning models
+        "o1".to_string(),
+        "o1-mini".to_string(),
+        "o1-preview".to_string(),
+        "o3".to_string(),
+        "o3-mini".to_string(),
+        // GPT-4 family (legacy)
         "gpt-4".to_string(),
         "gpt-4-turbo".to_string(),
         "gpt-4o".to_string(),
         "gpt-4o-mini".to_string(),
-        "gpt-3.5-turbo".to_string(),
+        // Claude family
         "claude-3-opus-20240229".to_string(),
         "claude-3-sonnet-20240229".to_string(),
         "claude-3-haiku-20240307".to_string(),
+        "claude-sonnet-4-20250514".to_string(),
+        "claude-opus-4-20250514".to_string(),
     ]
 }
 

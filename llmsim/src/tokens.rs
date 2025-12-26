@@ -15,18 +15,18 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
     // Model to encoding mapping based on OpenAI's documentation
     let model_lower = model.to_lowercase();
 
-    // o200k_base: GPT-4o and newer models
-    if model_lower.contains("gpt-4o")
-        || model_lower.contains("o1")
-        || model_lower.contains("o3")
+    // o200k_base: GPT-5, GPT-4o, O-series and newer models
+    if model_lower.contains("gpt-5")
+        || model_lower.contains("gpt-4o")
+        || model_lower.starts_with("o1")
+        || model_lower.starts_with("o3")
         || model_lower.contains("chatgpt-4o")
     {
         return o200k_base().map_err(|e| TokenError::InitError(e.to_string()));
     }
 
-    // cl100k_base: GPT-4, GPT-3.5-turbo, text-embedding-ada-002
+    // cl100k_base: GPT-4, text-embedding, Claude, Gemini
     if model_lower.contains("gpt-4")
-        || model_lower.contains("gpt-3.5")
         || model_lower.contains("text-embedding")
         || model_lower.contains("claude")
         || model_lower.contains("gemini")
@@ -55,7 +55,7 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
 ///
 /// # Arguments
 /// * `text` - The text to tokenize
-/// * `model` - The model name (e.g., "gpt-4", "gpt-3.5-turbo", "claude-3-opus")
+/// * `model` - The model name (e.g., "gpt-5", "gpt-5-mini", "gpt-4", "claude-3-opus")
 ///
 /// # Returns
 /// The number of tokens in the text
@@ -169,10 +169,10 @@ mod tests {
     #[test]
     fn test_different_models() {
         let text = "Testing different models";
-        let gpt4_tokens = count_tokens(text, "gpt-4").unwrap();
-        let gpt35_tokens = count_tokens(text, "gpt-3.5-turbo").unwrap();
-        // Same encoding for these models
-        assert_eq!(gpt4_tokens, gpt35_tokens);
+        // GPT-5 and GPT-4o use the same encoding (o200k)
+        let gpt5_tokens = count_tokens(text, "gpt-5").unwrap();
+        let gpt4o_tokens = count_tokens(text, "gpt-4o").unwrap();
+        assert_eq!(gpt5_tokens, gpt4o_tokens);
     }
 
     #[test]
@@ -183,8 +183,21 @@ mod tests {
     }
 
     #[test]
-    fn test_gpt4o_model() {
-        let count = count_tokens("Hello", "gpt-4o").unwrap();
-        assert!(count > 0);
+    fn test_gpt5_models() {
+        // All GPT-5 variants should work
+        let count_gpt5 = count_tokens("Hello", "gpt-5").unwrap();
+        let count_mini = count_tokens("Hello", "gpt-5-mini").unwrap();
+        let count_nano = count_tokens("Hello", "gpt-5-nano").unwrap();
+        assert!(count_gpt5 > 0);
+        assert_eq!(count_gpt5, count_mini);
+        assert_eq!(count_gpt5, count_nano);
+    }
+
+    #[test]
+    fn test_o_series_models() {
+        let count_o1 = count_tokens("Hello", "o1-preview").unwrap();
+        let count_o3 = count_tokens("Hello", "o3-mini").unwrap();
+        assert!(count_o1 > 0);
+        assert_eq!(count_o1, count_o3);
     }
 }
