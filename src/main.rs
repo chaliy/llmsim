@@ -6,7 +6,7 @@
 //! Examples:
 //!   llmsim serve --port 8080
 //!   llmsim serve --config config.yaml
-//!   llmsim serve --latency-profile gpt5 --generator lorem
+//!   llmsim serve --generator echo --target-tokens 50
 
 use clap::{Parser, Subcommand};
 use llmsim::cli::{Config, ConfigError};
@@ -35,10 +35,6 @@ enum Commands {
         #[arg(long, default_value = "0.0.0.0")]
         host: String,
 
-        /// Latency profile (gpt5, gpt5-mini, gpt4, claude-sonnet, instant, etc.)
-        #[arg(long)]
-        latency_profile: Option<String>,
-
         /// Response generator (lorem, echo, random, fixed:text)
         #[arg(long, default_value = "lorem")]
         generator: String,
@@ -53,7 +49,6 @@ fn build_config(
     config_file: Option<String>,
     port: u16,
     host: String,
-    latency_profile: Option<String>,
     generator: String,
     target_tokens: usize,
 ) -> Result<Config, ConfigError> {
@@ -66,11 +61,6 @@ fn build_config(
     // Override with CLI arguments
     config.server.port = port;
     config.server.host = host;
-
-    if latency_profile.is_some() {
-        config.latency.profile = latency_profile;
-    }
-
     config.response.generator = generator;
     config.response.target_tokens = target_tokens;
 
@@ -95,11 +85,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             config,
             port,
             host,
-            latency_profile,
             generator,
             target_tokens,
         } => {
-            let config = build_config(config, port, host, latency_profile, generator, target_tokens)?;
+            let config = build_config(config, port, host, generator, target_tokens)?;
             llmsim::cli::run_server(config).await?;
         }
     }
