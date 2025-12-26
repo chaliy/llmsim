@@ -17,7 +17,7 @@
 //!
 //! ```bash
 //! # Start the server
-//! llmsim serve --port 8080 --latency-profile gpt5
+//! llmsim serve --port 8080
 //! ```
 //!
 //! ### As a Library

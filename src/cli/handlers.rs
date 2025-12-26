@@ -186,6 +186,7 @@ fn count_request_tokens(request: &ChatCompletionRequest) -> usize {
 
 /// Application error type
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum AppError {
     NotFound(String),
     BadRequest(String),
@@ -217,14 +218,7 @@ impl IntoResponse for AppError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::config::Config;
     use crate::openai::Message;
-
-    fn test_state() -> Arc<AppState> {
-        Arc::new(AppState {
-            config: Config::default(),
-        })
-    }
 
     #[test]
     fn test_count_request_tokens() {
