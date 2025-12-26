@@ -113,9 +113,9 @@
   - `--port` (default: 8080)
   - `--host` (default: 0.0.0.0)
   - `--config` (optional config file path)
-  - `--latency-profile` (gpt5, claude-sonnet, etc.)
   - `--generator` (lorem, echo, random, fixed:text)
   - `--target-tokens` (default: 100)
+  - Note: Latency is auto-derived from model in each request
 - [x] Create `src/cli/` module for server functionality
 - [x] Set up Axum router with graceful shutdown
 - [x] Add health check endpoint (`GET /health`)
