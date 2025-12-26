@@ -76,17 +76,7 @@ impl LatencyProfile {
         }
     }
 
-    /// GPT-5-nano profile - optimized for speed and low latency
-    pub fn gpt5_nano() -> Self {
-        Self {
-            ttft_mean_ms: 150,
-            ttft_stddev_ms: 40,
-            tbt_mean_ms: 10,
-            tbt_stddev_ms: 3,
-        }
-    }
-
-    /// O1/O3 reasoning model profile - slower due to chain-of-thought
+    /// O3/O4 reasoning model profile - slower due to chain-of-thought
     pub fn o_series() -> Self {
         Self {
             ttft_mean_ms: 2000,
@@ -161,14 +151,12 @@ impl LatencyProfile {
         let model_lower = model.to_lowercase();
 
         // GPT-5 family (check specific variants first)
-        if model_lower.contains("gpt-5-nano") || model_lower.contains("gpt-5.1-nano") {
-            Self::gpt5_nano()
-        } else if model_lower.contains("gpt-5-mini") || model_lower.contains("gpt-5.1-mini") {
+        if model_lower.contains("gpt-5-mini") {
             Self::gpt5_mini()
         } else if model_lower.contains("gpt-5") {
             Self::gpt5()
-        // O-series reasoning models
-        } else if model_lower.starts_with("o1") || model_lower.starts_with("o3") {
+        // O-series reasoning models (o3, o4)
+        } else if model_lower.starts_with("o3") || model_lower.starts_with("o4") {
             Self::o_series()
         // GPT-4 family
         } else if model_lower.contains("gpt-4o") {
@@ -251,8 +239,8 @@ mod tests {
         assert!(gpt5.ttft_mean_ms > 0);
         assert!(gpt5.tbt_mean_ms > 0);
 
-        let gpt5_nano = LatencyProfile::gpt5_nano();
-        assert!(gpt5_nano.ttft_mean_ms < gpt5.ttft_mean_ms); // GPT-5-nano should be faster
+        let gpt5_mini = LatencyProfile::gpt5_mini();
+        assert!(gpt5_mini.ttft_mean_ms < gpt5.ttft_mean_ms); // GPT-5-mini should be faster
 
         let instant = LatencyProfile::instant();
         assert_eq!(instant.ttft_mean_ms, 0);
@@ -263,10 +251,8 @@ mod tests {
     fn test_gpt5_family() {
         let gpt5 = LatencyProfile::gpt5();
         let gpt5_mini = LatencyProfile::gpt5_mini();
-        let gpt5_nano = LatencyProfile::gpt5_nano();
 
-        // Nano should be fastest, then mini, then standard
-        assert!(gpt5_nano.ttft_mean_ms < gpt5_mini.ttft_mean_ms);
+        // Mini should be faster than standard
         assert!(gpt5_mini.ttft_mean_ms < gpt5.ttft_mean_ms);
     }
 
@@ -313,22 +299,19 @@ mod tests {
             LatencyProfile::gpt5_mini().ttft_mean_ms
         );
 
-        let gpt5_nano = LatencyProfile::from_model("gpt-5-nano");
-        assert_eq!(
-            gpt5_nano.ttft_mean_ms,
-            LatencyProfile::gpt5_nano().ttft_mean_ms
-        );
-
-        // GPT-5.1 variants
+        // GPT-5.1/5.2 variants
         let gpt51 = LatencyProfile::from_model("gpt-5.1");
         assert_eq!(gpt51.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
 
-        // O-series reasoning models
-        let o1 = LatencyProfile::from_model("o1-preview");
-        assert_eq!(o1.ttft_mean_ms, LatencyProfile::o_series().ttft_mean_ms);
+        let gpt52 = LatencyProfile::from_model("gpt-5.2");
+        assert_eq!(gpt52.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
 
+        // O-series reasoning models (o3, o4)
         let o3 = LatencyProfile::from_model("o3-mini");
         assert_eq!(o3.ttft_mean_ms, LatencyProfile::o_series().ttft_mean_ms);
+
+        let o4 = LatencyProfile::from_model("o4-mini");
+        assert_eq!(o4.ttft_mean_ms, LatencyProfile::o_series().ttft_mean_ms);
 
         // GPT-4 family
         let gpt4 = LatencyProfile::from_model("gpt-4-turbo");

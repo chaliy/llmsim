@@ -18,8 +18,8 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
     // o200k_base: GPT-5, GPT-4o, O-series and newer models
     if model_lower.contains("gpt-5")
         || model_lower.contains("gpt-4o")
-        || model_lower.starts_with("o1")
         || model_lower.starts_with("o3")
+        || model_lower.starts_with("o4")
         || model_lower.contains("chatgpt-4o")
     {
         return o200k_base().map_err(|e| TokenError::InitError(e.to_string()));
@@ -187,17 +187,19 @@ mod tests {
         // All GPT-5 variants should work
         let count_gpt5 = count_tokens("Hello", "gpt-5").unwrap();
         let count_mini = count_tokens("Hello", "gpt-5-mini").unwrap();
-        let count_nano = count_tokens("Hello", "gpt-5-nano").unwrap();
+        let count_codex = count_tokens("Hello", "gpt-5-codex").unwrap();
+        let count_51 = count_tokens("Hello", "gpt-5.1").unwrap();
         assert!(count_gpt5 > 0);
         assert_eq!(count_gpt5, count_mini);
-        assert_eq!(count_gpt5, count_nano);
+        assert_eq!(count_gpt5, count_codex);
+        assert_eq!(count_gpt5, count_51);
     }
 
     #[test]
     fn test_o_series_models() {
-        let count_o1 = count_tokens("Hello", "o1-preview").unwrap();
         let count_o3 = count_tokens("Hello", "o3-mini").unwrap();
-        assert!(count_o1 > 0);
-        assert_eq!(count_o1, count_o3);
+        let count_o4 = count_tokens("Hello", "o4-mini").unwrap();
+        assert!(count_o3 > 0);
+        assert_eq!(count_o3, count_o4);
     }
 }
