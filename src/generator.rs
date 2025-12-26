@@ -386,7 +386,7 @@ mod tests {
     #[test]
     fn test_generator_names() {
         assert_eq!(LoremGenerator::default().name(), "lorem");
-        assert_eq!(EchoGenerator::default().name(), "echo");
+        assert_eq!(EchoGenerator.name(), "echo");
         assert_eq!(FixedGenerator::new("test").name(), "fixed");
         assert_eq!(RandomWordGenerator::default().name(), "random_word");
         assert_eq!(SequenceGenerator::default().name(), "sequence");
