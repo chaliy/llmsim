@@ -2,19 +2,19 @@
 // Implements OpenAI-compatible API endpoints.
 
 use super::state::AppState;
-use axum::{
-    body::Body,
-    extract::{Path, State},
-    http::{header, StatusCode},
-    response::{IntoResponse, Response},
-    Json,
-};
 use crate::{
     create_generator,
     openai::{
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, Model, ModelsResponse, Usage,
     },
     ErrorInjector, LatencyProfile, TokenStreamBuilder,
+};
+use axum::{
+    body::Body,
+    extract::{Path, State},
+    http::{header, StatusCode},
+    response::{IntoResponse, Response},
+    Json,
 };
 use futures::StreamExt;
 use std::sync::Arc;
