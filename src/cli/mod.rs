@@ -35,9 +35,9 @@ pub async fn run_server(config: Config) -> Result<(), Box<dyn std::error::Error>
 
     let app = Router::new()
         .route("/health", get(handlers::health))
-        .route("/v1/chat/completions", post(handlers::chat_completions))
-        .route("/v1/models", get(handlers::list_models))
-        .route("/v1/models/:model_id", get(handlers::get_model))
+        .route("/openai/chat/completions", post(handlers::chat_completions))
+        .route("/openai/models", get(handlers::list_models))
+        .route("/openai/models/:model_id", get(handlers::get_model))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);
