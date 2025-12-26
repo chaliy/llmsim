@@ -32,6 +32,15 @@ Using LangChain's OpenAI-compatible client:
 uv run examples/langchain_client.py
 ```
 
+## TypeScript Example
+
+Direct usage of the official OpenAI Node.js library:
+
+```bash
+npm install openai
+npx tsx examples/openai_client.ts
+```
+
 ### Custom Server URL
 
 ```bash
