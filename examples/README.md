@@ -35,5 +35,5 @@ uv run examples/langchain_client.py
 ### Custom Server URL
 
 ```bash
-LLMSIM_URL=http://localhost:9000/v1 uv run examples/openai_client.py
+LLMSIM_URL=http://localhost:9000/openai uv run examples/openai_client.py
 ```

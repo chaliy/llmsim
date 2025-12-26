@@ -25,7 +25,7 @@ Usage:
         ./examples/langchain_client.py
 
 Environment variables:
-    LLMSIM_URL: Server URL (default: http://localhost:8080/v1)
+    LLMSIM_URL: Server URL (default: http://localhost:8080/openai)
 """
 
 import os
@@ -36,7 +36,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 
 
 def main() -> None:
-    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/v1")
+    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/openai")
 
     print("=" * 50)
     print("LangChain + LLMSim Example")

@@ -24,7 +24,7 @@ Usage:
         ./examples/openai_client.py
 
 Environment variables:
-    LLMSIM_URL: Server URL (default: http://localhost:8080/v1)
+    LLMSIM_URL: Server URL (default: http://localhost:8080/openai)
 """
 
 import os
@@ -34,7 +34,7 @@ from openai import OpenAI
 
 
 def main() -> None:
-    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/v1")
+    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/openai")
 
     print("=" * 50)
     print("OpenAI SDK + LLMSim Example")
