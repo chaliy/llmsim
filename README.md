@@ -31,11 +31,8 @@ cargo install --git https://github.com/llmsim/llmsim.git
 ### CLI Server
 
 ```bash
-# Start with defaults (port 8080, lorem generator, gpt-5 latency)
+# Start with defaults (port 8080, lorem generator)
 llmsim serve
-
-# Custom port and latency profile
-llmsim serve --port 3000 --latency-profile claude-sonnet
 
 # All options
 llmsim serve \
