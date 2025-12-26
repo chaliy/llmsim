@@ -1,16 +1,24 @@
-[workspace]
-resolver = "2"
-members = ["crates/*"]
-
-[workspace.package]
+[package]
+name = "llmsim"
 version = "0.1.0"
 edition = "2021"
 license = "MIT"
 authors = ["LLMSim Contributors"]
 repository = "https://github.com/llmsim/llmsim"
 description = "LLM Traffic Simulator - A lightweight, high-performance LLM API simulator"
+readme = "README.md"
+keywords = ["llm", "openai", "simulator", "mock", "testing"]
+categories = ["development-tools::testing", "simulation", "web-programming::http-server"]
 
-[workspace.dependencies]
+[lib]
+name = "llmsim"
+path = "src/lib.rs"
+
+[[bin]]
+name = "llmsim"
+path = "src/main.rs"
+
+[dependencies]
 # Async runtime
 tokio = { version = "1.42", features = ["full"] }
 
@@ -45,5 +53,5 @@ futures = "0.3"
 async-stream = "0.3"
 thiserror = "2.0"
 
-# Testing
+[dev-dependencies]
 tokio-test = "0.4"
