@@ -1,0 +1,57 @@
+[package]
+name = "llmsim"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+authors = ["LLMSim Contributors"]
+repository = "https://github.com/llmsim/llmsim"
+description = "LLM Traffic Simulator - A lightweight, high-performance LLM API simulator"
+readme = "README.md"
+keywords = ["llm", "openai", "simulator", "mock", "testing"]
+categories = ["development-tools::testing", "simulation", "web-programming::http-server"]
+
+[lib]
+name = "llmsim"
+path = "src/lib.rs"
+
+[[bin]]
+name = "llmsim"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.42", features = ["full"] }
+
+# HTTP framework
+axum = { version = "0.7", features = ["macros"] }
+tower = "0.5"
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+# Token counting
+tiktoken-rs = "0.6"
+
+# Random numbers
+rand = "0.8"
+rand_distr = "0.4"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# CLI
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Utilities
+uuid = { version = "1.11", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
+async-stream = "0.3"
+thiserror = "2.0"
+
+[dev-dependencies]
+tokio-test = "0.4"

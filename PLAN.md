@@ -3,43 +3,44 @@
 ## Phase 1: Project Foundation
 
 ### 1.1 Project Setup
-- [ ] Initialize Cargo workspace with two crates:
-  - `llmsim` (library)
-  - `llmsim-server` (binary)
-- [ ] Configure `Cargo.toml` with metadata (name, version, license = "MIT", authors)
-- [ ] Add initial dependencies:
+- [x] Initialize single Cargo crate with library + binary:
+  - Library: `llmsim` (src/lib.rs)
+  - Binary: `llmsim` with `serve` subcommand (src/main.rs)
+- [x] Configure `Cargo.toml` with metadata (name, version, license = "MIT", authors)
+- [x] Add initial dependencies:
   - `tokio` (async runtime)
   - `axum` (HTTP framework)
   - `serde` / `serde_json` (serialization)
   - `tiktoken-rs` (token counting)
   - `rand` (latency randomization)
   - `tracing` (logging)
-- [ ] Create basic CI workflow (`.github/workflows/ci.yml`): format, lint, test
+  - `clap` (CLI argument parsing)
+- [x] Create basic CI workflow (`.github/workflows/ci.yml`): format, lint, test
 
 ### 1.2 Core Types
-- [ ] Define OpenAI API types in `llmsim/src/openai/types.rs`:
+- [x] Define OpenAI API types in `src/openai/types.rs`:
   - `ChatCompletionRequest`
   - `ChatCompletionResponse`
   - `ChatCompletionChunk` (for streaming)
   - `Message`, `Role`, `Usage`
   - `ToolCall`, `Function`
-- [ ] Add serde derive macros with proper field naming (`#[serde(rename_all = "snake_case")]`)
-- [ ] Write unit tests for serialization/deserialization against real API examples
+- [x] Add serde derive macros with proper field naming (`#[serde(rename_all = "snake_case")]`)
+- [x] Write unit tests for serialization/deserialization against real API examples
 
 ---
 
-## Phase 2: Core Library (llmsim)
+## Phase 2: Core Library
 
 ### 2.1 Token Counter
-- [ ] Create `llmsim/src/tokens.rs`
-- [ ] Implement `count_tokens(text: &str, model: &str) -> usize`
-- [ ] Support model-to-encoding mapping (gpt-4, gpt-3.5-turbo, claude, etc.)
-- [ ] Add fallback for unknown models
-- [ ] Write tests with known token counts
+- [x] Create `src/tokens.rs`
+- [x] Implement `count_tokens(text: &str, model: &str) -> usize`
+- [x] Support model-to-encoding mapping (gpt-4, gpt-5, claude, etc.)
+- [x] Add fallback for unknown models
+- [x] Write tests with known token counts
 
 ### 2.2 Latency Profiles
-- [ ] Create `llmsim/src/latency.rs`
-- [ ] Define `LatencyProfile` struct:
+- [x] Create `src/latency.rs`
+- [x] Define `LatencyProfile` struct:
   ```rust
   pub struct LatencyProfile {
       pub ttft_mean_ms: u64,      // Time to first token
@@ -48,40 +49,42 @@
       pub tbt_stddev_ms: u64,
   }
   ```
-- [ ] Implement preset profiles:
-  - `LatencyProfile::gpt4()` - slower, higher quality
-  - `LatencyProfile::gpt35_turbo()` - faster
+- [x] Implement preset profiles:
+  - `LatencyProfile::gpt5()` - flagship model
+  - `LatencyProfile::gpt5_mini()` - faster
+  - `LatencyProfile::o_series()` - reasoning models (o3, o4)
+  - `LatencyProfile::gpt4()` - GPT-4 family
   - `LatencyProfile::claude_opus()` - Anthropic flagship
   - `LatencyProfile::claude_sonnet()` - balanced
   - `LatencyProfile::instant()` - no delay (for fast tests)
-- [ ] Implement `LatencyProfile::sample_ttft()` and `sample_tbt()` using normal distribution
-- [ ] Write tests for distribution sanity
+- [x] Implement `LatencyProfile::sample_ttft()` and `sample_tbt()` using normal distribution
+- [x] Write tests for distribution sanity
 
 ### 2.3 Response Generator
-- [ ] Create `llmsim/src/generator.rs`
-- [ ] Implement `ResponseGenerator` trait:
+- [x] Create `src/generator.rs`
+- [x] Implement `ResponseGenerator` trait:
   ```rust
   pub trait ResponseGenerator: Send + Sync {
       fn generate(&self, request: &ChatCompletionRequest) -> String;
   }
   ```
-- [ ] Implement `LoremGenerator` - generates lorem ipsum text
-- [ ] Implement `EchoGenerator` - echoes back the user message
-- [ ] Implement `FixedGenerator` - returns configured fixed response
-- [ ] Implement `RandomWordGenerator` - random words to target token count
-- [ ] Add configurable response length (target token count)
+- [x] Implement `LoremGenerator` - generates lorem ipsum text
+- [x] Implement `EchoGenerator` - echoes back the user message
+- [x] Implement `FixedGenerator` - returns configured fixed response
+- [x] Implement `RandomWordGenerator` - random words to target token count
+- [x] Add configurable response length (target token count)
 
 ### 2.4 Streaming Engine
-- [ ] Create `llmsim/src/stream.rs`
-- [ ] Implement `TokenStream` that yields `ChatCompletionChunk` with delays
-- [ ] Support SSE format (`data: {...}\n\n`)
-- [ ] Handle `[DONE]` termination message
-- [ ] Integrate with latency profiles for inter-token delays
-- [ ] Write integration test with mock time
+- [x] Create `src/stream.rs`
+- [x] Implement `TokenStream` that yields `ChatCompletionChunk` with delays
+- [x] Support SSE format (`data: {...}\n\n`)
+- [x] Handle `[DONE]` termination message
+- [x] Integrate with latency profiles for inter-token delays
+- [x] Write integration tests
 
 ### 2.5 Error Injection
-- [ ] Create `llmsim/src/errors.rs`
-- [ ] Define `ErrorConfig`:
+- [x] Create `src/errors.rs`
+- [x] Define `ErrorConfig`:
   ```rust
   pub struct ErrorConfig {
       pub rate_limit_rate: f64,     // 0.0-1.0
@@ -90,54 +93,58 @@
       pub timeout_after_ms: u64,
   }
   ```
-- [ ] Implement error decision logic
-- [ ] Create proper OpenAI-format error responses
-- [ ] Write tests for error rate distribution
+- [x] Implement error decision logic
+- [x] Create proper OpenAI-format error responses
+- [x] Write tests for error rate distribution
 
 ### 2.6 Rate Limiter (Optional for Phase 2)
-- [ ] Create `llmsim/src/rate_limit.rs`
+- [ ] Create `src/rate_limit.rs`
 - [ ] Implement token bucket algorithm
 - [ ] Support requests-per-minute and tokens-per-minute limits
 - [ ] Return proper 429 responses with `Retry-After` header
 
 ---
 
-## Phase 3: Server Binary (llmsim-server)
+## Phase 3: Server CLI (`llmsim serve`)
 
 ### 3.1 Basic Server Setup
-- [ ] Create `llmsim-server/src/main.rs`
-- [ ] Set up Axum router with graceful shutdown
-- [ ] Add health check endpoint (`GET /health`)
-- [ ] Implement CLI argument parsing (clap):
+- [x] Create `src/main.rs` with clap subcommand structure
+- [x] Implement `llmsim serve` subcommand with CLI options:
   - `--port` (default: 8080)
   - `--host` (default: 0.0.0.0)
   - `--config` (optional config file path)
-- [ ] Add tracing/logging setup
+  - `--generator` (lorem, echo, random, fixed:text)
+  - `--target-tokens` (default: 100)
+  - Note: Latency is auto-derived from model in each request
+- [x] Create `src/cli/` module for server functionality
+- [x] Set up Axum router with graceful shutdown
+- [x] Add health check endpoint (`GET /health`)
+- [x] Add tracing/logging setup
 
 ### 3.2 OpenAI Chat Completions Endpoint
-- [ ] Implement `POST /v1/chat/completions`
-- [ ] Parse `ChatCompletionRequest`
-- [ ] Handle `stream: true` vs `stream: false`
-- [ ] Return proper `ChatCompletionResponse` with usage
-- [ ] Implement SSE streaming response
-- [ ] Add request validation
+- [x] Implement `POST /v1/chat/completions`
+- [x] Parse `ChatCompletionRequest`
+- [x] Handle `stream: true` vs `stream: false`
+- [x] Return proper `ChatCompletionResponse` with usage
+- [x] Implement SSE streaming response
+- [x] Add request validation
 - [ ] Write integration tests with reqwest
 
 ### 3.3 OpenAI Models Endpoint
-- [ ] Implement `GET /v1/models`
-- [ ] Return list of "available" models with metadata
-- [ ] Implement `GET /v1/models/{model_id}`
+- [x] Implement `GET /v1/models`
+- [x] Return list of "available" models with metadata (GPT-5, o-series, Claude, etc.)
+- [x] Implement `GET /v1/models/{model_id}`
 
 ### 3.4 Configuration
-- [ ] Create `llmsim-server/src/config.rs`
-- [ ] Support YAML/TOML config file:
+- [x] Create `src/cli/config.rs`
+- [x] Support YAML config file:
   ```yaml
   server:
     port: 8080
     host: "0.0.0.0"
 
   latency:
-    profile: "gpt4"  # or custom values
+    profile: "gpt5"  # or custom values
 
   response:
     generator: "lorem"
@@ -147,11 +154,11 @@
     rate_limit_rate: 0.01
     server_error_rate: 0.001
   ```
-- [ ] Support environment variable overrides
-- [ ] Validate configuration on startup
+- [x] CLI arguments override config file values
+- [x] Validate configuration on startup
 
 ### 3.5 Docker Support
-- [ ] Create `Dockerfile` (multi-stage build)
+- [x] Create `Dockerfile` (multi-stage build)
 - [ ] Create `docker-compose.yml` for easy local testing
 - [ ] Document Docker usage in README
 
@@ -286,4 +293,6 @@ Document significant technical decisions here as implementation progresses:
 1. **Axum over Actix-web**: Axum is simpler, well-integrated with tokio, and has good streaming support
 2. **tiktoken-rs**: Direct port of OpenAI's tokenizer, ensures accurate token counts
 3. **YAML for config**: More readable than JSON, better for complex configurations
-4. **Workspace structure**: Separates reusable library from binary, enables future crate publication
+4. **Single crate with lib + bin**: Simpler structure with `llmsim` as library and `llmsim serve` as CLI subcommand. Avoids workspace complexity while still exposing library for programmatic use
+5. **Clap subcommands**: Using `llmsim serve` pattern allows future expansion with additional commands (e.g., `llmsim mock`, `llmsim record`)
+6. **Model list from models.dev**: GPT-5 family, o-series reasoning models, and Claude models based on current production models

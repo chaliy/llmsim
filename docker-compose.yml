@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  llmsim:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - LLMSIM_HOST=0.0.0.0
+      - LLMSIM_PORT=8080
+      - LLMSIM_LATENCY_PROFILE=gpt4
+      - LLMSIM_GENERATOR=lorem
+      - LLMSIM_TARGET_TOKENS=100
+      - RUST_LOG=llmsim_server=info
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Example with custom configuration
+  llmsim-fast:
+    build: .
+    ports:
+      - "8081:8080"
+    environment:
+      - LLMSIM_LATENCY_PROFILE=instant
+      - LLMSIM_GENERATOR=echo
+    profiles:
+      - fast
