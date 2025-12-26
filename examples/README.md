@@ -8,21 +8,32 @@ Demonstrates library usage: token counting, generators, latency profiles, and st
 cargo run --example basic_usage
 ```
 
-## Python (LangChain) Example
+## Python Examples
 
-Shows how to connect to llmsim using LangChain's OpenAI-compatible client.
+Both Python examples require the server to be running first:
 
-1. Start the server:
-   ```bash
-   cargo run --release -- serve --port 8080
-   ```
-
-2. Run the client (in another terminal):
-   ```bash
-   uv run examples/langchain_client.py
-   ```
-
-To use a different server URL:
 ```bash
-LLMSIM_URL=http://localhost:9000/v1 uv run examples/langchain_client.py
+cargo run --release -- serve --port 8080
+```
+
+### OpenAI SDK
+
+Direct usage of the official OpenAI Python library:
+
+```bash
+uv run examples/openai_client.py
+```
+
+### LangChain
+
+Using LangChain's OpenAI-compatible client:
+
+```bash
+uv run examples/langchain_client.py
+```
+
+### Custom Server URL
+
+```bash
+LLMSIM_URL=http://localhost:9000/v1 uv run examples/openai_client.py
 ```
