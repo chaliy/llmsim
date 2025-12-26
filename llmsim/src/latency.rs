@@ -55,13 +55,44 @@ impl LatencyProfile {
         }
     }
 
-    /// GPT-3.5-turbo profile - faster, lower cost model
-    pub fn gpt35_turbo() -> Self {
+    /// GPT-5 profile - flagship model with reasoning capabilities
+    /// Designed for logic and multi-step tasks
+    pub fn gpt5() -> Self {
+        Self {
+            ttft_mean_ms: 600,
+            ttft_stddev_ms: 150,
+            tbt_mean_ms: 40,
+            tbt_stddev_ms: 12,
+        }
+    }
+
+    /// GPT-5-mini profile - lightweight version for cost-sensitive applications
+    pub fn gpt5_mini() -> Self {
         Self {
             ttft_mean_ms: 300,
             ttft_stddev_ms: 80,
             tbt_mean_ms: 20,
-            tbt_stddev_ms: 5,
+            tbt_stddev_ms: 6,
+        }
+    }
+
+    /// GPT-5-nano profile - optimized for speed and low latency
+    pub fn gpt5_nano() -> Self {
+        Self {
+            ttft_mean_ms: 150,
+            ttft_stddev_ms: 40,
+            tbt_mean_ms: 10,
+            tbt_stddev_ms: 3,
+        }
+    }
+
+    /// O1/O3 reasoning model profile - slower due to chain-of-thought
+    pub fn o_series() -> Self {
+        Self {
+            ttft_mean_ms: 2000,
+            ttft_stddev_ms: 500,
+            tbt_mean_ms: 30,
+            tbt_stddev_ms: 10,
         }
     }
 
@@ -129,23 +160,34 @@ impl LatencyProfile {
     pub fn from_model(model: &str) -> Self {
         let model_lower = model.to_lowercase();
 
-        if model_lower.contains("gpt-4o") {
+        // GPT-5 family (check specific variants first)
+        if model_lower.contains("gpt-5-nano") || model_lower.contains("gpt-5.1-nano") {
+            Self::gpt5_nano()
+        } else if model_lower.contains("gpt-5-mini") || model_lower.contains("gpt-5.1-mini") {
+            Self::gpt5_mini()
+        } else if model_lower.contains("gpt-5") {
+            Self::gpt5()
+        // O-series reasoning models
+        } else if model_lower.starts_with("o1") || model_lower.starts_with("o3") {
+            Self::o_series()
+        // GPT-4 family
+        } else if model_lower.contains("gpt-4o") {
             Self::gpt4o()
         } else if model_lower.contains("gpt-4") {
             Self::gpt4()
-        } else if model_lower.contains("gpt-3.5") {
-            Self::gpt35_turbo()
+        // Claude family
         } else if model_lower.contains("opus") {
             Self::claude_opus()
         } else if model_lower.contains("sonnet") {
             Self::claude_sonnet()
         } else if model_lower.contains("haiku") {
             Self::claude_haiku()
+        // Gemini
         } else if model_lower.contains("gemini") {
             Self::gemini_pro()
         } else {
-            // Default to GPT-4-like latency
-            Self::gpt4()
+            // Default to GPT-5-like latency
+            Self::gpt5()
         }
     }
 
@@ -205,16 +247,27 @@ mod tests {
 
     #[test]
     fn test_preset_profiles() {
-        let gpt4 = LatencyProfile::gpt4();
-        assert!(gpt4.ttft_mean_ms > 0);
-        assert!(gpt4.tbt_mean_ms > 0);
+        let gpt5 = LatencyProfile::gpt5();
+        assert!(gpt5.ttft_mean_ms > 0);
+        assert!(gpt5.tbt_mean_ms > 0);
 
-        let gpt35 = LatencyProfile::gpt35_turbo();
-        assert!(gpt35.ttft_mean_ms < gpt4.ttft_mean_ms); // GPT-3.5 should be faster
+        let gpt5_nano = LatencyProfile::gpt5_nano();
+        assert!(gpt5_nano.ttft_mean_ms < gpt5.ttft_mean_ms); // GPT-5-nano should be faster
 
         let instant = LatencyProfile::instant();
         assert_eq!(instant.ttft_mean_ms, 0);
         assert_eq!(instant.tbt_mean_ms, 0);
+    }
+
+    #[test]
+    fn test_gpt5_family() {
+        let gpt5 = LatencyProfile::gpt5();
+        let gpt5_mini = LatencyProfile::gpt5_mini();
+        let gpt5_nano = LatencyProfile::gpt5_nano();
+
+        // Nano should be fastest, then mini, then standard
+        assert!(gpt5_nano.ttft_mean_ms < gpt5_mini.ttft_mean_ms);
+        assert!(gpt5_mini.ttft_mean_ms < gpt5.ttft_mean_ms);
     }
 
     #[test]
@@ -250,17 +303,46 @@ mod tests {
 
     #[test]
     fn test_from_model() {
+        // GPT-5 family
+        let gpt5 = LatencyProfile::from_model("gpt-5");
+        assert_eq!(gpt5.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
+
+        let gpt5_mini = LatencyProfile::from_model("gpt-5-mini");
+        assert_eq!(
+            gpt5_mini.ttft_mean_ms,
+            LatencyProfile::gpt5_mini().ttft_mean_ms
+        );
+
+        let gpt5_nano = LatencyProfile::from_model("gpt-5-nano");
+        assert_eq!(
+            gpt5_nano.ttft_mean_ms,
+            LatencyProfile::gpt5_nano().ttft_mean_ms
+        );
+
+        // GPT-5.1 variants
+        let gpt51 = LatencyProfile::from_model("gpt-5.1");
+        assert_eq!(gpt51.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
+
+        // O-series reasoning models
+        let o1 = LatencyProfile::from_model("o1-preview");
+        assert_eq!(o1.ttft_mean_ms, LatencyProfile::o_series().ttft_mean_ms);
+
+        let o3 = LatencyProfile::from_model("o3-mini");
+        assert_eq!(o3.ttft_mean_ms, LatencyProfile::o_series().ttft_mean_ms);
+
+        // GPT-4 family
         let gpt4 = LatencyProfile::from_model("gpt-4-turbo");
         assert_eq!(gpt4.ttft_mean_ms, LatencyProfile::gpt4().ttft_mean_ms);
 
+        let gpt4o = LatencyProfile::from_model("gpt-4o-mini");
+        assert_eq!(gpt4o.ttft_mean_ms, LatencyProfile::gpt4o().ttft_mean_ms);
+
+        // Claude family
         let claude = LatencyProfile::from_model("claude-3-opus-20240229");
         assert_eq!(
             claude.ttft_mean_ms,
             LatencyProfile::claude_opus().ttft_mean_ms
         );
-
-        let gpt4o = LatencyProfile::from_model("gpt-4o-mini");
-        assert_eq!(gpt4o.ttft_mean_ms, LatencyProfile::gpt4o().ttft_mean_ms);
     }
 
     #[test]
