@@ -12,16 +12,20 @@ This script demonstrates connecting to a running llmsim server using the
 official OpenAI Python library. The server simulates LLM responses with
 realistic latency without running actual models.
 
+Server endpoints:
+    POST /openai/chat/completions - Chat completions (streaming supported)
+    GET  /openai/models           - List available models
+    GET  /openai/models/:id       - Get model details
+
 Prerequisites:
     Start the llmsim server first:
+        llmsim serve --port 8080
+
+    Or from source:
         cargo run --release -- serve --port 8080
 
 Usage:
     uv run examples/openai_client.py
-
-    Or make executable and run directly:
-        chmod +x examples/openai_client.py
-        ./examples/openai_client.py
 
 Environment variables:
     LLMSIM_URL: Server URL (default: http://localhost:8080/openai)
@@ -66,7 +70,7 @@ def main() -> None:
     except Exception as e:
         print(f"Error: {e}")
         print("\nMake sure the llmsim server is running:")
-        print("  cargo run --release -- serve --port 8080")
+        print("  llmsim serve --port 8080")
         sys.exit(1)
     print()
 
