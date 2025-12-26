@@ -10,26 +10,26 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Copy manifests
 COPY Cargo.toml Cargo.lock ./
-COPY llmsim/Cargo.toml ./llmsim/
-COPY llmsim-server/Cargo.toml ./llmsim-server/
+COPY crates/llmsim/Cargo.toml ./crates/llmsim/
+COPY crates/llmsim-server/Cargo.toml ./crates/llmsim-server/
 
 # Create dummy source files for dependency caching
-RUN mkdir -p llmsim/src llmsim-server/src \
-    && echo "pub fn dummy() {}" > llmsim/src/lib.rs \
-    && echo "fn main() {}" > llmsim-server/src/main.rs
+RUN mkdir -p crates/llmsim/src crates/llmsim-server/src \
+    && echo "pub fn dummy() {}" > crates/llmsim/src/lib.rs \
+    && echo "fn main() {}" > crates/llmsim-server/src/main.rs
 
 # Build dependencies (this layer is cached)
 RUN cargo build --release --package llmsim-server
 
 # Remove dummy source files
-RUN rm -rf llmsim/src llmsim-server/src
+RUN rm -rf crates/llmsim/src crates/llmsim-server/src
 
 # Copy actual source code
-COPY llmsim/src ./llmsim/src
-COPY llmsim-server/src ./llmsim-server/src
+COPY crates/llmsim/src ./crates/llmsim/src
+COPY crates/llmsim-server/src ./crates/llmsim-server/src
 
 # Build the actual application
-RUN touch llmsim/src/lib.rs llmsim-server/src/main.rs \
+RUN touch crates/llmsim/src/lib.rs crates/llmsim-server/src/main.rs \
     && cargo build --release --package llmsim-server
 
 # Runtime stage
