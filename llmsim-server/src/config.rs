@@ -40,9 +40,8 @@ impl Config {
                 // GPT-5 family
                 "gpt5" | "gpt-5" => LatencyProfile::gpt5(),
                 "gpt5-mini" | "gpt-5-mini" => LatencyProfile::gpt5_mini(),
-                "gpt5-nano" | "gpt-5-nano" => LatencyProfile::gpt5_nano(),
-                // O-series reasoning models
-                "o1" | "o3" | "o-series" => LatencyProfile::o_series(),
+                // O-series reasoning models (o3, o4)
+                "o3" | "o4" | "o-series" => LatencyProfile::o_series(),
                 // GPT-4 family
                 "gpt4" | "gpt-4" => LatencyProfile::gpt4(),
                 "gpt4o" | "gpt-4o" => LatencyProfile::gpt4o(),
@@ -182,31 +181,33 @@ pub struct ModelsConfig {
 
 fn default_models() -> Vec<String> {
     vec![
-        // GPT-5 family
+        // GPT-5 family (from models.dev)
         "gpt-5".to_string(),
         "gpt-5-mini".to_string(),
-        "gpt-5-nano".to_string(),
+        "gpt-5-codex".to_string(),
         "gpt-5.1".to_string(),
-        "gpt-5.1-mini".to_string(),
-        "gpt-5.1-nano".to_string(),
+        "gpt-5.1-codex".to_string(),
+        "gpt-5.1-codex-mini".to_string(),
+        "gpt-5.1-codex-max".to_string(),
         "gpt-5.2".to_string(),
         // O-series reasoning models
-        "o1".to_string(),
-        "o1-mini".to_string(),
-        "o1-preview".to_string(),
         "o3".to_string(),
         "o3-mini".to_string(),
-        // GPT-4 family (legacy)
+        "o4-mini".to_string(),
+        // GPT-4 family
         "gpt-4".to_string(),
         "gpt-4-turbo".to_string(),
         "gpt-4o".to_string(),
         "gpt-4o-mini".to_string(),
+        "gpt-4.1".to_string(),
         // Claude family
-        "claude-3-opus-20240229".to_string(),
-        "claude-3-sonnet-20240229".to_string(),
-        "claude-3-haiku-20240307".to_string(),
-        "claude-sonnet-4-20250514".to_string(),
-        "claude-opus-4-20250514".to_string(),
+        "claude-3.5-sonnet".to_string(),
+        "claude-3.7-sonnet".to_string(),
+        "claude-sonnet-4".to_string(),
+        "claude-sonnet-4.5".to_string(),
+        "claude-opus-4".to_string(),
+        "claude-opus-4.5".to_string(),
+        "claude-haiku-4.5".to_string(),
     ]
 }
 
