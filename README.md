@@ -103,35 +103,6 @@ LLMSim-specific endpoints:
 |----------|--------|-------------|
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
 
-### Stats Response
-
-```json
-{
-  "uptime_secs": 3600,
-  "total_requests": 15000,
-  "active_requests": 5,
-  "streaming_requests": 12000,
-  "non_streaming_requests": 3000,
-  "completions_requests": 10000,
-  "responses_requests": 5000,
-  "prompt_tokens": 500000,
-  "completion_tokens": 1500000,
-  "total_tokens": 2000000,
-  "total_errors": 150,
-  "rate_limit_errors": 100,
-  "server_errors": 30,
-  "timeout_errors": 20,
-  "requests_per_second": 4.2,
-  "avg_latency_ms": 245.5,
-  "min_latency_ms": 50.0,
-  "max_latency_ms": 2500.0,
-  "model_requests": {
-    "gpt-5": 10000,
-    "gpt-4o": 5000
-  }
-}
-```
-
 ## Configuration
 
 ### YAML Config File
