@@ -73,7 +73,8 @@ impl App {
                     // Calculate token rate
                     let elapsed = self.last_fetch.elapsed().as_secs_f64();
                     if elapsed > 0.0 && self.last_total_tokens > 0 {
-                        let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
+                        let token_diff =
+                            snapshot.total_tokens.saturating_sub(self.last_total_tokens);
                         let token_rate = token_diff as f64 / elapsed;
                         self.tokens_history.push(token_rate);
                         if self.tokens_history.len() > 60 {

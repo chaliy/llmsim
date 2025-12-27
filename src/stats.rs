@@ -116,7 +116,12 @@ impl Stats {
     }
 
     /// Record the completion of a request
-    pub fn record_request_end(&self, latency: Duration, prompt_tokens: u32, completion_tokens: u32) {
+    pub fn record_request_end(
+        &self,
+        latency: Duration,
+        prompt_tokens: u32,
+        completion_tokens: u32,
+    ) {
         self.active_requests.fetch_sub(1, ORDERING);
         self.completed_requests.fetch_add(1, ORDERING);
 

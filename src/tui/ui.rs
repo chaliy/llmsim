@@ -15,11 +15,11 @@ pub fn draw(f: &mut Frame, app: &App) {
         .direction(Direction::Vertical)
         .margin(1)
         .constraints([
-            Constraint::Length(3),  // Header
-            Constraint::Length(8),  // Request stats + Token stats
-            Constraint::Length(8),  // Latency + Errors
-            Constraint::Min(8),     // Charts
-            Constraint::Length(1),  // Footer
+            Constraint::Length(3), // Header
+            Constraint::Length(8), // Request stats + Token stats
+            Constraint::Length(8), // Latency + Errors
+            Constraint::Min(8),    // Charts
+            Constraint::Length(1), // Footer
         ])
         .split(f.area());
 
@@ -44,7 +44,10 @@ fn draw_header(f: &mut Frame, app: &App, area: Rect) {
     };
 
     let header = Paragraph::new(Line::from(vec![
-        Span::styled("  LLMSim Stats Dashboard  ", Style::default().fg(Color::Cyan).bold()),
+        Span::styled(
+            "  LLMSim Stats Dashboard  ",
+            Style::default().fg(Color::Cyan).bold(),
+        ),
         Span::raw(" │ "),
         status,
         Span::raw(" │ Uptime: "),
@@ -81,7 +84,10 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
     let rows = vec![
         Row::new(vec![
             Span::raw("Total Requests"),
-            Span::styled(format_number(total), Style::default().fg(Color::Green).bold()),
+            Span::styled(
+                format_number(total),
+                Style::default().fg(Color::Green).bold(),
+            ),
         ]),
         Row::new(vec![
             Span::raw("Active Requests"),
@@ -100,22 +106,31 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Row::new(vec![
             Span::raw("Non-Streaming"),
-            Span::styled(format_number(non_streaming), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format_number(non_streaming),
+                Style::default().fg(Color::Magenta),
+            ),
         ]),
         Row::new(vec![
             Span::raw("Requests/sec"),
-            Span::styled(format!("{:.2}", rps), Style::default().fg(Color::Green).bold()),
+            Span::styled(
+                format!("{:.2}", rps),
+                Style::default().fg(Color::Green).bold(),
+            ),
         ]),
     ];
 
-    let table = Table::new(rows, [Constraint::Percentage(60), Constraint::Percentage(40)])
-        .block(
-            Block::default()
-                .title(" Requests ")
-                .title_style(Style::default().fg(Color::Green).bold())
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Green)),
-        );
+    let table = Table::new(
+        rows,
+        [Constraint::Percentage(60), Constraint::Percentage(40)],
+    )
+    .block(
+        Block::default()
+            .title(" Requests ")
+            .title_style(Style::default().fg(Color::Green).bold())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Green)),
+    );
 
     f.render_widget(table, area);
 }
@@ -141,26 +156,38 @@ fn draw_token_stats(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Row::new(vec![
             Span::raw("Completion Tokens"),
-            Span::styled(format_number(completion), Style::default().fg(Color::Magenta)),
+            Span::styled(
+                format_number(completion),
+                Style::default().fg(Color::Magenta),
+            ),
         ]),
         Row::new(vec![
             Span::raw("Total Tokens"),
-            Span::styled(format_number(total), Style::default().fg(Color::Cyan).bold()),
+            Span::styled(
+                format_number(total),
+                Style::default().fg(Color::Cyan).bold(),
+            ),
         ]),
         Row::new(vec![
             Span::raw("Tokens/sec"),
-            Span::styled(format!("{:.1}", token_rate), Style::default().fg(Color::Green)),
+            Span::styled(
+                format!("{:.1}", token_rate),
+                Style::default().fg(Color::Green),
+            ),
         ]),
     ];
 
-    let table = Table::new(rows, [Constraint::Percentage(60), Constraint::Percentage(40)])
-        .block(
-            Block::default()
-                .title(" Tokens ")
-                .title_style(Style::default().fg(Color::Cyan).bold())
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Cyan)),
-        );
+    let table = Table::new(
+        rows,
+        [Constraint::Percentage(60), Constraint::Percentage(40)],
+    )
+    .block(
+        Block::default()
+            .title(" Tokens ")
+            .title_style(Style::default().fg(Color::Cyan).bold())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Cyan)),
+    );
 
     f.render_widget(table, area);
 }
@@ -204,14 +231,17 @@ fn draw_latency_stats(f: &mut Frame, app: &App, area: Rect) {
         ]),
     ];
 
-    let table = Table::new(rows, [Constraint::Percentage(50), Constraint::Percentage(50)])
-        .block(
-            Block::default()
-                .title(" Latency ")
-                .title_style(Style::default().fg(Color::Yellow).bold())
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Yellow)),
-        );
+    let table = Table::new(
+        rows,
+        [Constraint::Percentage(50), Constraint::Percentage(50)],
+    )
+    .block(
+        Block::default()
+            .title(" Latency ")
+            .title_style(Style::default().fg(Color::Yellow).bold())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)),
+    );
 
     f.render_widget(table, area);
 }
@@ -245,7 +275,10 @@ fn draw_error_stats(f: &mut Frame, app: &App, area: Rect) {
         ]),
         Row::new(vec![
             Span::raw("Rate Limit (429)"),
-            Span::styled(format!("{}", rate_limit), Style::default().fg(Color::Yellow)),
+            Span::styled(
+                format!("{}", rate_limit),
+                Style::default().fg(Color::Yellow),
+            ),
         ]),
         Row::new(vec![
             Span::raw("Server (5xx)"),
@@ -257,14 +290,17 @@ fn draw_error_stats(f: &mut Frame, app: &App, area: Rect) {
         ]),
     ];
 
-    let table = Table::new(rows, [Constraint::Percentage(60), Constraint::Percentage(40)])
-        .block(
-            Block::default()
-                .title(" Errors ")
-                .title_style(Style::default().fg(Color::Red).bold())
-                .borders(Borders::ALL)
-                .border_style(Style::default().fg(Color::Red)),
-        );
+    let table = Table::new(
+        rows,
+        [Constraint::Percentage(60), Constraint::Percentage(40)],
+    )
+    .block(
+        Block::default()
+            .title(" Errors ")
+            .title_style(Style::default().fg(Color::Red).bold())
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Red)),
+    );
 
     f.render_widget(table, area);
 }
@@ -293,7 +329,10 @@ fn draw_sparklines(f: &mut Frame, app: &App, area: Rect) {
     let rps_sparkline = Sparkline::default()
         .block(
             Block::default()
-                .title(format!(" RPS (current: {:.2}, max: {:.2}) ", current_rps, max_rps))
+                .title(format!(
+                    " RPS (current: {:.2}, max: {:.2}) ",
+                    current_rps, max_rps
+                ))
                 .title_style(Style::default().fg(Color::Green))
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(Color::Green)),
@@ -328,9 +367,7 @@ fn draw_sparklines(f: &mut Frame, app: &App, area: Rect) {
 fn draw_model_chart(f: &mut Frame, app: &App, area: Rect) {
     let stats = app.stats.as_ref();
 
-    let model_requests = stats
-        .map(|s| s.model_requests.clone())
-        .unwrap_or_default();
+    let model_requests = stats.map(|s| s.model_requests.clone()).unwrap_or_default();
 
     if model_requests.is_empty() {
         let empty = Paragraph::new("No requests yet")
@@ -380,7 +417,11 @@ fn draw_model_chart(f: &mut Frame, app: &App, area: Rect) {
         .bar_width(3)
         .bar_gap(1)
         .bar_style(Style::default().fg(Color::Magenta))
-        .value_style(Style::default().fg(Color::White).add_modifier(Modifier::BOLD));
+        .value_style(
+            Style::default()
+                .fg(Color::White)
+                .add_modifier(Modifier::BOLD),
+        );
 
     f.render_widget(bar_chart, area);
 }
