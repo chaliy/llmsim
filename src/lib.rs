@@ -44,11 +44,15 @@ pub mod errors;
 pub mod generator;
 pub mod latency;
 pub mod openai;
+pub mod stats;
 pub mod stream;
 pub mod tokens;
 
 // CLI module (for `llmsim serve` command)
 pub mod cli;
+
+// TUI module (for `llmsim stats` command)
+pub mod tui;
 
 // Re-export commonly used types
 pub use errors::{ErrorConfig, ErrorInjector, SimulatedError};
@@ -57,5 +61,6 @@ pub use generator::{
     ResponseGenerator, SequenceGenerator,
 };
 pub use latency::LatencyProfile;
+pub use stats::{new_shared_stats, SharedStats, Stats, StatsSnapshot};
 pub use stream::{TokenStream, TokenStreamBuilder};
 pub use tokens::{count_tokens, count_tokens_default, TokenCounter, TokenError};

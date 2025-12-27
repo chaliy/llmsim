@@ -19,6 +19,8 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
 - **Model-Specific Profiles** - GPT-5, GPT-4, Claude, Gemini latency profiles
+- **Real-time Stats Dashboard** - TUI dashboard with live metrics (requests, tokens, latency, errors)
+- **Stats API** - JSON endpoint for programmatic access to server metrics
 
 ## Installation
 
@@ -34,16 +36,32 @@ cargo install --git https://github.com/llmsim/llmsim.git
 # Start with defaults (port 8080, lorem generator)
 llmsim serve
 
+# Start with real-time stats dashboard (TUI)
+llmsim serve --tui
+
 # All options
 llmsim serve \
   --port 8080 \
   --host 0.0.0.0 \
   --generator lorem \
-  --target-tokens 150
+  --target-tokens 150 \
+  --tui
 
 # Using config file
 llmsim serve --config config.yaml
 ```
+
+### Stats Dashboard
+
+The `--tui` flag launches an interactive terminal dashboard showing real-time metrics:
+
+- **Requests**: Total, active, streaming vs non-streaming, requests/sec
+- **Tokens**: Prompt, completion, total, tokens/sec
+- **Latency**: Average, min, max response times
+- **Errors**: Total errors, rate limits (429), server errors (5xx), timeouts
+- **Charts**: RPS and token rate sparklines, model distribution
+
+Controls: `q` to quit, `r` to force refresh.
 
 ### As a Library
 
@@ -75,6 +93,39 @@ OpenAI-compatible endpoints:
 | `/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/v1/models` | GET | List available models |
 | `/v1/models/{model_id}` | GET | Get specific model details |
+
+LLMSim-specific endpoints:
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/llmsim/stats` | GET | Real-time server statistics (JSON) |
+
+### Stats Response
+
+```json
+{
+  "uptime_secs": 3600,
+  "total_requests": 15000,
+  "active_requests": 5,
+  "streaming_requests": 12000,
+  "non_streaming_requests": 3000,
+  "prompt_tokens": 500000,
+  "completion_tokens": 1500000,
+  "total_tokens": 2000000,
+  "total_errors": 150,
+  "rate_limit_errors": 100,
+  "server_errors": 30,
+  "timeout_errors": 20,
+  "requests_per_second": 4.2,
+  "avg_latency_ms": 245.5,
+  "min_latency_ms": 50.0,
+  "max_latency_ms": 2500.0,
+  "model_requests": {
+    "gpt-5": 10000,
+    "gpt-4o": 5000
+  }
+}
+```
 
 ## Configuration
 

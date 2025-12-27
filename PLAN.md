@@ -228,7 +228,29 @@
 - [ ] Support regex patterns
 - [ ] Add mock priority/ordering
 
-### 6.2 Metrics & Observability
+### 6.2 Real-time Stats & TUI Dashboard
+- [x] Create `src/stats.rs` with thread-safe atomic counters:
+  - Request metrics: total, active, streaming, non-streaming
+  - Token metrics: prompt, completion, total
+  - Error tracking by status code (429, 5xx, 504)
+  - Latency: average, min, max
+  - Per-model request counts
+  - RPS: rolling 60-second window calculation
+- [x] Add stats endpoint (`GET /llmsim/stats`) returning JSON snapshot
+- [x] Create `src/tui/` module with Ratatui dashboard:
+  - `app.rs`: Event loop, state management, HTTP polling
+  - `ui.rs`: Widget layout and rendering
+- [x] TUI features:
+  - Real-time updating (200ms refresh)
+  - Request and token statistics panels
+  - Latency and error metrics
+  - RPS and token rate sparkline charts
+  - Model distribution bar chart
+  - Keyboard controls (q=quit, r=refresh)
+- [x] Add `--tui` flag to `llmsim serve` command
+- [x] Add `on_complete` callback to TokenStreamBuilder for streaming stats
+
+### 6.3 Metrics & Observability (Prometheus)
 - [ ] Add Prometheus metrics endpoint (`/metrics`)
 - [ ] Track:
   - Request count by endpoint and model
@@ -238,7 +260,7 @@
   - Active connections
 - [ ] Add structured logging with request IDs
 
-### 6.3 Record/Replay Mode
+### 6.4 Record/Replay Mode
 - [ ] Implement proxy mode to real APIs
 - [ ] Record requests/responses to file
 - [ ] Replay recorded sessions
@@ -296,3 +318,7 @@ Document significant technical decisions here as implementation progresses:
 4. **Single crate with lib + bin**: Simpler structure with `llmsim` as library and `llmsim serve` as CLI subcommand. Avoids workspace complexity while still exposing library for programmatic use
 5. **Clap subcommands**: Using `llmsim serve` pattern allows future expansion with additional commands (e.g., `llmsim mock`, `llmsim record`)
 6. **Model list from models.dev**: GPT-5 family, o-series reasoning models, and Claude models based on current production models
+7. **Ratatui for TUI**: Leading Rust TUI library (fork of tui-rs), used by Codex CLI. Provides sub-millisecond rendering, rich widgets (sparklines, bar charts), and good documentation
+8. **Atomic counters for stats**: Thread-safe statistics using `std::sync::atomic` with relaxed ordering for minimal contention
+9. **Stats under /llmsim prefix**: Keep LLMSim-specific endpoints separate from OpenAI-compatible /v1 routes
+10. **TUI as --tui flag**: Integrate dashboard into serve command rather than separate subcommand for simpler UX
