@@ -71,8 +71,9 @@ Examples:
 - `GET /openai/v1/models` - List available models
 - `GET /openai/v1/models/:id` - Get model details
 
-**Other endpoints:**
+**System endpoints:**
 - `GET /health` - Health check
+- `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
 
 See `specs/api-endpoints.md` for the full specification.
 

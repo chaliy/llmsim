@@ -50,6 +50,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check endpoint |
+| `GET` | `/llmsim/stats` | Server statistics (requests, tokens, latency) |
 
 ### R5: SDK Compatibility
 
