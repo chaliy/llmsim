@@ -46,9 +46,11 @@ pub async fn chat_completions(
     );
 
     // Record request start in stats
-    state
-        .stats
-        .record_request_start(&request.model, request.stream, EndpointType::ChatCompletions);
+    state.stats.record_request_start(
+        &request.model,
+        request.stream,
+        EndpointType::ChatCompletions,
+    );
 
     // Check for error injection
     let error_injector = ErrorInjector::new(state.config.error_config());

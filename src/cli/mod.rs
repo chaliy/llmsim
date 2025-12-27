@@ -47,7 +47,10 @@ pub async fn run_server_with_stats(
         .route("/health", get(handlers::health))
         .route("/llmsim/stats", get(handlers::get_stats))
         // OpenAI Chat Completions API
-        .route("/openai/v1/chat/completions", post(handlers::chat_completions))
+        .route(
+            "/openai/v1/chat/completions",
+            post(handlers::chat_completions),
+        )
         // OpenAI Models API
         .route("/openai/v1/models", get(handlers::list_models))
         .route("/openai/v1/models/:model_id", get(handlers::get_model))
