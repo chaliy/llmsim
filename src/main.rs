@@ -2,14 +2,17 @@
 //!
 //! Usage:
 //!   llmsim serve [OPTIONS]    Start the HTTP server
+//!   llmsim stats [OPTIONS]    Show real-time stats dashboard
 //!
 //! Examples:
 //!   llmsim serve --port 8080
 //!   llmsim serve --config config.yaml
 //!   llmsim serve --generator echo --target-tokens 50
+//!   llmsim stats --url http://localhost:8080
 
 use clap::{Parser, Subcommand};
 use llmsim::cli::{Config, ConfigError};
+use llmsim::tui::{run_dashboard, DashboardConfig};
 
 #[derive(Parser)]
 #[command(name = "llmsim")]
@@ -43,6 +46,17 @@ enum Commands {
         #[arg(long, default_value = "100")]
         target_tokens: usize,
     },
+
+    /// Show real-time stats dashboard (TUI)
+    Stats {
+        /// LLMSim server URL
+        #[arg(short, long, default_value = "http://127.0.0.1:8080")]
+        url: String,
+
+        /// Refresh interval in milliseconds
+        #[arg(short, long, default_value = "200")]
+        refresh: u64,
+    },
 }
 
 fn build_config(
@@ -69,15 +83,6 @@ fn build_config(
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Initialize tracing
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("llmsim=info".parse().unwrap())
-                .add_directive("tower_http=debug".parse().unwrap()),
-        )
-        .init();
-
     let cli = Cli::parse();
 
     match cli.command {
@@ -88,8 +93,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             generator,
             target_tokens,
         } => {
+            // Initialize tracing for server mode
+            tracing_subscriber::fmt()
+                .with_env_filter(
+                    tracing_subscriber::EnvFilter::from_default_env()
+                        .add_directive("llmsim=info".parse().unwrap())
+                        .add_directive("tower_http=debug".parse().unwrap()),
+                )
+                .init();
+
             let config = build_config(config, port, host, generator, target_tokens)?;
             llmsim::cli::run_server(config).await?;
+        }
+        Commands::Stats { url, refresh } => {
+            // Run the TUI dashboard
+            let config = DashboardConfig {
+                server_url: url,
+                refresh_ms: refresh,
+            };
+            run_dashboard(config).await?;
         }
     }
 

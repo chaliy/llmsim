@@ -18,6 +18,7 @@ use axum::{
 };
 use futures::StreamExt;
 use std::sync::Arc;
+use std::time::Instant;
 
 /// Health check endpoint
 pub async fn health() -> impl IntoResponse {
@@ -32,6 +33,8 @@ pub async fn chat_completions(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ChatCompletionRequest>,
 ) -> Result<Response, AppError> {
+    let request_start = Instant::now();
+
     tracing::info!(
         model = %request.model,
         stream = request.stream,
@@ -39,12 +42,18 @@ pub async fn chat_completions(
         "Chat completion request"
     );
 
+    // Record request start in stats
+    state
+        .stats
+        .record_request_start(&request.model, request.stream);
+
     // Check for error injection
     let error_injector = ErrorInjector::new(state.config.error_config());
     if let Some(error) = error_injector.maybe_inject() {
         tracing::warn!("Injecting error: {:?}", error);
 
-        let status = match error.status_code() {
+        let status_code = error.status_code();
+        let status = match status_code {
             429 => StatusCode::TOO_MANY_REQUESTS,
             500 => StatusCode::INTERNAL_SERVER_ERROR,
             503 => StatusCode::SERVICE_UNAVAILABLE,
@@ -53,6 +62,9 @@ pub async fn chat_completions(
             401 => StatusCode::UNAUTHORIZED,
             _ => StatusCode::INTERNAL_SERVER_ERROR,
         };
+
+        // Record error in stats
+        state.stats.record_error(status_code);
 
         let mut response = Json(error.to_error_response()).into_response();
         *response.status_mut() = status;
@@ -94,9 +106,17 @@ pub async fn chat_completions(
 
     if request.stream {
         // Streaming response
+        // Clone stats for the streaming completion callback
+        let stats = state.stats.clone();
+        let prompt_tok = usage.prompt_tokens;
+        let completion_tok = usage.completion_tokens;
+
         let stream = TokenStreamBuilder::new(&request.model, content)
             .latency(latency)
             .usage(usage)
+            .on_complete(move || {
+                stats.record_request_end(request_start.elapsed(), prompt_tok, completion_tok);
+            })
             .build();
 
         let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
@@ -115,9 +135,21 @@ pub async fn chat_completions(
             tokio::time::sleep(delay).await;
         }
 
+        // Record request completion
+        state.stats.record_request_end(
+            request_start.elapsed(),
+            usage.prompt_tokens,
+            usage.completion_tokens,
+        );
+
         let response = ChatCompletionResponse::new(request.model.clone(), content, usage);
         Ok(Json(response).into_response())
     }
+}
+
+/// GET /v1/stats - Get server statistics
+pub async fn get_stats(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    Json(state.stats.snapshot())
 }
 
 /// GET /v1/models

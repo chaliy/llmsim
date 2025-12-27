@@ -9,6 +9,7 @@ mod state;
 pub use config::{Config, ConfigError};
 pub use state::AppState;
 
+use crate::stats::{new_shared_stats, SharedStats};
 use axum::{
     routing::{get, post},
     Router,
@@ -19,6 +20,14 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 
 /// Run the LLMSim server with the given configuration
 pub async fn run_server(config: Config) -> Result<(), Box<dyn std::error::Error>> {
+    run_server_with_stats(config, new_shared_stats()).await
+}
+
+/// Run the LLMSim server with the given configuration and shared stats
+pub async fn run_server_with_stats(
+    config: Config,
+    stats: SharedStats,
+) -> Result<(), Box<dyn std::error::Error>> {
     let addr: SocketAddr = format!("{}:{}", config.server.host, config.server.port)
         .parse()
         .expect("Invalid address");
@@ -30,11 +39,17 @@ pub async fn run_server(config: Config) -> Result<(), Box<dyn std::error::Error>
         config.response.generator,
         config.response.target_tokens
     );
+    tracing::info!("Stats endpoint available at /v1/stats");
 
-    let state = Arc::new(AppState::new(config));
+    let state = Arc::new(AppState::new(config, stats));
 
     let app = Router::new()
         .route("/health", get(handlers::health))
+        .route("/v1/stats", get(handlers::get_stats))
+        .route("/v1/chat/completions", post(handlers::chat_completions))
+        .route("/v1/models", get(handlers::list_models))
+        .route("/v1/models/:model_id", get(handlers::get_model))
+        // Legacy OpenAI-compatible routes (without /v1 prefix)
         .route("/openai/chat/completions", post(handlers::chat_completions))
         .route("/openai/models", get(handlers::list_models))
         .route("/openai/models/:model_id", get(handlers::get_model))

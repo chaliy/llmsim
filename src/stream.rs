@@ -8,6 +8,9 @@ use futures::Stream;
 use std::pin::Pin;
 use tokio::time::sleep;
 
+/// Callback type for stream completion
+type OnCompleteCallback = Box<dyn FnOnce() + Send + 'static>;
+
 /// A streaming response that yields chunks with simulated delays
 pub struct TokenStream {
     /// The response ID (shared across all chunks)
@@ -22,6 +25,8 @@ pub struct TokenStream {
     content: String,
     /// Token usage (included in final chunk if stream_options.include_usage is true)
     usage: Option<Usage>,
+    /// Callback to invoke when stream completes
+    on_complete: Option<OnCompleteCallback>,
 }
 
 impl TokenStream {
@@ -33,11 +38,20 @@ impl TokenStream {
             latency,
             content,
             usage: None,
+            on_complete: None,
         }
     }
 
     pub fn with_usage(mut self, usage: Usage) -> Self {
         self.usage = Some(usage);
+        self
+    }
+
+    pub fn with_on_complete<F>(mut self, callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.on_complete = Some(Box::new(callback));
         self
     }
 
@@ -76,6 +90,7 @@ impl TokenStream {
         let created = self.created;
         let latency = self.latency.clone();
         let usage = self.usage.clone();
+        let on_complete = self.on_complete;
 
         Box::pin(stream! {
             // Initial delay (time to first token)
@@ -114,6 +129,11 @@ impl TokenStream {
 
             // Done marker
             yield "data: [DONE]\n\n".to_string();
+
+            // Invoke completion callback
+            if let Some(callback) = on_complete {
+                callback();
+            }
         })
     }
 
@@ -173,6 +193,7 @@ pub struct TokenStreamBuilder {
     content: String,
     latency: LatencyProfile,
     usage: Option<Usage>,
+    on_complete: Option<OnCompleteCallback>,
 }
 
 impl TokenStreamBuilder {
@@ -183,6 +204,7 @@ impl TokenStreamBuilder {
             content: content.into(),
             latency: LatencyProfile::default(),
             usage: None,
+            on_complete: None,
         }
     }
 
@@ -201,6 +223,15 @@ impl TokenStreamBuilder {
         self
     }
 
+    /// Set a callback to be invoked when the stream completes
+    pub fn on_complete<F>(mut self, callback: F) -> Self
+    where
+        F: FnOnce() + Send + 'static,
+    {
+        self.on_complete = Some(Box::new(callback));
+        self
+    }
+
     pub fn build(self) -> TokenStream {
         let id = self
             .id
@@ -209,6 +240,9 @@ impl TokenStreamBuilder {
         let mut stream = TokenStream::new(id, self.model, self.content, self.latency);
         if let Some(usage) = self.usage {
             stream = stream.with_usage(usage);
+        }
+        if let Some(on_complete) = self.on_complete {
+            stream = stream.with_on_complete(on_complete);
         }
         stream
     }
