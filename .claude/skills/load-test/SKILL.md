@@ -1,6 +1,9 @@
-# Load Testing Skill
+---
+name: load-test
+description: Run load and stress tests for llmsim using k6. Use this skill when you need to benchmark performance, validate high concurrency handling, or run smoke tests for CI validation.
+---
 
-Run load and stress tests for llmsim using k6.
+# Load Testing Skill
 
 ## Environment Setup
 
