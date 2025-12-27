@@ -1,0 +1,20 @@
+# llmsim chaos testing configuration
+# High error rates to test client error handling
+
+server:
+  port: 8888
+  host: "0.0.0.0"
+
+latency:
+  profile: "fast"
+
+response:
+  generator: "lorem"
+  target_tokens: 100
+
+# Chaos mode: inject errors at high rates
+errors:
+  rate_limit_rate: 0.10    # 10% rate limit errors (429)
+  server_error_rate: 0.05  # 5% server errors (500/503)
+  timeout_rate: 0.02       # 2% timeout errors (504)
+  timeout_after_ms: 5000   # 5s before timeout

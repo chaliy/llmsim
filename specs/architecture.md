@@ -28,6 +28,14 @@ llmsim/
 │   ├── generator.rs    # Response generators
 │   ├── stream.rs       # SSE streaming engine
 │   └── errors.rs       # Error injection
+├── benchmarks/         # Load testing benchmarks (k6)
+│   ├── run-benchmark.sh    # Main benchmark runner
+│   ├── smoke-test.sh       # Quick smoke test
+│   └── k6/                 # k6 test scripts
+│       ├── config.js       # Shared configuration
+│       ├── chat-completions.js
+│       ├── endpoints.js
+│       └── high-concurrency.js
 └── Dockerfile          # Multi-stage build
 ```
 
