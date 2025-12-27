@@ -67,6 +67,39 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 - `metadata`: Custom key-value metadata
 - `previous_response_id`: Chain responses together
 - `tool_choice`: Control tool usage
+- `reasoning`: Reasoning configuration for o-series models
+
+### R4.3: Reasoning Configuration
+
+Support reasoning configuration for o-series models (o1, o3, o4-mini, etc.):
+```json
+{
+  "reasoning": {
+    "effort": "none|low|medium|high",
+    "summary": "auto|concise|detailed"
+  }
+}
+```
+
+**R4.3.1**: Simulate reasoning tokens based on effort level:
+- `none`: No reasoning tokens
+- `low`: ~1.5x output tokens as reasoning
+- `medium`: ~3x output tokens as reasoning (default)
+- `high`: ~6x output tokens as reasoning
+
+**R4.3.2**: Include reasoning tokens in usage statistics:
+```json
+{
+  "usage": {
+    "input_tokens": 100,
+    "output_tokens": 50,
+    "total_tokens": 300,
+    "output_tokens_details": {
+      "reasoning_tokens": 150
+    }
+  }
+}
+```
 
 ### R5: Streaming
 

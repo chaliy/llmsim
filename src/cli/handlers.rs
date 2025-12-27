@@ -6,8 +6,9 @@ use crate::{
     create_generator,
     openai::{
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
-        MessageContent, Model, ModelsResponse, OutputTokensDetails, ResponsesErrorResponse,
-        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
+        MessageContent, Model, ModelsResponse, OutputTokensDetails, ReasoningConfig,
+        ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
+        ResponsesUsage, Usage,
     },
     ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
 };
@@ -303,12 +304,16 @@ pub async fn create_response(
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
+    // Simulate reasoning tokens for o-series and reasoning models
+    let reasoning_tokens =
+        calculate_reasoning_tokens(&request.model, &request.reasoning, output_tokens);
+
     let usage = ResponsesUsage {
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
-        total_tokens: (input_tokens + output_tokens) as u32,
+        total_tokens: (input_tokens + output_tokens + reasoning_tokens) as u32,
         output_tokens_details: Some(OutputTokensDetails {
-            reasoning_tokens: 0,
+            reasoning_tokens: reasoning_tokens as u32,
         }),
     };
 
@@ -400,6 +405,42 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
     }
 
     parts.join("\n")
+}
+
+/// Calculate simulated reasoning tokens for o-series and reasoning models
+fn calculate_reasoning_tokens(
+    model: &str,
+    reasoning: &Option<ReasoningConfig>,
+    output_tokens: usize,
+) -> usize {
+    // Check if this is a reasoning model (o-series)
+    let is_reasoning_model = model.starts_with("o1")
+        || model.starts_with("o3")
+        || model.starts_with("o4")
+        || model.contains("-o1")
+        || model.contains("-o3");
+
+    if !is_reasoning_model {
+        return 0;
+    }
+
+    // Determine effort level
+    let effort = reasoning
+        .as_ref()
+        .and_then(|r| r.effort.as_deref())
+        .unwrap_or("medium");
+
+    // Simulate reasoning tokens based on effort level
+    // Reasoning models typically generate 2-10x the output tokens in reasoning
+    let multiplier = match effort {
+        "none" => 0.0,
+        "low" => 1.5,
+        "medium" => 3.0,
+        "high" => 6.0,
+        _ => 3.0, // default to medium
+    };
+
+    (output_tokens as f64 * multiplier) as usize
 }
 
 /// Count tokens in a chat request

@@ -13,8 +13,8 @@ use llmsim::{
     latency::LatencyProfile,
     openai::{
         InputItem, InputRole, ItemStatus, MessageContent, OutputContentPart, OutputItem,
-        OutputRole, OutputTokensDetails, ResponsesInput, ResponsesRequest, ResponsesResponse,
-        ResponsesUsage,
+        OutputRole, OutputTokensDetails, ReasoningConfig, ResponsesInput, ResponsesRequest,
+        ResponsesResponse, ResponsesUsage,
     },
     responses_stream::ResponsesTokenStreamBuilder,
 };
@@ -42,6 +42,7 @@ async fn main() {
         previous_response_id: None,
         tools: None,
         tool_choice: None,
+        reasoning: None,
     };
     println!("Simple request model: {}", simple_request.model);
     println!(
@@ -74,7 +75,35 @@ async fn main() {
         previous_response_id: None,
         tools: None,
         tool_choice: None,
+        reasoning: None,
     };
+
+    // Reasoning model request (o-series)
+    let reasoning_request = ResponsesRequest {
+        model: "o3-mini".to_string(),
+        input: ResponsesInput::Text("Solve this step by step: 2 + 2 * 3".to_string()),
+        instructions: None,
+        temperature: None,
+        top_p: None,
+        max_output_tokens: Some(200),
+        stream: false,
+        metadata: None,
+        previous_response_id: None,
+        tools: None,
+        tool_choice: None,
+        reasoning: Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: None,
+        }),
+    };
+    println!(
+        "Reasoning request model: {} (effort: {:?})",
+        reasoning_request.model,
+        reasoning_request
+            .reasoning
+            .as_ref()
+            .and_then(|r| r.effort.as_deref())
+    );
     println!(
         "Message request has instructions: {}",
         message_request.instructions.is_some()

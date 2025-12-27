@@ -65,6 +65,17 @@ pub enum ContentPart {
     },
 }
 
+/// Reasoning configuration for the Responses API
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReasoningConfig {
+    /// Reasoning effort level: "none", "low", "medium", "high"
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    /// Whether to include reasoning summary in output
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+}
+
 /// Responses API request
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ResponsesRequest {
@@ -99,6 +110,9 @@ pub struct ResponsesRequest {
     /// Control tool usage
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tool_choice: Option<ResponsesToolChoice>,
+    /// Reasoning configuration (for o-series and reasoning models)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reasoning: Option<ReasoningConfig>,
 }
 
 /// A tool definition for the Responses API
