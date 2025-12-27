@@ -112,6 +112,8 @@ LLMSim-specific endpoints:
   "active_requests": 5,
   "streaming_requests": 12000,
   "non_streaming_requests": 3000,
+  "completions_requests": 10000,
+  "responses_requests": 5000,
   "prompt_tokens": 500000,
   "completion_tokens": 1500000,
   "total_tokens": 2000000,

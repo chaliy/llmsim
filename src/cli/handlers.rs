@@ -10,7 +10,7 @@ use crate::{
         ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
         ResponsesUsage, Usage,
     },
-    ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
+    EndpointType, ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
 };
 use axum::{
     body::Body,
@@ -48,7 +48,7 @@ pub async fn chat_completions(
     // Record request start in stats
     state
         .stats
-        .record_request_start(&request.model, request.stream);
+        .record_request_start(&request.model, request.stream, EndpointType::ChatCompletions);
 
     // Check for error injection
     let error_injector = ErrorInjector::new(state.config.error_config());
@@ -219,7 +219,7 @@ pub async fn create_response(
     // Record request start in stats
     state
         .stats
-        .record_request_start(&request.model, request.stream);
+        .record_request_start(&request.model, request.stream, EndpointType::Responses);
 
     // Check for error injection
     let error_injector = ErrorInjector::new(state.config.error_config());

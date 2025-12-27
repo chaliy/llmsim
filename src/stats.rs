@@ -11,6 +11,15 @@ use std::time::{Duration, Instant};
 /// Relaxed ordering for stats - we don't need strict ordering guarantees
 const ORDERING: Ordering = Ordering::Relaxed;
 
+/// Type of API endpoint being called
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EndpointType {
+    /// Chat Completions API (/openai/v1/chat/completions)
+    ChatCompletions,
+    /// Responses API (/openai/v1/responses)
+    Responses,
+}
+
 /// Global statistics tracker for the LLMSim server.
 #[derive(Debug)]
 pub struct Stats {
@@ -26,6 +35,10 @@ pub struct Stats {
     pub streaming_requests: AtomicU64,
     /// Total non-streaming requests
     pub non_streaming_requests: AtomicU64,
+    /// Chat Completions API requests
+    pub completions_requests: AtomicU64,
+    /// Responses API requests
+    pub responses_requests: AtomicU64,
 
     // Token counters
     /// Total prompt tokens processed
@@ -75,6 +88,8 @@ impl Stats {
             active_requests: AtomicU64::new(0),
             streaming_requests: AtomicU64::new(0),
             non_streaming_requests: AtomicU64::new(0),
+            completions_requests: AtomicU64::new(0),
+            responses_requests: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
             total_errors: AtomicU64::new(0),
@@ -91,7 +106,7 @@ impl Stats {
     }
 
     /// Record the start of a new request
-    pub fn record_request_start(&self, model: &str, is_streaming: bool) {
+    pub fn record_request_start(&self, model: &str, is_streaming: bool, endpoint: EndpointType) {
         self.total_requests.fetch_add(1, ORDERING);
         self.active_requests.fetch_add(1, ORDERING);
 
@@ -99,6 +114,16 @@ impl Stats {
             self.streaming_requests.fetch_add(1, ORDERING);
         } else {
             self.non_streaming_requests.fetch_add(1, ORDERING);
+        }
+
+        // Track by endpoint type
+        match endpoint {
+            EndpointType::ChatCompletions => {
+                self.completions_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Responses => {
+                self.responses_requests.fetch_add(1, ORDERING);
+            }
         }
 
         // Track per-model requests
@@ -261,6 +286,8 @@ impl Stats {
             active_requests: self.active_requests.load(ORDERING),
             streaming_requests: self.streaming_requests.load(ORDERING),
             non_streaming_requests: self.non_streaming_requests.load(ORDERING),
+            completions_requests: self.completions_requests.load(ORDERING),
+            responses_requests: self.responses_requests.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
             total_tokens: self.total_tokens(),
@@ -285,6 +312,8 @@ pub struct StatsSnapshot {
     pub active_requests: u64,
     pub streaming_requests: u64,
     pub non_streaming_requests: u64,
+    pub completions_requests: u64,
+    pub responses_requests: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub total_tokens: u64,
@@ -315,10 +344,11 @@ mod tests {
     fn test_stats_basic() {
         let stats = Stats::new();
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         assert_eq!(stats.total_requests.load(ORDERING), 1);
         assert_eq!(stats.active_requests.load(ORDERING), 1);
         assert_eq!(stats.non_streaming_requests.load(ORDERING), 1);
+        assert_eq!(stats.completions_requests.load(ORDERING), 1);
 
         stats.record_request_end(Duration::from_millis(100), 50, 100);
         assert_eq!(stats.active_requests.load(ORDERING), 0);
@@ -330,7 +360,7 @@ mod tests {
     fn test_stats_streaming() {
         let stats = Stats::new();
 
-        stats.record_request_start("gpt-4", true);
+        stats.record_request_start("gpt-4", true, EndpointType::ChatCompletions);
         assert_eq!(stats.streaming_requests.load(ORDERING), 1);
         assert_eq!(stats.non_streaming_requests.load(ORDERING), 0);
     }
@@ -339,7 +369,7 @@ mod tests {
     fn test_stats_errors() {
         let stats = Stats::new();
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_error(429);
 
         assert_eq!(stats.total_errors.load(ORDERING), 1);
@@ -351,10 +381,10 @@ mod tests {
     fn test_stats_latency() {
         let stats = Stats::new();
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(100), 10, 20);
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(200), 10, 20);
 
         assert_eq!(stats.avg_latency_ms(), 150.0);
@@ -366,12 +396,25 @@ mod tests {
     fn test_model_requests() {
         let stats = Stats::new();
 
-        stats.record_request_start("gpt-4", false);
-        stats.record_request_start("gpt-4", false);
-        stats.record_request_start("claude-3", true);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
+        stats.record_request_start("gpt-4", false, EndpointType::Responses);
+        stats.record_request_start("claude-3", true, EndpointType::Responses);
 
         let model_counts = stats.model_requests();
         assert_eq!(model_counts.get("gpt-4"), Some(&2));
         assert_eq!(model_counts.get("claude-3"), Some(&1));
+    }
+
+    #[test]
+    fn test_endpoint_types() {
+        let stats = Stats::new();
+
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
+        stats.record_request_start("gpt-4", true, EndpointType::ChatCompletions);
+        stats.record_request_start("gpt-5", false, EndpointType::Responses);
+
+        assert_eq!(stats.completions_requests.load(ORDERING), 2);
+        assert_eq!(stats.responses_requests.load(ORDERING), 1);
+        assert_eq!(stats.total_requests.load(ORDERING), 3);
     }
 }
