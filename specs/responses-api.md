@@ -67,15 +67,20 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 - `metadata`: Custom key-value metadata
 - `previous_response_id`: Chain responses together
 - `tool_choice`: Control tool usage
-- `reasoning`: Reasoning configuration for o-series models
+- `reasoning`: Reasoning configuration for reasoning models (o-series and GPT-5)
 
 ### R4.3: Reasoning Configuration
 
-Support reasoning configuration for o-series models (o1, o3, o4-mini, etc.):
+Support reasoning configuration for reasoning models (o-series and GPT-5 family):
+
+**Supported Models:**
+- o-series: o1, o3, o4 (explicit reasoning models)
+- GPT-5 family: gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2 (trained with RL for reasoning)
+
 ```json
 {
   "reasoning": {
-    "effort": "none|low|medium|high",
+    "effort": "none|minimal|low|medium|high|xhigh",
     "summary": "auto|concise|detailed"
   }
 }
@@ -83,9 +88,11 @@ Support reasoning configuration for o-series models (o1, o3, o4-mini, etc.):
 
 **R4.3.1**: Simulate reasoning tokens based on effort level:
 - `none`: No reasoning tokens
+- `minimal`: ~0.5x output tokens as reasoning (GPT-5 only, fastest)
 - `low`: ~1.5x output tokens as reasoning
 - `medium`: ~3x output tokens as reasoning (default)
 - `high`: ~6x output tokens as reasoning
+- `xhigh`: ~10x output tokens as reasoning (GPT-5.2 only, most thorough)
 
 **R4.3.2**: Include reasoning tokens in usage statistics:
 ```json

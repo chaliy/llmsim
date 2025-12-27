@@ -409,24 +409,30 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
     parts.join("\n")
 }
 
-/// Calculate simulated reasoning tokens for o-series and reasoning models
+/// Calculate simulated reasoning tokens for reasoning models (o-series and GPT-5)
 fn calculate_reasoning_tokens(
     model: &str,
     reasoning: &Option<ReasoningConfig>,
     output_tokens: usize,
 ) -> usize {
-    // Check if this is a reasoning model (o-series)
-    let is_reasoning_model = model.starts_with("o1")
+    // Check if this is a reasoning model
+    // o-series: o1, o3, o4 (explicit reasoning models)
+    // GPT-5 family: gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2 (trained with RL for reasoning)
+    let is_o_series = model.starts_with("o1")
         || model.starts_with("o3")
         || model.starts_with("o4")
         || model.contains("-o1")
         || model.contains("-o3");
 
-    if !is_reasoning_model {
+    let is_gpt5 = model.starts_with("gpt-5");
+
+    if !is_o_series && !is_gpt5 {
         return 0;
     }
 
     // Determine effort level
+    // GPT-5 supports: minimal, low, medium, high, xhigh
+    // o-series supports: low, medium, high
     let effort = reasoning
         .as_ref()
         .and_then(|r| r.effort.as_deref())
@@ -436,10 +442,12 @@ fn calculate_reasoning_tokens(
     // Reasoning models typically generate 2-10x the output tokens in reasoning
     let multiplier = match effort {
         "none" => 0.0,
+        "minimal" => 0.5, // GPT-5 only: fastest, minimal reasoning
         "low" => 1.5,
         "medium" => 3.0,
         "high" => 6.0,
-        _ => 3.0, // default to medium
+        "xhigh" => 10.0, // GPT-5.2 only: most thorough reasoning
+        _ => 3.0,        // default to medium
     };
 
     (output_tokens as f64 * multiplier) as usize
