@@ -18,7 +18,8 @@ This repo is intended to be runnable locally and easy for coding agents to work 
 `specs/` folder contains feature specifications outlining requirements for specific features and components. New code should comply with these specifications or propose changes to them.
 
 Available specs:
-- `specs/[spec name].md` - [Spec description]
+- `specs/architecture.md` - System architecture and module organization
+- `specs/load-testing.md` - Load testing framework and benchmarks
 
 Specification format: Abstract and Requirements sections.
 
