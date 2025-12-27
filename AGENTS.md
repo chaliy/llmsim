@@ -54,6 +54,17 @@ These secrets are pre-configured in the environment and do not require manual se
 
 ### Conventions
 
+#### API Endpoints
+
+All OpenAI-compatible API endpoints use the `/openai/` prefix. Never use `/v1/` prefix in this service.
+
+Available endpoints:
+- `POST /openai/chat/completions` - Chat completions (streaming supported)
+- `POST /openai/responses` - Responses API (streaming supported)
+- `GET /openai/models` - List available models
+- `GET /openai/models/:id` - Get model details
+- `GET /health` - Health check
+
 #### Code organization
 
 ....
