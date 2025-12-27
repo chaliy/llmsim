@@ -65,7 +65,7 @@ impl App {
 
     /// Update the stats by fetching from the server
     pub async fn update_stats(&mut self) {
-        let url = format!("{}/v1/stats", self.server_url);
+        let url = format!("{}/llmsim/stats", self.server_url);
 
         match reqwest::get(&url).await {
             Ok(response) => match response.json::<StatsSnapshot>().await {

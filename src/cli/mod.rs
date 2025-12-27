@@ -39,17 +39,18 @@ pub async fn run_server_with_stats(
         config.response.generator,
         config.response.target_tokens
     );
-    tracing::info!("Stats endpoint available at /v1/stats");
+    tracing::info!("Stats endpoint available at /llmsim/stats");
 
     let state = Arc::new(AppState::new(config, stats));
 
     let app = Router::new()
         .route("/health", get(handlers::health))
-        .route("/v1/stats", get(handlers::get_stats))
+        .route("/llmsim/stats", get(handlers::get_stats))
+        // OpenAI-compatible routes
         .route("/v1/chat/completions", post(handlers::chat_completions))
         .route("/v1/models", get(handlers::list_models))
         .route("/v1/models/:model_id", get(handlers::get_model))
-        // Legacy OpenAI-compatible routes (without /v1 prefix)
+        // Legacy routes (without /v1 prefix)
         .route("/openai/chat/completions", post(handlers::chat_completions))
         .route("/openai/models", get(handlers::list_models))
         .route("/openai/models/:model_id", get(handlers::get_model))
