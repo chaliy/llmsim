@@ -20,6 +20,8 @@
 #   --port PORT     Port to use (default: 8888)
 #   --output FILE   Output results to file
 #   --vus NUM       Override VU count (high-concurrency only)
+#   --chaos         Enable error injection (rate limits, server errors)
+#   --config FILE   Use custom llmsim config file
 #   --help          Show this help
 
 set -e
@@ -34,6 +36,8 @@ START_SERVER=true
 OUTPUT_FILE=""
 MAX_VUS=""
 LLMSIM_PID=""
+CHAOS_MODE=false
+CUSTOM_CONFIG=""
 
 # Colors
 RED='\033[0;31m'
@@ -81,6 +85,14 @@ while [[ $# -gt 0 ]]; do
             MAX_VUS="$2"
             shift 2
             ;;
+        --chaos)
+            CHAOS_MODE=true
+            shift
+            ;;
+        --config)
+            CUSTOM_CONFIG="$2"
+            shift 2
+            ;;
         --help|-h)
             show_help
             ;;
@@ -111,6 +123,7 @@ echo "=============================="
 echo "Profile: $PROFILE"
 echo "Port: $PORT"
 echo "Start server: $START_SERVER"
+echo "Chaos mode: $CHAOS_MODE"
 echo ""
 
 # Start server if needed
@@ -118,8 +131,18 @@ if [ "$START_SERVER" = true ]; then
     log_info "Building llmsim..."
     cargo build --release --quiet --manifest-path "$PROJECT_ROOT/Cargo.toml"
 
-    log_info "Starting llmsim server on port $PORT..."
-    "$PROJECT_ROOT/target/release/llmsim" serve --port $PORT &
+    # Determine which config to use
+    if [ -n "$CUSTOM_CONFIG" ]; then
+        CONFIG_FILE="$CUSTOM_CONFIG"
+    elif [ "$CHAOS_MODE" = true ]; then
+        CONFIG_FILE="$SCRIPT_DIR/config/chaos.yaml"
+        log_warn "Chaos mode enabled - error injection active"
+    else
+        CONFIG_FILE="$SCRIPT_DIR/config/benchmark.yaml"
+    fi
+
+    log_info "Starting llmsim server on port $PORT (config: $(basename $CONFIG_FILE))..."
+    "$PROJECT_ROOT/target/release/llmsim" serve --port $PORT --config "$CONFIG_FILE" &
     LLMSIM_PID=$!
 
     # Wait for server to start

@@ -70,7 +70,24 @@ Ultra-fast variant (3 iterations):
 
 # Custom VU count for high-concurrency
 ./benchmarks/run-benchmark.sh high-concurrency --vus 1000
+
+# Chaos mode - enable error injection (rate limits, server errors)
+./benchmarks/run-benchmark.sh load --chaos
+
+# Custom llmsim config file
+./benchmarks/run-benchmark.sh load --config path/to/config.yaml
 ```
+
+### Error Injection (Chaos Mode)
+
+By default, benchmarks run with error injection **disabled** for consistent results.
+
+Use `--chaos` to enable error injection:
+- 10% rate limit errors (429)
+- 5% server errors (500/503)
+- 2% timeout errors (504)
+
+This tests client error handling and retry logic under realistic conditions.
 
 ### Remote Testing
 
@@ -120,6 +137,8 @@ Tests pass if thresholds are met:
 
 - `benchmarks/run-benchmark.sh` - Main runner script
 - `benchmarks/smoke-test.sh` - Quick smoke test
-- `benchmarks/k6/config.js` - Test configuration
-- `benchmarks/k6/*.js` - Test scripts
+- `benchmarks/config/benchmark.yaml` - Default config (no errors)
+- `benchmarks/config/chaos.yaml` - Chaos mode config (error injection)
+- `benchmarks/k6/config.js` - k6 test configuration
+- `benchmarks/k6/*.js` - k6 test scripts
 - `specs/load-testing.md` - Full specification

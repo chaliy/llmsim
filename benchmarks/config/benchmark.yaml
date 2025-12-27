@@ -1,0 +1,19 @@
+# llmsim benchmark configuration
+# Explicitly disable error injection for consistent benchmark results
+
+server:
+  port: 8888
+  host: "0.0.0.0"
+
+latency:
+  profile: "fast"  # Use fast profile for higher throughput in benchmarks
+
+response:
+  generator: "lorem"
+  target_tokens: 100
+
+# Disable all error injection for benchmarks
+errors:
+  rate_limit_rate: 0.0
+  server_error_rate: 0.0
+  timeout_rate: 0.0
