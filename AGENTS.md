@@ -28,7 +28,7 @@ Specification format: Abstract and Requirements sections.
 `.claude/skills/` contains development skills following the [Agent Skills Specification](https://agentskills.io/specification).
 
 Available skills:
-- `[skill name]/` - [Skill description]
+- `load-test/` - Run load and stress tests for llmsim using k6
 
 
 ### Public Documentation
