@@ -8,7 +8,7 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 
 ### R1: Core Endpoint
 
-**R1.1**: Implement `POST /openai/responses` endpoint that accepts Responses API requests and returns simulated responses.
+**R1.1**: Implement `POST /openai/v1/responses` endpoint that accepts Responses API requests and returns simulated responses.
 
 **R1.2**: Support both string and array input formats:
 - Simple string: `"input": "Hello, world!"`
@@ -174,7 +174,7 @@ data: <json_payload>
 ### Simple Text Request
 
 ```bash
-curl -X POST http://localhost:8080/openai/responses \
+curl -X POST http://localhost:8080/openai/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5",
@@ -220,7 +220,7 @@ curl -X POST http://localhost:8080/openai/responses \
 ### Streaming Request
 
 ```bash
-curl -X POST http://localhost:8080/openai/responses \
+curl -X POST http://localhost:8080/openai/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5",

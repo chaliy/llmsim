@@ -85,14 +85,17 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-OpenAI-compatible endpoints:
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
-| `/v1/models` | GET | List available models |
-| `/v1/models/{model_id}` | GET | Get specific model details |
+| `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
+| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
+| `/openai/v1/models` | GET | List available models |
+| `/openai/v1/models/{model_id}` | GET | Get specific model details |
+
+When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 
 LLMSim-specific endpoints:
 

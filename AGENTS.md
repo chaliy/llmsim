@@ -56,14 +56,25 @@ These secrets are pre-configured in the environment and do not require manual se
 
 #### API Endpoints
 
-All OpenAI-compatible API endpoints use the `/openai/` prefix. Never use `/v1/` prefix in this service.
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name. This ensures compatibility with official SDKs when using the provider prefix as the base URL.
 
-Available endpoints:
-- `POST /openai/chat/completions` - Chat completions (streaming supported)
-- `POST /openai/responses` - Responses API (streaming supported)
-- `GET /openai/models` - List available models
-- `GET /openai/models/:id` - Get model details
+**Pattern:** `/{provider}{original_path}`
+
+Examples:
+- OpenAI `/v1/chat/completions` → `/openai/v1/chat/completions`
+- OpenAI `/v1/responses` → `/openai/v1/responses`
+- Anthropic `/v1/messages` → `/anthropic/v1/messages` (future)
+
+**Current OpenAI endpoints:**
+- `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
+- `POST /openai/v1/responses` - Responses API (streaming supported)
+- `GET /openai/v1/models` - List available models
+- `GET /openai/v1/models/:id` - Get model details
+
+**Other endpoints:**
 - `GET /health` - Health check
+
+See `specs/api-endpoints.md` for the full specification.
 
 #### Code organization
 

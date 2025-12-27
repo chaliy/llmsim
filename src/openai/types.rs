@@ -394,7 +394,7 @@ impl ErrorResponse {
     }
 }
 
-/// Model object returned by /v1/models endpoint
+/// Model object returned by /openai/v1/models endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub id: String,
@@ -414,7 +414,7 @@ impl Model {
     }
 }
 
-/// Response for /v1/models endpoint
+/// Response for /openai/v1/models endpoint
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelsResponse {
     pub object: String,

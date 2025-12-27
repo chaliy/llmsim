@@ -109,18 +109,18 @@ Using `llmsim serve` allows for future expansion:
 
 ## API Endpoints
 
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name.
+See `specs/api-endpoints.md` for the full specification.
+
 ### OpenAI Chat Completions API
-- `POST /v1/chat/completions` - Create a chat completion
-- `POST /openai/chat/completions` - Alias for compatibility
+- `POST /openai/v1/chat/completions` - Create a chat completion
 
 ### OpenAI Models API
-- `GET /v1/models` - List available models
-- `GET /v1/models/:model_id` - Get model details
-- `GET /openai/models` - Alias for compatibility
-- `GET /openai/models/:model_id` - Alias for compatibility
+- `GET /openai/v1/models` - List available models
+- `GET /openai/v1/models/:model_id` - Get model details
 
 ### OpenAI Responses API
-- `POST /v1/responses` - Create a response (streaming and non-streaming)
+- `POST /openai/v1/responses` - Create a response (streaming and non-streaming)
 
 See `specs/responses-api.md` for detailed Responses API specification.
 

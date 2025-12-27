@@ -13,7 +13,7 @@ OpenAI Responses API format. The Responses API is OpenAI's newer stateful API
 that unifies Chat Completions and Assistants capabilities.
 
 Server endpoints:
-    POST /openai/responses - Create a response (streaming and non-streaming)
+    POST /openai/v1/responses - Create a response (streaming and non-streaming)
 
 Prerequisites:
     Start the llmsim server first:
@@ -55,7 +55,7 @@ def create_response(
     if stream:
         return _stream_response(client, payload)
     else:
-        response = client.post("/openai/responses", json=payload)
+        response = client.post("/openai/v1/responses", json=payload)
         response.raise_for_status()
         return response.json()
 
@@ -64,7 +64,7 @@ def _stream_response(
     client: httpx.Client, payload: dict[str, Any]
 ) -> Iterator[dict[str, Any]]:
     """Stream a response and yield parsed events."""
-    with client.stream("POST", "/openai/responses", json=payload) as response:
+    with client.stream("POST", "/openai/v1/responses", json=payload) as response:
         response.raise_for_status()
 
         buffer = ""
