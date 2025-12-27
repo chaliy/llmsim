@@ -14,10 +14,15 @@ llmsim/
 │   │   ├── mod.rs      # Server runner
 │   │   ├── config.rs   # Configuration loading
 │   │   ├── handlers.rs # HTTP request handlers
-│   │   └── state.rs    # Application state
+│   │   └── state.rs    # Application state (config + stats)
+│   ├── tui/            # Terminal UI dashboard
+│   │   ├── mod.rs      # TUI module entry point
+│   │   ├── app.rs      # Application state and event loop
+│   │   └── ui.rs       # Ratatui widget rendering
 │   ├── openai/         # OpenAI API types
 │   │   ├── mod.rs
 │   │   └── types.rs
+│   ├── stats.rs        # Real-time statistics tracking
 │   ├── tokens.rs       # Token counting with tiktoken
 │   ├── latency.rs      # Latency profile simulation
 │   ├── generator.rs    # Response generators
@@ -32,7 +37,10 @@ llmsim/
 
 ```bash
 # Start the server
-llmsim serve --port 8080 --latency-profile gpt5
+llmsim serve --port 8080
+
+# Start with real-time stats dashboard
+llmsim serve --tui
 
 # With a config file
 llmsim serve --config config.yaml
@@ -41,9 +49,9 @@ llmsim serve --config config.yaml
 llmsim serve \
   --port 8080 \
   --host 0.0.0.0 \
-  --latency-profile claude-sonnet \
   --generator lorem \
-  --target-tokens 150
+  --target-tokens 150 \
+  --tui
 ```
 
 ### As a Library
@@ -93,8 +101,28 @@ Using `llmsim serve` allows for future expansion:
 
 ### Module Organization
 
-- **Public modules** (`openai`, `generator`, `latency`, `stream`, `tokens`, `errors`): Core library functionality, re-exported from `lib.rs`
-- **CLI modules** (`cli/*`): Server-specific code, only used by the binary
+- **Public modules** (`openai`, `generator`, `latency`, `stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
+- **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration
+- **TUI modules** (`tui/*`): Terminal dashboard, built with Ratatui
+
+### Stats Module
+
+The `stats` module provides thread-safe metrics collection using atomic counters:
+
+- **Request metrics**: total, active, streaming, non-streaming, per-model counts
+- **Token metrics**: prompt tokens, completion tokens, total tokens
+- **Error tracking**: by status code (429, 5xx, 504)
+- **Latency**: average, min, max response times
+- **RPS**: rolling 60-second window calculation
+
+Stats are exposed via `/llmsim/stats` endpoint and consumed by the TUI dashboard.
+
+### TUI Module
+
+The `tui` module provides a real-time terminal dashboard built with [Ratatui](https://ratatui.rs/):
+
+- **app.rs**: Event loop, state management, HTTP polling
+- **ui.rs**: Widget layout and rendering (tables, sparklines, bar charts)
 
 ## Supported Models
 
