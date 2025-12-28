@@ -1,6 +1,8 @@
 # Examples
 
-## Rust Example
+## Rust Examples
+
+### Basic Usage
 
 Demonstrates library usage: token counting, generators, latency profiles, and streaming.
 
@@ -8,9 +10,17 @@ Demonstrates library usage: token counting, generators, latency profiles, and st
 cargo run --example basic_usage
 ```
 
+### Responses API Usage
+
+Demonstrates the OpenAI Responses API types, structures, and streaming:
+
+```bash
+cargo run --example responses_usage
+```
+
 ## Python Examples
 
-Both Python examples require the server to be running first:
+Python examples require the server to be running first:
 
 ```bash
 # Start server (headless)
@@ -20,12 +30,20 @@ cargo run --release -- serve --port 8080
 cargo run --release -- serve --port 8080 --tui
 ```
 
-### OpenAI SDK
+### OpenAI SDK (Chat Completions)
 
-Direct usage of the official OpenAI Python library:
+Direct usage of the official OpenAI Python library with Chat Completions API:
 
 ```bash
 uv run examples/openai_client.py
+```
+
+### Responses API Client
+
+Using the OpenAI Responses API with httpx:
+
+```bash
+uv run examples/responses_client.py
 ```
 
 ### LangChain
@@ -48,7 +66,8 @@ npx tsx examples/openai_client.ts
 ### Custom Server URL
 
 ```bash
-LLMSIM_URL=http://localhost:9000/openai uv run examples/openai_client.py
+LLMSIM_URL=http://localhost:8080 uv run examples/responses_client.py
+LLMSIM_URL=http://localhost:8080/openai uv run examples/openai_client.py
 ```
 
 ## Stats API

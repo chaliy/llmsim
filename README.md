@@ -85,47 +85,23 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-OpenAI-compatible endpoints:
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
-| `/v1/models` | GET | List available models |
-| `/v1/models/{model_id}` | GET | Get specific model details |
+| `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
+| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
+| `/openai/v1/models` | GET | List available models |
+| `/openai/v1/models/{model_id}` | GET | Get specific model details |
+
+When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 
 LLMSim-specific endpoints:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
-
-### Stats Response
-
-```json
-{
-  "uptime_secs": 3600,
-  "total_requests": 15000,
-  "active_requests": 5,
-  "streaming_requests": 12000,
-  "non_streaming_requests": 3000,
-  "prompt_tokens": 500000,
-  "completion_tokens": 1500000,
-  "total_tokens": 2000000,
-  "total_errors": 150,
-  "rate_limit_errors": 100,
-  "server_errors": 30,
-  "timeout_errors": 20,
-  "requests_per_second": 4.2,
-  "avg_latency_ms": 245.5,
-  "min_latency_ms": 50.0,
-  "max_latency_ms": 2500.0,
-  "model_requests": {
-    "gpt-5": 10000,
-    "gpt-4o": 5000
-  }
-}
-```
 
 ## Configuration
 

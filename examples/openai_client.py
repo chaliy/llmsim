@@ -13,9 +13,9 @@ official OpenAI Python library. The server simulates LLM responses with
 realistic latency without running actual models.
 
 Server endpoints:
-    POST /openai/chat/completions - Chat completions (streaming supported)
-    GET  /openai/models           - List available models
-    GET  /openai/models/:id       - Get model details
+    POST /openai/v1/chat/completions - Chat completions (streaming supported)
+    GET  /openai/v1/models           - List available models
+    GET  /openai/v1/models/:id       - Get model details
 
 Prerequisites:
     Start the llmsim server first:
@@ -28,7 +28,7 @@ Usage:
     uv run examples/openai_client.py
 
 Environment variables:
-    LLMSIM_URL: Server URL (default: http://localhost:8080/openai)
+    LLMSIM_URL: Server URL (default: http://localhost:8080/openai/v1)
 """
 
 import os
@@ -38,7 +38,7 @@ from openai import OpenAI
 
 
 def main() -> None:
-    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/openai")
+    base_url = os.environ.get("LLMSIM_URL", "http://localhost:8080/openai/v1")
 
     print("=" * 50)
     print("OpenAI SDK + LLMSim Example")
