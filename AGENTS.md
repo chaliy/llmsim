@@ -54,6 +54,29 @@ These secrets are pre-configured in the environment and do not require manual se
 
 ### Conventions
 
+#### API Endpoints
+
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name. This ensures compatibility with official SDKs when using the provider prefix as the base URL.
+
+**Pattern:** `/{provider}{original_path}`
+
+Examples:
+- OpenAI `/v1/chat/completions` → `/openai/v1/chat/completions`
+- OpenAI `/v1/responses` → `/openai/v1/responses`
+- Anthropic `/v1/messages` → `/anthropic/v1/messages` (future)
+
+**Current OpenAI endpoints:**
+- `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
+- `POST /openai/v1/responses` - Responses API (streaming supported)
+- `GET /openai/v1/models` - List available models
+- `GET /openai/v1/models/:id` - Get model details
+
+**System endpoints:**
+- `GET /health` - Health check
+- `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
+
+See `specs/api-endpoints.md` for the full specification.
+
 #### Code organization
 
 ....
