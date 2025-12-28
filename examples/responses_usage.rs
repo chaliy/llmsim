@@ -43,6 +43,8 @@ async fn main() {
         tools: None,
         tool_choice: None,
         reasoning: None,
+        background: false,
+        include: None,
     };
     println!("Simple request model: {}", simple_request.model);
     println!(
@@ -76,6 +78,8 @@ async fn main() {
         tools: None,
         tool_choice: None,
         reasoning: None,
+        background: false,
+        include: None,
     };
 
     // Reasoning model request (o-series)
@@ -95,6 +99,8 @@ async fn main() {
             effort: Some("high".to_string()),
             summary: None,
         }),
+        background: false,
+        include: None,
     };
     println!(
         "Reasoning request model: {} (effort: {:?})",

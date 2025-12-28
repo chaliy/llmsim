@@ -113,6 +113,12 @@ pub struct ResponsesRequest {
     /// Reasoning configuration (for o-series and reasoning models)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningConfig>,
+    /// Enable background/async processing for long-running tasks
+    #[serde(default)]
+    pub background: bool,
+    /// Include additional data in response (e.g., "reasoning.encrypted_content")
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub include: Option<Vec<String>>,
 }
 
 /// A tool definition for the Responses API
@@ -133,6 +139,16 @@ pub enum ResponsesTool {
     FileSearch {},
     /// Code interpreter tool
     CodeInterpreter {},
+    /// Remote MCP server tool
+    Mcp {
+        /// MCP server URL
+        server_url: String,
+        /// Optional headers for authentication
+        #[serde(skip_serializing_if = "Option::is_none")]
+        headers: Option<std::collections::HashMap<String, String>>,
+    },
+    /// Image generation tool
+    ImageGeneration {},
 }
 
 /// Tool choice option for Responses API

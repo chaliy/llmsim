@@ -65,17 +65,20 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 
 **R4.2**: Support optional parameters:
 - `metadata`: Custom key-value metadata
-- `previous_response_id`: Chain responses together
+- `previous_response_id`: Chain responses together (stateful multi-turn)
 - `tool_choice`: Control tool usage
 - `reasoning`: Reasoning configuration for reasoning models (o-series and GPT-5)
+- `background`: Enable async processing for long-running tasks
+- `include`: Request additional data in response (e.g., `["reasoning.encrypted_content"]`)
 
 ### R4.3: Reasoning Configuration
 
 Support reasoning configuration for reasoning models (o-series and GPT-5 family):
 
 **Supported Models:**
-- o-series: o1, o3, o4 (explicit reasoning models)
+- o-series: o1, o3, o4-mini (explicit reasoning models with chain-of-thought)
 - GPT-5 family: gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2 (trained with RL for reasoning)
+- GPT-4.1 series: gpt-4.1, gpt-4.1-mini, gpt-4.1-nano (also supports tools in Responses API)
 
 ```json
 {
@@ -167,14 +170,30 @@ data: <json_payload>
 
 **R8.2**: Use model-specific latency profiles for realistic simulation.
 
-## Non-Requirements (Out of Scope)
+### R9: Tool Definitions
 
-- Tool execution (web_search, file_search, code_interpreter)
-- MCP server integration
-- Image generation
+**R9.1**: Accept tool definitions in requests (parsed but not executed):
+- `function`: Custom function definitions with name, description, parameters
+- `web_search`: Web search capability
+- `file_search`: File search capability
+- `code_interpreter`: Python code execution in sandboxed environment
+- `mcp`: Remote MCP (Model Context Protocol) server with server_url and optional headers
+- `image_generation`: Image generation via gpt-image-1 series
+
+**R9.2**: Support `tool_choice` parameter:
+- `"auto"`: Model decides when to use tools
+- `"none"`: Disable tool usage
+- `"required"`: Force tool usage
+- `{"type": "function", "name": "..."}`: Force specific function
+
+## Non-Requirements (Out of Scope for Simulation)
+
+- Actual tool execution (tools are parsed but responses are simulated)
+- MCP server connections (server_url accepted but not connected)
+- Image generation output (accepted but not produced)
 - Audio processing
-- Background processing mode
-- Conversation persistence (previous_response_id chains)
+- Background processing polling (background flag accepted, returns immediately)
+- Conversation persistence (previous_response_id accepted but not stored)
 
 ## API Examples
 
