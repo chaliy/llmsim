@@ -219,13 +219,10 @@ mod generator_tests {
         let response = generator.generate(&request);
 
         assert!(!response.is_empty());
-        // Should contain lorem ipsum words
-        assert!(
-            response.contains("Lorem")
-                || response.contains("ipsum")
-                || response.contains("dolor")
-                || response.to_lowercase().contains("lorem")
-        );
+        // Response should end with a period
+        assert!(response.ends_with('.'));
+        // Response should have reasonable length (at least a few words)
+        assert!(response.split_whitespace().count() >= 5);
     }
 }
 

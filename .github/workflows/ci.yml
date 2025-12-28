@@ -168,4 +168,4 @@ jobs:
         run: uv run examples/langchain_client.py
 
       - name: Run TypeScript example
-        run: npx tsx examples/openai_client.ts
+        run: tsx examples/openai_client.ts
