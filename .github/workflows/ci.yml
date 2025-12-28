@@ -142,6 +142,7 @@ jobs:
 
       - name: Install Node dependencies
         run: npm install
+        working-directory: examples/typescript
 
       - name: Run Rust example (basic)
         run: cargo run --example basic_usage
@@ -168,4 +169,5 @@ jobs:
         run: uv run examples/langchain_client.py
 
       - name: Run TypeScript example
-        run: npx tsx examples/openai_client.ts
+        run: npx tsx openai_client.ts
+        working-directory: examples/typescript
