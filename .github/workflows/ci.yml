@@ -140,8 +140,8 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install tsx
-        run: npm install -g tsx openai
+      - name: Install Node dependencies
+        run: npm install
 
       - name: Run Rust example (basic)
         run: cargo run --example basic_usage
@@ -168,4 +168,4 @@ jobs:
         run: uv run examples/langchain_client.py
 
       - name: Run TypeScript example
-        run: tsx examples/openai_client.ts
+        run: npx tsx examples/openai_client.ts
