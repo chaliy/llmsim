@@ -25,8 +25,12 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 ## Installation
 
 ```bash
-cargo install --git https://github.com/llmsim/llmsim.git
+cargo install llmsim
 ```
+
+## Demo
+
+![Console UI Demo](/docs/images/tui.png)
 
 ## Usage
 
