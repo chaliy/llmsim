@@ -13,8 +13,9 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Features
 
+- **Multi-Provider API Support** - OpenAI Chat Completions and [OpenResponses](https://www.openresponses.org) APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
-- **Streaming Support** - Server-Sent Events (SSE) for OpenAI-compatible streaming
+- **Streaming Support** - Server-Sent Events (SSE) for both OpenAI and OpenResponses streaming formats
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
@@ -85,7 +86,7 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-OpenAI-compatible endpoints:
+### OpenAI-compatible endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
@@ -94,11 +95,58 @@ OpenAI-compatible endpoints:
 | `/v1/models` | GET | List available models |
 | `/v1/models/{model_id}` | GET | Get specific model details |
 
-LLMSim-specific endpoints:
+### OpenResponses-compatible endpoints
+
+[OpenResponses](https://www.openresponses.org) is an open-source specification for building multi-provider, interoperable LLM interfaces.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/v1/responses` | POST | Create response (streaming & non-streaming) |
+
+### LLMSim-specific endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
+
+### Example: OpenAI Chat Completions
+
+```bash
+curl http://localhost:8080/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [{"role": "user", "content": "Hello!"}],
+    "stream": false
+  }'
+```
+
+### Example: OpenResponses API
+
+```bash
+curl http://localhost:8080/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "input": "What is the capital of France?",
+    "stream": false
+  }'
+```
+
+Or with message-based input:
+
+```bash
+curl http://localhost:8080/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "input": [
+      {"role": "system", "content": "You are a helpful assistant."},
+      {"role": "user", "content": "Hello!"}
+    ],
+    "stream": true
+  }'
+```
 
 ### Stats Response
 
