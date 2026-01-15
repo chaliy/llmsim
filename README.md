@@ -86,33 +86,34 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-### OpenAI-compatible endpoints
+### OpenAI API (`/openai/v1/...`)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
-| `/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
-| `/v1/models` | GET | List available models |
-| `/v1/models/{model_id}` | GET | Get specific model details |
+| `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
+| `/openai/v1/models` | GET | List available models |
+| `/openai/v1/models/{model_id}` | GET | Get specific model details |
+| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 
-### OpenResponses-compatible endpoints
+### OpenResponses API (`/openresponses/v1/...`)
 
 [OpenResponses](https://www.openresponses.org) is an open-source specification for building multi-provider, interoperable LLM interfaces.
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/v1/responses` | POST | Create response (streaming & non-streaming) |
+| `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
 
-### LLMSim-specific endpoints
+### LLMSim endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/health` | GET | Health check |
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
 
 ### Example: OpenAI Chat Completions
 
 ```bash
-curl http://localhost:8080/v1/chat/completions \
+curl http://localhost:8080/openai/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5",
@@ -121,10 +122,10 @@ curl http://localhost:8080/v1/chat/completions \
   }'
 ```
 
-### Example: OpenResponses API
+### Example: OpenAI Responses API
 
 ```bash
-curl http://localhost:8080/v1/responses \
+curl http://localhost:8080/openai/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5",
@@ -133,10 +134,10 @@ curl http://localhost:8080/v1/responses \
   }'
 ```
 
-Or with message-based input:
+### Example: OpenResponses API
 
 ```bash
-curl http://localhost:8080/v1/responses \
+curl http://localhost:8080/openresponses/v1/responses \
   -H "Content-Type: application/json" \
   -d '{
     "model": "gpt-5",

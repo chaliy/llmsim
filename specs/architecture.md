@@ -119,14 +119,16 @@ Using `llmsim serve` allows for future expansion:
 
 ### API Support
 
-The server implements two LLM API specifications:
+The server implements two LLM API specifications with provider-namespaced routes:
 
-1. **OpenAI Chat Completions API** (`/v1/chat/completions`)
-   - Full streaming and non-streaming support
-   - Tool calling support
-   - All standard parameters (temperature, top_p, max_tokens, etc.)
+1. **OpenAI API** (`/openai/v1/...`)
+   - `/openai/v1/chat/completions` - Chat completions (streaming & non-streaming)
+   - `/openai/v1/models` - List available models
+   - `/openai/v1/models/:model_id` - Get specific model
+   - `/openai/v1/responses` - Responses API (streaming & non-streaming)
 
-2. **OpenResponses API** (`/v1/responses`) - [openresponses.org](https://www.openresponses.org)
+2. **OpenResponses API** (`/openresponses/v1/...`) - [openresponses.org](https://www.openresponses.org)
+   - `/openresponses/v1/responses` - Create response (streaming & non-streaming)
    - Open-source specification for interoperable LLM interfaces
    - Supports text and message-based input
    - Full streaming with lifecycle events (response.created, response.output_text.delta, etc.)
