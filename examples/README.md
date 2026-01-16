@@ -1,26 +1,32 @@
 # Examples
 
-## Rust Examples
+## API Endpoints
 
-### Basic Usage
+LLMSim provides two API providers:
 
-Demonstrates library usage: token counting, generators, latency profiles, and streaming.
+| Provider | Base Path | Description |
+|----------|-----------|-------------|
+| **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
+| **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 
-```bash
-cargo run --example basic_usage
-```
+### OpenAI API Endpoints
 
-### Responses API Usage
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/openai/v1/chat/completions` | POST | Chat completions (streaming supported) |
+| `/openai/v1/responses` | POST | Responses API (streaming supported) |
+| `/openai/v1/models` | GET | List available models |
+| `/openai/v1/models/:id` | GET | Get model details |
 
-Demonstrates the OpenAI Responses API types, structures, and streaming:
+### OpenResponses API Endpoints
 
-```bash
-cargo run --example responses_usage
-```
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/openresponses/v1/responses` | POST | Create response (streaming supported) |
 
-## Python Examples
+## Running the Examples
 
-Python examples require the server to be running first:
+All examples require the server to be running first:
 
 ```bash
 # Start server (headless)
@@ -30,20 +36,30 @@ cargo run --release -- serve --port 8080
 cargo run --release -- serve --port 8080 --tui
 ```
 
-### OpenAI SDK (Chat Completions)
+## Rust Example
 
-Direct usage of the official OpenAI Python library with Chat Completions API:
+Demonstrates library usage: token counting, generators, latency profiles, and streaming.
+
+```bash
+cargo run --example basic_usage
+```
+
+## Python Examples
+
+### OpenAI SDK
+
+Direct usage of the official OpenAI Python library:
 
 ```bash
 uv run examples/openai_client.py
 ```
 
-### Responses API Client
+### OpenResponses API
 
-Using the OpenAI Responses API with httpx:
+Using the OpenResponses specification with httpx:
 
 ```bash
-uv run examples/responses_client.py
+uv run examples/openresponses_client.py
 ```
 
 ### LangChain
@@ -63,11 +79,14 @@ npm install openai
 npx tsx examples/openai_client.ts
 ```
 
-### Custom Server URL
+## Custom Server URL
 
 ```bash
-LLMSIM_URL=http://localhost:8080 uv run examples/responses_client.py
-LLMSIM_URL=http://localhost:8080/openai uv run examples/openai_client.py
+# OpenAI examples
+LLMSIM_URL=http://localhost:9000/openai/v1 uv run examples/openai_client.py
+
+# OpenResponses example
+LLMSIM_URL=http://localhost:9000 uv run examples/openresponses_client.py
 ```
 
 ## Stats API
@@ -85,3 +104,50 @@ Response includes:
 - Latency metrics (avg, min, max)
 - Requests per second
 - Per-model request distribution
+
+## Quick API Test
+
+### OpenAI Chat Completions
+
+```bash
+curl http://localhost:8080/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "messages": [{"role": "user", "content": "Hello!"}]
+  }'
+```
+
+### OpenAI Responses API
+
+```bash
+curl http://localhost:8080/openai/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "input": "What is 2+2?"
+  }'
+```
+
+### OpenResponses API
+
+```bash
+curl http://localhost:8080/openresponses/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "input": "Hello, world!"
+  }'
+```
+
+### Streaming (OpenResponses)
+
+```bash
+curl http://localhost:8080/openresponses/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-5",
+    "input": "Tell me a story",
+    "stream": true
+  }'
+```
