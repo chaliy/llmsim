@@ -7,9 +7,10 @@
  * realistic latency without running actual models.
  *
  * Server endpoints:
- *     POST /openai/chat/completions - Chat completions (streaming supported)
- *     GET  /openai/models           - List available models
- *     GET  /openai/models/:id       - Get model details
+ *     POST /openai/v1/chat/completions - Chat completions (streaming supported)
+ *     POST /openai/v1/responses        - Responses API
+ *     GET  /openai/v1/models           - List available models
+ *     GET  /openai/v1/models/:id       - Get model details
  *
  * Prerequisites:
  *     Start the llmsim server first:
@@ -25,13 +26,13 @@
  *     npx tsx examples/openai_client.ts
  *
  * Environment variables:
- *     LLMSIM_URL: Server URL (default: http://localhost:8080/openai)
+ *     LLMSIM_URL: Server URL (default: http://localhost:8080/openai/v1)
  */
 
 import OpenAI from "openai";
 
 async function main(): Promise<void> {
-  const baseURL = process.env.LLMSIM_URL || "http://localhost:8080/openai";
+  const baseURL = process.env.LLMSIM_URL || "http://localhost:8080/openai/v1";
 
   console.log("=".repeat(50));
   console.log("OpenAI SDK (TypeScript) + LLMSim Example");
