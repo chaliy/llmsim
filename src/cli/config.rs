@@ -180,10 +180,13 @@ pub struct ModelsConfig {
 }
 
 fn default_models() -> Vec<String> {
+    // Default model list with profiles from https://models.dev
+    // Each model has realistic context_window and max_output_tokens
     vec![
         // GPT-5 family (from models.dev)
         "gpt-5".to_string(),
         "gpt-5-mini".to_string(),
+        "gpt-5-nano".to_string(),
         "gpt-5-codex".to_string(),
         "gpt-5.1".to_string(),
         "gpt-5.1-codex".to_string(),

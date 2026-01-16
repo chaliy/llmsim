@@ -10,6 +10,7 @@
 //! - Accurate token counting using tiktoken-rs
 //! - Error injection for testing error handling
 //! - Multiple response generators (lorem, echo, fixed, random)
+//! - Realistic model profiles from [models.dev](https://models.dev) with context windows
 //!
 //! ## Usage
 //!

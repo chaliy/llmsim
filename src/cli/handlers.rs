@@ -316,23 +316,23 @@ fn count_openresponses_input_tokens(request: &ResponseRequest) -> usize {
 }
 
 /// GET /openai/v1/models
+/// Returns models with realistic profiles from models.dev when available
 pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    use crate::openai::{get_model_profile, infer_model_owner};
+
     let models: Vec<Model> = state
         .config
         .models
         .available
         .iter()
         .map(|id| {
-            let owned_by = if id.contains("gpt") {
-                "openai"
-            } else if id.contains("claude") {
-                "anthropic"
-            } else if id.contains("gemini") {
-                "google"
+            // Use profile from models.dev registry if available
+            if let Some(profile) = get_model_profile(id) {
+                Model::from_profile(profile)
             } else {
-                "llmsim"
-            };
-            Model::new(id, owned_by)
+                // Fall back to basic model with inferred owner
+                Model::new(id, infer_model_owner(id))
+            }
         })
         .collect();
 
@@ -340,21 +340,21 @@ pub async fn list_models(State(state): State<Arc<AppState>>) -> impl IntoRespons
 }
 
 /// GET /openai/v1/models/:model_id
+/// Returns model with realistic profile from models.dev when available
 pub async fn get_model(
     State(state): State<Arc<AppState>>,
     Path(model_id): Path<String>,
 ) -> Result<Json<Model>, AppError> {
+    use crate::openai::{get_model_profile, infer_model_owner};
+
     if state.config.models.available.contains(&model_id) {
-        let owned_by = if model_id.contains("gpt") {
-            "openai"
-        } else if model_id.contains("claude") {
-            "anthropic"
-        } else if model_id.contains("gemini") {
-            "google"
+        // Use profile from models.dev registry if available
+        let model = if let Some(profile) = get_model_profile(&model_id) {
+            Model::from_profile(profile)
         } else {
-            "llmsim"
+            Model::new(&model_id, infer_model_owner(&model_id))
         };
-        Ok(Json(Model::new(&model_id, owned_by)))
+        Ok(Json(model))
     } else {
         Err(AppError::NotFound(format!(
             "Model '{}' not found",

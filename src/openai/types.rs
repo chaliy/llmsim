@@ -395,21 +395,43 @@ impl ErrorResponse {
 }
 
 /// Model object returned by /openai/v1/models endpoint
+/// Extended with context_window and max_output_tokens from models.dev profiles
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Model {
     pub id: String,
     pub object: String,
     pub created: i64,
     pub owned_by: String,
+    /// Maximum context window size in tokens
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub context_window: Option<u32>,
+    /// Maximum output tokens per request
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub max_output_tokens: Option<u32>,
 }
 
 impl Model {
+    /// Create a basic model (backward compatible)
     pub fn new(id: impl Into<String>, owned_by: impl Into<String>) -> Self {
         Self {
             id: id.into(),
             object: "model".to_string(),
             created: chrono::Utc::now().timestamp(),
             owned_by: owned_by.into(),
+            context_window: None,
+            max_output_tokens: None,
+        }
+    }
+
+    /// Create a model with full profile information
+    pub fn from_profile(profile: &super::models::ModelProfile) -> Self {
+        Self {
+            id: profile.id.clone(),
+            object: "model".to_string(),
+            created: profile.created,
+            owned_by: profile.owned_by.clone(),
+            context_window: Some(profile.context_window),
+            max_output_tokens: Some(profile.max_output_tokens),
         }
     }
 }
