@@ -15,8 +15,8 @@ LLMSim provides two API providers:
 |----------|--------|-------------|
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming supported) |
 | `/openai/v1/responses` | POST | Responses API (streaming supported) |
-| `/openai/v1/models` | GET | List available models with context windows |
-| `/openai/v1/models/:id` | GET | Get model details including limits |
+| `/openai/v1/models` | GET | List available models |
+| `/openai/v1/models/:id` | GET | Get model details |
 
 ### OpenResponses API Endpoints
 
@@ -106,27 +106,6 @@ Response includes:
 - Per-model request distribution
 
 ## Quick API Test
-
-### List Models
-
-The models endpoint returns realistic model profiles sourced from [models.dev](https://models.dev):
-
-```bash
-curl http://localhost:8080/openai/v1/models | jq '.data[0]'
-```
-
-Response includes context window and output limits:
-
-```json
-{
-  "id": "gpt-5",
-  "object": "model",
-  "created": 1754524800,
-  "owned_by": "openai",
-  "context_window": 400000,
-  "max_output_tokens": 128000
-}
-```
 
 ### OpenAI Chat Completions
 
