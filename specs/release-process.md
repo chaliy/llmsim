@@ -2,7 +2,7 @@
 
 ## Abstract
 
-This document describes the release process for LLMSim, including versioning strategy, release workflow, and automation.
+This document describes the release process for LLMSim. Releases are initiated by asking a coding agent to prepare the release, with CI automation handling the rest.
 
 ## Versioning
 
@@ -17,61 +17,73 @@ LLMSim follows [Semantic Versioning](https://semver.org/):
 ### Overview
 
 ```
-┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
-│  Prepare        │     │  GitHub         │     │  crates.io      │
-│  Release PR     │────>│  Release        │────>│  Publish        │
-│                 │     │  (automatic)    │     │  (automatic)    │
-└─────────────────┘     └─────────────────┘     └─────────────────┘
+┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────┐
+│  Human asks     │     │  Agent creates  │     │  GitHub         │     │  crates.io      │
+│  "release v0.2" │────>│  release PR     │────>│  Release        │────>│  Publish        │
+│                 │     │                 │     │  (automatic)    │     │  (automatic)    │
+└─────────────────┘     └─────────────────┘     └─────────────────┘     └─────────────────┘
 ```
 
-### Step 1: Prepare Release
+### Human Steps
 
-1. **Update CHANGELOG.md**
+1. **Ask the agent** to create a release:
+   - "Create release v0.2.0"
+   - "Prepare a patch release"
+   - "Release the current changes as v0.2.0"
+
+2. **Review the PR** created by the agent
+
+3. **Merge to main** - CI handles GitHub Release and crates.io publish
+
+### Agent Steps (automated)
+
+When asked to create a release, the agent:
+
+1. **Determine version**
+   - Use version specified by human, OR
+   - Suggest next version based on changes (patch/minor/major)
+
+2. **Update CHANGELOG.md**
    - Move items from `[Unreleased]` to new version section
    - Add release date: `## [X.Y.Z] - YYYY-MM-DD`
    - Update comparison links at bottom of file
 
-2. **Update version in Cargo.toml**
-   ```toml
-   version = "X.Y.Z"
-   ```
+3. **Update Cargo.toml**
+   - Set `version = "X.Y.Z"`
 
-3. **Create release commit**
-   ```bash
-   git add CHANGELOG.md Cargo.toml
-   git commit -m "chore(release): prepare vX.Y.Z"
-   ```
+4. **Run verification**
+   - `cargo fmt --check`
+   - `cargo clippy`
+   - `cargo test`
 
-4. **Create PR and merge to main**
-   - PR title: `chore(release): prepare vX.Y.Z`
-   - Get review and merge
+5. **Commit and push**
+   - Commit message: `chore(release): prepare vX.Y.Z`
+   - Push to feature branch
 
-### Step 2: Automated Release (CI)
+6. **Create PR**
+   - Title: `chore(release): prepare vX.Y.Z`
+   - Include changelog excerpt in description
 
-When the release commit is pushed to `main`, the release workflow automatically:
+### CI Automation
 
-1. Extracts version from commit message
-2. Verifies `Cargo.toml` version matches
-3. Extracts release notes from `CHANGELOG.md`
-4. Creates GitHub Release with tag `vX.Y.Z`
+**On merge to main** (release.yml):
+- Detects commit message `chore(release): prepare vX.Y.Z`
+- Extracts release notes from CHANGELOG.md
+- Creates GitHub Release with tag `vX.Y.Z`
 
-### Step 3: Automated Publish (CI)
-
-When the GitHub Release is created, the publish workflow automatically:
-
-1. Runs verification (fmt, clippy, tests)
-2. Publishes to crates.io
+**On GitHub Release created** (publish.yml):
+- Runs verification (fmt, clippy, tests)
+- Publishes to crates.io
 
 ## Pre-Release Checklist
 
-Before preparing a release:
+The agent verifies before creating a release PR:
 
 - [ ] All CI checks pass on main
 - [ ] `cargo fmt` - code is formatted
 - [ ] `cargo clippy` - no warnings
 - [ ] `cargo test` - all tests pass
-- [ ] Documentation is up to date
-- [ ] CHANGELOG.md has entries for all changes
+- [ ] CHANGELOG.md has entries for changes since last release
 
 ## Workflows
 
@@ -88,31 +100,30 @@ Before preparing a release:
 - **File**: `.github/workflows/publish.yml`
 - **Secret required**: `CARGO_REGISTRY_TOKEN`
 
-## Example Release
+## Example Conversation
 
-```bash
-# 1. Update CHANGELOG.md with new version section
-# 2. Update Cargo.toml version
+```
+Human: Create release v0.2.0
 
-# 3. Commit changes
-git add CHANGELOG.md Cargo.toml
-git commit -m "chore(release): prepare v0.2.0"
+Agent: I'll prepare the v0.2.0 release. Let me:
+1. Update CHANGELOG.md with the v0.2.0 section
+2. Update Cargo.toml version to 0.2.0
+3. Run verification checks
+4. Create the release PR
 
-# 4. Push (or create PR)
-git push origin main
+[Agent performs steps...]
 
-# CI automatically:
-# - Creates GitHub Release v0.2.0
-# - Publishes to crates.io
+Done. PR created: https://github.com/llmsim/llmsim/pull/XX
+Please review and merge to trigger the release.
 ```
 
 ## Hotfix Releases
 
 For urgent fixes:
 
-1. Create fix on `main` branch
-2. Follow normal release process with patch version bump
-3. Example: `v0.1.0` -> `v0.1.1`
+1. Ask agent: "Create patch release v0.1.1 for the auth fix"
+2. Agent prepares release with patch version
+3. Review and merge
 
 ## Release Artifacts
 
