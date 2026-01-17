@@ -104,7 +104,7 @@ function quickNonStreaming() {
     });
 
     const response = http.post(
-        `${TARGET_URL}/v1/chat/completions`,
+        `${TARGET_URL}/openai/v1/chat/completions`,
         payload,
         {
             ...HTTP_PARAMS,
@@ -126,7 +126,7 @@ function streamingRequest() {
     });
 
     const response = http.post(
-        `${TARGET_URL}/v1/chat/completions`,
+        `${TARGET_URL}/openai/v1/chat/completions`,
         payload,
         {
             ...HTTP_PARAMS,
