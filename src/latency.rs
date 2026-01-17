@@ -185,7 +185,7 @@ impl LatencyProfile {
             return Duration::ZERO;
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let sample = if self.ttft_stddev_ms > 0 {
             let normal = Normal::new(self.ttft_mean_ms as f64, self.ttft_stddev_ms as f64)
                 .unwrap_or_else(|_| Normal::new(self.ttft_mean_ms as f64, 1.0).unwrap());
@@ -204,7 +204,7 @@ impl LatencyProfile {
             return Duration::ZERO;
         }
 
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let sample = if self.tbt_stddev_ms > 0 {
             let normal = Normal::new(self.tbt_mean_ms as f64, self.tbt_stddev_ms as f64)
                 .unwrap_or_else(|_| Normal::new(self.tbt_mean_ms as f64, 1.0).unwrap());
@@ -219,8 +219,8 @@ impl LatencyProfile {
 
     /// Sample a variable delay with jitter (0.5x to 1.5x of base)
     pub fn sample_with_jitter(&self, base_ms: u64) -> Duration {
-        let mut rng = rand::thread_rng();
-        let factor = rng.gen_range(0.5..1.5);
+        let mut rng = rand::rng();
+        let factor = rng.random_range(0.5..1.5);
         Duration::from_millis((base_ms as f64 * factor) as u64)
     }
 }
