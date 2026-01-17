@@ -273,3 +273,227 @@ mod stream_tests {
         assert!(has_usage, "Stream should include usage in final chunk");
     }
 }
+
+mod openresponses_tests {
+    use futures::StreamExt;
+    use llmsim::latency::LatencyProfile;
+    use llmsim::openresponses::{
+        Input, InputMessage, MessageContent, OpenResponsesStreamBuilder, Response, ResponseRequest,
+        ResponseStatus, Role, StreamEvent, StreamEventType, Usage,
+    };
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+
+    #[test]
+    fn test_response_request_text_input() {
+        let json = r#"{
+            "model": "gpt-5",
+            "input": "Hello, world!",
+            "stream": false
+        }"#;
+
+        let request: ResponseRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.model, "gpt-5");
+        assert!(!request.stream);
+        match request.input {
+            Input::Text(s) => assert_eq!(s, "Hello, world!"),
+            _ => panic!("Expected text input"),
+        }
+    }
+
+    #[test]
+    fn test_response_request_messages_input() {
+        let json = r#"{
+            "model": "gpt-5",
+            "input": [
+                {"role": "system", "content": "You are helpful."},
+                {"role": "user", "content": "Hello!"}
+            ],
+            "stream": true
+        }"#;
+
+        let request: ResponseRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.model, "gpt-5");
+        assert!(request.stream);
+        match &request.input {
+            Input::Messages(msgs) => {
+                assert_eq!(msgs.len(), 2);
+                assert_eq!(msgs[0].role, Role::System);
+                assert_eq!(msgs[1].role, Role::User);
+            }
+            _ => panic!("Expected messages input"),
+        }
+    }
+
+    #[test]
+    fn test_response_creation() {
+        let usage = Usage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 30,
+            input_tokens_details: None,
+            output_tokens_details: None,
+        };
+
+        let response = Response::new("gpt-5".to_string(), "Hello!".to_string(), usage);
+
+        assert_eq!(response.model, "gpt-5");
+        assert_eq!(response.status, ResponseStatus::Completed);
+        assert_eq!(response.object, "response");
+        assert!(response.id.starts_with("resp_"));
+        assert_eq!(response.output.len(), 1);
+    }
+
+    #[test]
+    fn test_response_serialization() {
+        let usage = Usage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 30,
+            input_tokens_details: None,
+            output_tokens_details: None,
+        };
+
+        let response = Response::new("gpt-5".to_string(), "Test response".to_string(), usage);
+        let json = serde_json::to_string(&response).unwrap();
+
+        assert!(json.contains("\"object\":\"response\""));
+        assert!(json.contains("\"model\":\"gpt-5\""));
+        assert!(json.contains("\"status\":\"completed\""));
+        assert!(json.contains("\"total_tokens\":30"));
+    }
+
+    #[test]
+    fn test_input_extract_text() {
+        // Test text input
+        let text_input = Input::Text("Hello, world!".to_string());
+        assert_eq!(text_input.extract_text(), "Hello, world!");
+
+        // Test messages input
+        let messages_input = Input::Messages(vec![
+            InputMessage {
+                role: Role::System,
+                content: MessageContent::Text("You are helpful.".to_string()),
+            },
+            InputMessage {
+                role: Role::User,
+                content: MessageContent::Text("Hello!".to_string()),
+            },
+        ]);
+        assert_eq!(messages_input.extract_text(), "You are helpful. Hello!");
+    }
+
+    #[test]
+    fn test_stream_event_types() {
+        let event = StreamEvent::output_text_delta(0, 0, "Hello".to_string());
+        assert_eq!(event.event_type, StreamEventType::OutputTextDelta);
+        assert_eq!(event.delta, Some("Hello".to_string()));
+        assert_eq!(event.output_index, Some(0));
+        assert_eq!(event.content_index, Some(0));
+    }
+
+    #[tokio::test]
+    async fn test_openresponses_stream_basic() {
+        let stream = OpenResponsesStreamBuilder::new("gpt-5", "Hello world")
+            .latency(LatencyProfile::instant())
+            .build();
+
+        let chunks: Vec<String> = stream.into_stream().collect().await;
+
+        // Should have multiple events
+        assert!(chunks.len() >= 6);
+        assert!(chunks.last().unwrap().contains("[DONE]"));
+
+        // Verify key events are present
+        let all_text = chunks.join("");
+        assert!(all_text.contains("response.created"));
+        assert!(all_text.contains("response.in_progress"));
+        assert!(all_text.contains("response.output_text.delta"));
+        assert!(all_text.contains("response.completed"));
+    }
+
+    #[tokio::test]
+    async fn test_openresponses_stream_with_usage() {
+        let usage = Usage {
+            input_tokens: 10,
+            output_tokens: 5,
+            total_tokens: 15,
+            input_tokens_details: None,
+            output_tokens_details: None,
+        };
+
+        let stream = OpenResponsesStreamBuilder::new("gpt-5", "Hi")
+            .latency(LatencyProfile::instant())
+            .usage(usage)
+            .build();
+
+        let chunks: Vec<String> = stream.into_stream().collect().await;
+
+        // Should include usage in completed event
+        let has_usage = chunks.iter().any(|c| c.contains("\"total_tokens\":15"));
+        assert!(has_usage, "Stream should include usage in completed event");
+    }
+
+    #[tokio::test]
+    async fn test_openresponses_stream_callback() {
+        let callback_called = Arc::new(AtomicBool::new(false));
+        let callback_clone = callback_called.clone();
+
+        let stream = OpenResponsesStreamBuilder::new("gpt-5", "Test")
+            .latency(LatencyProfile::instant())
+            .on_complete(move || {
+                callback_clone.store(true, Ordering::SeqCst);
+            })
+            .build();
+
+        let _chunks: Vec<String> = stream.into_stream().collect().await;
+        assert!(callback_called.load(Ordering::SeqCst));
+    }
+
+    #[test]
+    fn test_error_response() {
+        let error = llmsim::openresponses::ErrorResponse::rate_limit();
+        let json = serde_json::to_string(&error).unwrap();
+        assert!(json.contains("\"type\":\"rate_limit_error\""));
+        assert!(json.contains("\"code\":\"rate_limit_exceeded\""));
+    }
+
+    #[test]
+    fn test_tool_parsing() {
+        let json = r#"{
+            "model": "gpt-5",
+            "input": "What's the weather?",
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "get_weather",
+                        "description": "Get weather for a location"
+                    }
+                }
+            ]
+        }"#;
+
+        let request: ResponseRequest = serde_json::from_str(json).unwrap();
+        assert!(request.tools.is_some());
+        assert_eq!(request.tools.as_ref().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn test_reasoning_config() {
+        let json = r#"{
+            "model": "o3",
+            "input": "Solve this",
+            "reasoning": {
+                "effort": "high",
+                "summary": "detailed"
+            }
+        }"#;
+
+        let request: ResponseRequest = serde_json::from_str(json).unwrap();
+        assert!(request.reasoning.is_some());
+        let reasoning = request.reasoning.unwrap();
+        assert_eq!(reasoning.effort, Some("high".to_string()));
+        assert_eq!(reasoning.summary, Some("detailed".to_string()));
+    }
+}

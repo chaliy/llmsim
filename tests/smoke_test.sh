@@ -77,8 +77,8 @@ else
 fi
 
 # Test 3: Models list
-echo_info "Testing /v1/models endpoint..."
-MODELS=$(curl -s "$BASE_URL/v1/models")
+echo_info "Testing /openai/v1/models endpoint..."
+MODELS=$(curl -s "$BASE_URL/openai/v1/models")
 if echo "$MODELS" | grep -q '"object":"list"'; then
     echo_pass "Models endpoint passed"
 else
@@ -87,8 +87,8 @@ else
 fi
 
 # Test 4: Chat completion (non-streaming)
-echo_info "Testing /v1/chat/completions (non-streaming)..."
-RESPONSE=$(curl -s -X POST "$BASE_URL/v1/chat/completions" \
+echo_info "Testing /openai/v1/chat/completions (non-streaming)..."
+RESPONSE=$(curl -s -X POST "$BASE_URL/openai/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -d '{
         "model": "gpt-4",
@@ -103,8 +103,8 @@ else
 fi
 
 # Test 5: Chat completion (streaming)
-echo_info "Testing /v1/chat/completions (streaming)..."
-STREAM_RESPONSE=$(curl -s -X POST "$BASE_URL/v1/chat/completions" \
+echo_info "Testing /openai/v1/chat/completions (streaming)..."
+STREAM_RESPONSE=$(curl -s -X POST "$BASE_URL/openai/v1/chat/completions" \
     -H "Content-Type: application/json" \
     -d '{
         "model": "gpt-4",
@@ -138,19 +138,51 @@ else
     exit 1
 fi
 
-# Test 8: Legacy endpoint support
-echo_info "Testing legacy /openai/chat/completions endpoint..."
-LEGACY_RESPONSE=$(curl -s -X POST "$BASE_URL/openai/chat/completions" \
+# Test 8: OpenAI Responses API
+echo_info "Testing /openai/v1/responses endpoint..."
+RESPONSES_API=$(curl -s -X POST "$BASE_URL/openai/v1/responses" \
     -H "Content-Type: application/json" \
     -d '{
         "model": "gpt-4",
-        "messages": [{"role": "user", "content": "Test"}],
+        "input": "Hello!",
         "stream": false
     }')
-if echo "$LEGACY_RESPONSE" | grep -q '"choices"'; then
-    echo_pass "Legacy endpoint passed"
+if echo "$RESPONSES_API" | grep -q '"status":"completed"'; then
+    echo_pass "OpenAI Responses API passed"
 else
-    echo_fail "Legacy endpoint failed: $LEGACY_RESPONSE"
+    echo_fail "OpenAI Responses API failed: $RESPONSES_API"
+    exit 1
+fi
+
+# Test 9: OpenResponses API
+echo_info "Testing /openresponses/v1/responses endpoint..."
+OPENRESPONSES=$(curl -s -X POST "$BASE_URL/openresponses/v1/responses" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "gpt-4",
+        "input": [{"role": "user", "content": "Test"}],
+        "stream": false
+    }')
+if echo "$OPENRESPONSES" | grep -q '"status":"completed"'; then
+    echo_pass "OpenResponses API passed"
+else
+    echo_fail "OpenResponses API failed: $OPENRESPONSES"
+    exit 1
+fi
+
+# Test 10: OpenResponses streaming
+echo_info "Testing /openresponses/v1/responses (streaming)..."
+OPENRESPONSES_STREAM=$(curl -s -X POST "$BASE_URL/openresponses/v1/responses" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "gpt-4",
+        "input": "Hello!",
+        "stream": true
+    }')
+if echo "$OPENRESPONSES_STREAM" | grep -q 'response.completed'; then
+    echo_pass "OpenResponses streaming passed"
+else
+    echo_fail "OpenResponses streaming failed: $OPENRESPONSES_STREAM"
     exit 1
 fi
 

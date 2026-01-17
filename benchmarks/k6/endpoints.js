@@ -82,7 +82,7 @@ function testHealth() {
 }
 
 function testModels() {
-    const response = http.get(`${TARGET_URL}/v1/models`);
+    const response = http.get(`${TARGET_URL}/openai/v1/models`);
     modelListCalls.add(1);
 
     const success = check(response, {
@@ -111,7 +111,7 @@ function testModelDetail() {
     const models = ['gpt-5', 'gpt-4o', 'claude-opus-4'];
     const model = models[Math.floor(Math.random() * models.length)];
 
-    const response = http.get(`${TARGET_URL}/v1/models/${model}`);
+    const response = http.get(`${TARGET_URL}/openai/v1/models/${model}`);
 
     const success = check(response, {
         'model detail status 200': (r) => r.status === 200,
@@ -160,7 +160,7 @@ function testChatCompletion() {
     });
 
     const response = http.post(
-        `${TARGET_URL}/v1/chat/completions`,
+        `${TARGET_URL}/openai/v1/chat/completions`,
         payload,
         {
             ...HTTP_PARAMS,

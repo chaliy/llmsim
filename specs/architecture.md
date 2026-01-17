@@ -22,6 +22,10 @@ llmsim/
 │   ├── openai/         # OpenAI API types
 │   │   ├── mod.rs
 │   │   └── types.rs
+│   ├── openresponses/  # OpenResponses API types (https://www.openresponses.org)
+│   │   ├── mod.rs
+│   │   ├── types.rs    # Request/response types
+│   │   └── stream.rs   # OpenResponses-specific streaming
 │   ├── stats.rs        # Real-time statistics tracking
 │   ├── tokens.rs       # Token counting with tiktoken
 │   ├── latency.rs      # Latency profile simulation
@@ -126,9 +130,26 @@ See `specs/responses-api.md` for detailed Responses API specification.
 
 ### Module Organization
 
-- **Public modules** (`openai`, `generator`, `latency`, `stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
+- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration
 - **TUI modules** (`tui/*`): Terminal dashboard, built with Ratatui
+
+### API Support
+
+The server implements two LLM API specifications with provider-namespaced routes:
+
+1. **OpenAI API** (`/openai/v1/...`)
+   - `/openai/v1/chat/completions` - Chat completions (streaming & non-streaming)
+   - `/openai/v1/models` - List available models
+   - `/openai/v1/models/:model_id` - Get specific model
+   - `/openai/v1/responses` - Responses API (streaming & non-streaming)
+
+2. **OpenResponses API** (`/openresponses/v1/...`) - [openresponses.org](https://www.openresponses.org)
+   - `/openresponses/v1/responses` - Create response (streaming & non-streaming)
+   - Open-source specification for interoperable LLM interfaces
+   - Supports text and message-based input
+   - Full streaming with lifecycle events (response.created, response.output_text.delta, etc.)
+   - Tool support, reasoning configuration, and metadata
 
 ### Stats Module
 

@@ -39,7 +39,11 @@ pub async fn run_server_with_stats(
         config.response.generator,
         config.response.target_tokens
     );
-    tracing::info!("Stats endpoint available at /llmsim/stats");
+    tracing::info!("OpenAI endpoints: /openai/v1/...");
+    tracing::info!(
+        "OpenResponses endpoint: /openresponses/v1/responses (https://www.openresponses.org)"
+    );
+    tracing::info!("Stats endpoint: /llmsim/stats");
 
     let state = Arc::new(AppState::new(config, stats));
 
@@ -56,6 +60,11 @@ pub async fn run_server_with_stats(
         .route("/openai/v1/models/:model_id", get(handlers::get_model))
         // OpenAI Responses API
         .route("/openai/v1/responses", post(handlers::create_response))
+        // OpenResponses API routes (https://www.openresponses.org)
+        .route(
+            "/openresponses/v1/responses",
+            post(handlers::create_openresponses_response),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state);

@@ -44,6 +44,7 @@ pub mod errors;
 pub mod generator;
 pub mod latency;
 pub mod openai;
+pub mod openresponses;
 pub mod responses_stream;
 pub mod stats;
 pub mod stream;

@@ -13,8 +13,9 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Features
 
+- **Multi-Provider API Support** - OpenAI Chat Completions and [OpenResponses](https://www.openresponses.org) APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
-- **Streaming Support** - Server-Sent Events (SSE) for OpenAI-compatible streaming
+- **Streaming Support** - Server-Sent Events (SSE) for both OpenAI and OpenResponses streaming formats
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
@@ -101,7 +102,15 @@ Provider-specific endpoints mirror their original API paths, prefixed with the p
 
 When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 
-LLMSim-specific endpoints:
+### OpenResponses API
+
+[OpenResponses](https://www.openresponses.org) is an open-source specification for building multi-provider, interoperable LLM interfaces.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
+
+### LLMSim-specific endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
