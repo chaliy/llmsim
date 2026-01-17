@@ -162,6 +162,9 @@ jobs:
       - name: Run OpenAI Python example
         run: uv run examples/openai_client.py
 
+      - name: Run List Models Python example
+        run: uv run examples/list_models.py
+
       - name: Run Responses Python example
         run: uv run examples/responses_client.py
 

@@ -170,23 +170,73 @@ The `tui` module provides a real-time terminal dashboard built with [Ratatui](ht
 - **app.rs**: Event loop, state management, HTTP polling
 - **ui.rs**: Widget layout and rendering (tables, sparklines, bar charts)
 
-## Supported Models
+## Model Profiles
 
-Based on [models.dev](https://models.dev/api.json):
+Model specifications are sourced from [models.dev](https://models.dev) and baked into the codebase at compile time. Each model profile includes:
+
+- **Context Window**: Maximum input token limit
+- **Max Output Tokens**: Maximum response length
+- **Capabilities**: Function calling, vision, JSON mode, reasoning
+- **Knowledge Cutoff**: Training data cutoff date
+- **Release Date**: Model availability timestamp
+
+### OpenAI Models
+
+The `/openai/v1/models` endpoint returns realistic model data including context windows and output limits:
+
+```json
+{
+  "object": "list",
+  "data": [
+    {
+      "id": "gpt-5",
+      "object": "model",
+      "created": 1754524800,
+      "owned_by": "openai",
+      "context_window": 400000,
+      "max_output_tokens": 128000
+    }
+  ]
+}
+```
 
 ### GPT-5 Family
-- gpt-5, gpt-5-mini, gpt-5-codex
-- gpt-5.1, gpt-5.1-codex, gpt-5.1-codex-mini, gpt-5.1-codex-max
-- gpt-5.2
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| gpt-5 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5-mini | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5-nano | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.1 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.2 | 400K | 128K | Vision, Reasoning, Tools, JSON |
 
-### O-Series Reasoning
-- o3, o3-mini, o4-mini
+### O-Series Reasoning Models
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| o3 | 200K | 100K | Vision, Reasoning, Tools, JSON |
+| o3-mini | 200K | 100K | Vision, Reasoning, Tools, JSON |
+| o4-mini | 200K | 100K | Vision, Reasoning, Tools, JSON |
 
 ### GPT-4 Family
-- gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| gpt-4o | 128K | 16K | Vision, Tools, JSON |
+| gpt-4o-mini | 128K | 16K | Vision, Tools, JSON |
+| gpt-4-turbo | 128K | 4K | Tools, JSON |
+| gpt-4 | 8K | 8K | Tools, JSON |
+| gpt-4.1 | 1M | 32K | Vision, Tools, JSON |
 
 ### Claude Family
-- claude-3.5-sonnet, claude-3.7-sonnet
-- claude-sonnet-4, claude-sonnet-4.5
-- claude-opus-4, claude-opus-4.5
-- claude-haiku-4.5
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| claude-3.5-sonnet | 200K | 8K | Vision, Tools, JSON |
+| claude-3.7-sonnet | 200K | 64K | Vision, Reasoning, Tools, JSON |
+| claude-sonnet-4 | 200K | 64K | Vision, Tools, JSON |
+| claude-sonnet-4.5 | 200K | 64K | Vision, Tools, JSON |
+| claude-opus-4 | 200K | 64K | Vision, Tools, JSON |
+| claude-opus-4.5 | 200K | 64K | Vision, Tools, JSON |
+| claude-haiku-4.5 | 200K | 64K | Vision, Tools, JSON |
+
+### Context Window Emulation (Future)
+
+The context window information is included to support future context window limit emulation, where requests exceeding a model's context window will return appropriate error responses.

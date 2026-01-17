@@ -90,19 +90,18 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-Provider-specific endpoints mirror their original API paths, prefixed with the provider name:
+### OpenAI API (`/openai/v1/...`)
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
-| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
+| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 
 When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 
-### OpenResponses API
+### OpenResponses API (`/openresponses/v1/...`)
 
 [OpenResponses](https://www.openresponses.org) is an open-source specification for building multi-provider, interoperable LLM interfaces.
 
@@ -110,10 +109,11 @@ When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 |----------|--------|-------------|
 | `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
 
-### LLMSim-specific endpoints
+### LLMSim endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/health` | GET | Health check |
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
 
 ## Configuration
