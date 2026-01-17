@@ -2,7 +2,7 @@
 // Provides different strategies for generating simulated LLM responses.
 
 use crate::openai::ChatCompletionRequest;
-use rand::seq::SliceRandom;
+use rand::prelude::IndexedRandom;
 use rand::Rng;
 
 /// Trait for generating simulated responses
@@ -90,7 +90,7 @@ impl LoremGenerator {
     }
 
     fn generate_text(&self, word_count: usize) -> String {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let words: Vec<&str> = (0..word_count)
             .map(|_| *Self::LOREM_WORDS.choose(&mut rng).unwrap())
             .collect();
@@ -224,7 +224,7 @@ impl Default for RandomWordGenerator {
 
 impl ResponseGenerator for RandomWordGenerator {
     fn generate(&self, _request: &ChatCompletionRequest) -> String {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         // Approximate: 1 token ≈ 0.75 words
         let word_count = (self.target_tokens as f64 * 0.75) as usize;
 
@@ -247,7 +247,7 @@ impl ResponseGenerator for RandomWordGenerator {
             }
 
             // Add punctuation
-            if (i + 1) % rng.gen_range(8..15) == 0 && i < words.len() - 1 {
+            if (i + 1) % rng.random_range(8..15) == 0 && i < words.len() - 1 {
                 result.push('.');
                 // Next word should be capitalized (handled in next iteration if we check)
             }

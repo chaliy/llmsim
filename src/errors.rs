@@ -183,8 +183,8 @@ impl ErrorInjector {
     /// Decide whether to inject an error based on configured rates
     /// Returns None if no error should be injected
     pub fn maybe_inject(&self) -> Option<SimulatedError> {
-        let mut rng = rand::thread_rng();
-        let roll: f64 = rng.gen();
+        let mut rng = rand::rng();
+        let roll: f64 = rng.random();
 
         let mut threshold = 0.0;
 
@@ -192,7 +192,7 @@ impl ErrorInjector {
         threshold += self.config.rate_limit_rate;
         if roll < threshold {
             return Some(SimulatedError::RateLimit {
-                retry_after_seconds: rng.gen_range(1..60),
+                retry_after_seconds: rng.random_range(1..60),
             });
         }
 
@@ -200,7 +200,7 @@ impl ErrorInjector {
         threshold += self.config.server_error_rate;
         if roll < threshold {
             // Randomly choose between 500 and 503
-            return if rng.gen_bool(0.7) {
+            return if rng.random_bool(0.7) {
                 Some(SimulatedError::ServerError)
             } else {
                 Some(SimulatedError::ServiceUnavailable)
