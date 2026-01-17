@@ -46,6 +46,8 @@ When asked to create a release, the agent:
 2. **Update CHANGELOG.md**
    - Move items from `[Unreleased]` to new version section
    - Add release date: `## [X.Y.Z] - YYYY-MM-DD`
+   - Add breaking changes section if applicable (see format below)
+   - List commits in GitHub-style format with PR links and contributors
    - Update comparison links at bottom of file
 
 3. **Update Cargo.toml**
@@ -84,6 +86,60 @@ The agent verifies before creating a release PR:
 - [ ] `cargo clippy` - no warnings
 - [ ] `cargo test` - all tests pass
 - [ ] CHANGELOG.md has entries for changes since last release
+
+## Changelog Format
+
+The changelog follows [Keep a Changelog](https://keepachangelog.com/) with GitHub-style commit listings.
+
+### Structure
+
+```markdown
+## [X.Y.Z] - YYYY-MM-DD
+
+### Breaking Changes
+
+- **Short description**: Detailed explanation of what changed and migration steps.
+  - Before: `/old/path`
+  - After: `/new/path`
+
+### What's Changed
+
+- Commit message ([#PR](https://github.com/chaliy/llmsim/pull/PR)) by @contributor
+- Another commit ([#PR](https://github.com/chaliy/llmsim/pull/PR)) by @contributor
+```
+
+### Generating Commit List
+
+Get commits since last release, excluding chore/ci/bench commits:
+
+```bash
+git log --oneline | grep -v -E "^.{7} (chore|ci|bench)"
+```
+
+Format each commit as:
+```
+- <commit message> ([#<PR>](https://github.com/chaliy/llmsim/pull/<PR>)) by @<author>
+```
+
+### Breaking Changes Section
+
+Include when the release has breaking changes (typically MINOR or MAJOR versions):
+
+1. **Bold summary** of the breaking change
+2. **Migration guide** showing before/after
+3. **Code examples** if helpful
+
+Example:
+```markdown
+### Breaking Changes
+
+- **API endpoints now require provider prefix**: All provider-specific endpoints are prefixed with the provider name.
+  - `/v1/chat/completions` → `/openai/v1/chat/completions`
+  - When using SDKs, configure base URL with provider prefix:
+    ```python
+    client = OpenAI(base_url="http://localhost:3000/openai/v1", api_key="not-needed")
+    ```
+```
 
 ## Workflows
 
