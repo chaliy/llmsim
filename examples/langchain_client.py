@@ -15,7 +15,6 @@ latency without running actual models.
 
 Server endpoints:
     POST /openai/v1/chat/completions - Chat completions (streaming supported)
-    POST /openai/v1/responses        - Responses API
     GET  /openai/v1/models           - List available models
     GET  /openai/v1/models/:id       - Get model details
 

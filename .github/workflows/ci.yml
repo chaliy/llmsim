@@ -135,8 +135,20 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Run Rust example
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Node dependencies
+        run: npm install
+        working-directory: examples/node
+
+      - name: Run Rust example (basic)
         run: cargo run --example basic_usage
+
+      - name: Run Rust example (responses)
+        run: cargo run --example responses_usage
 
       - name: Build server
         run: cargo build --release
@@ -150,5 +162,12 @@ jobs:
       - name: Run OpenAI Python example
         run: uv run examples/openai_client.py
 
+      - name: Run Responses Python example
+        run: uv run examples/responses_client.py
+
       - name: Run LangChain Python example
         run: uv run examples/langchain_client.py
+
+      - name: Run TypeScript example
+        run: npx tsx openai_client.ts
+        working-directory: examples/node

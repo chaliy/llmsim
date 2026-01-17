@@ -77,8 +77,9 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
 
     let total = stats.map(|s| s.total_requests).unwrap_or(0);
     let active = stats.map(|s| s.active_requests).unwrap_or(0);
+    let completions = stats.map(|s| s.completions_requests).unwrap_or(0);
+    let responses = stats.map(|s| s.responses_requests).unwrap_or(0);
     let streaming = stats.map(|s| s.streaming_requests).unwrap_or(0);
-    let non_streaming = stats.map(|s| s.non_streaming_requests).unwrap_or(0);
     let rps = stats.map(|s| s.requests_per_second).unwrap_or(0.0);
 
     let rows = vec![
@@ -101,15 +102,19 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
             ),
         ]),
         Row::new(vec![
-            Span::raw("Streaming"),
-            Span::styled(format_number(streaming), Style::default().fg(Color::Cyan)),
+            Span::raw("Completions API"),
+            Span::styled(format_number(completions), Style::default().fg(Color::Cyan)),
         ]),
         Row::new(vec![
-            Span::raw("Non-Streaming"),
+            Span::raw("Responses API"),
             Span::styled(
-                format_number(non_streaming),
+                format_number(responses),
                 Style::default().fg(Color::Magenta),
             ),
+        ]),
+        Row::new(vec![
+            Span::raw("Streaming"),
+            Span::styled(format_number(streaming), Style::default().fg(Color::Blue)),
         ]),
         Row::new(vec![
             Span::raw("Requests/sec"),

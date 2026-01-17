@@ -50,18 +50,20 @@ pub async fn run_server_with_stats(
     let app = Router::new()
         .route("/health", get(handlers::health))
         .route("/llmsim/stats", get(handlers::get_stats))
-        // OpenAI API routes
+        // OpenAI Chat Completions API
         .route(
             "/openai/v1/chat/completions",
             post(handlers::chat_completions),
         )
+        // OpenAI Models API
         .route("/openai/v1/models", get(handlers::list_models))
         .route("/openai/v1/models/:model_id", get(handlers::get_model))
+        // OpenAI Responses API
         .route("/openai/v1/responses", post(handlers::create_response))
         // OpenResponses API routes (https://www.openresponses.org)
         .route(
             "/openresponses/v1/responses",
-            post(handlers::create_response),
+            post(handlers::create_openresponses_response),
         )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())

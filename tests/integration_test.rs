@@ -7,7 +7,7 @@
 //! - Error injection
 
 use llmsim::cli::Config;
-use llmsim::stats::Stats;
+use llmsim::stats::{EndpointType, Stats};
 use llmsim::StatsSnapshot;
 use std::time::Duration;
 
@@ -19,13 +19,13 @@ mod stats_tests {
         let stats = Stats::new();
 
         // Record some activity
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(150), 50, 100);
 
-        stats.record_request_start("gpt-4", true);
+        stats.record_request_start("gpt-4", true, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(200), 30, 80);
 
-        stats.record_request_start("claude-opus", false);
+        stats.record_request_start("claude-opus", false, EndpointType::Responses);
         stats.record_error(429);
 
         let snapshot = stats.snapshot();
@@ -61,7 +61,7 @@ mod stats_tests {
 
             handles.push(thread::spawn(move || {
                 for _ in 0..100 {
-                    stats.record_request_start(model, is_streaming);
+                    stats.record_request_start(model, is_streaming, EndpointType::ChatCompletions);
                     stats.record_request_end(Duration::from_millis(10), 10, 20);
                 }
             }));
@@ -83,17 +83,17 @@ mod stats_tests {
 
         // Record requests for different models
         for _ in 0..100 {
-            stats.record_request_start("gpt-4", false);
+            stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
             stats.record_request_end(Duration::from_millis(10), 10, 10);
         }
 
         for _ in 0..50 {
-            stats.record_request_start("gpt-5", true);
+            stats.record_request_start("gpt-5", true, EndpointType::Responses);
             stats.record_request_end(Duration::from_millis(10), 10, 10);
         }
 
         for _ in 0..25 {
-            stats.record_request_start("claude-opus", false);
+            stats.record_request_start("claude-opus", false, EndpointType::ChatCompletions);
             stats.record_request_end(Duration::from_millis(10), 10, 10);
         }
 
@@ -108,13 +108,13 @@ mod stats_tests {
         let stats = Stats::new();
 
         // Record requests with varying latencies
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(100), 10, 10);
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(200), 10, 10);
 
-        stats.record_request_start("gpt-4", false);
+        stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
         stats.record_request_end(Duration::from_millis(300), 10, 10);
 
         // Average should be 200ms
@@ -129,17 +129,17 @@ mod stats_tests {
 
         // Record different types of errors
         for _ in 0..10 {
-            stats.record_request_start("gpt-4", false);
+            stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
             stats.record_error(429);
         }
 
         for _ in 0..5 {
-            stats.record_request_start("gpt-4", false);
+            stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
             stats.record_error(500);
         }
 
         for _ in 0..3 {
-            stats.record_request_start("gpt-4", false);
+            stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
             stats.record_error(504);
         }
 
@@ -219,13 +219,10 @@ mod generator_tests {
         let response = generator.generate(&request);
 
         assert!(!response.is_empty());
-        // Should contain lorem ipsum words
-        assert!(
-            response.contains("Lorem")
-                || response.contains("ipsum")
-                || response.contains("dolor")
-                || response.to_lowercase().contains("lorem")
-        );
+        // Response should end with a period
+        assert!(response.ends_with('.'));
+        // Response should have reasonable length (at least a few words)
+        assert!(response.split_whitespace().count() >= 5);
     }
 }
 

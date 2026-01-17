@@ -26,8 +26,12 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 ## Installation
 
 ```bash
-cargo install --git https://github.com/llmsim/llmsim.git
+cargo install llmsim
 ```
+
+## Demo
+
+![Console UI Demo](/docs/images/tui.png)
 
 ## Usage
 
@@ -86,16 +90,19 @@ let response = generator.generate(&request);
 
 ## API Endpoints
 
-### OpenAI API (`/openai/v1/...`)
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name:
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
+| `/health` | GET | Health check |
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
+| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
-| `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 
-### OpenResponses API (`/openresponses/v1/...`)
+When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
+
+### OpenResponses API
 
 [OpenResponses](https://www.openresponses.org) is an open-source specification for building multi-provider, interoperable LLM interfaces.
 
@@ -103,78 +110,11 @@ let response = generator.generate(&request);
 |----------|--------|-------------|
 | `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
 
-### LLMSim endpoints
+### LLMSim-specific endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/health` | GET | Health check |
 | `/llmsim/stats` | GET | Real-time server statistics (JSON) |
-
-### Example: OpenAI Chat Completions
-
-```bash
-curl http://localhost:8080/openai/v1/chat/completions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-5",
-    "messages": [{"role": "user", "content": "Hello!"}],
-    "stream": false
-  }'
-```
-
-### Example: OpenAI Responses API
-
-```bash
-curl http://localhost:8080/openai/v1/responses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-5",
-    "input": "What is the capital of France?",
-    "stream": false
-  }'
-```
-
-### Example: OpenResponses API
-
-```bash
-curl http://localhost:8080/openresponses/v1/responses \
-  -H "Content-Type: application/json" \
-  -d '{
-    "model": "gpt-5",
-    "input": [
-      {"role": "system", "content": "You are a helpful assistant."},
-      {"role": "user", "content": "Hello!"}
-    ],
-    "stream": true
-  }'
-```
-
-### Stats Response
-
-```json
-{
-  "uptime_secs": 3600,
-  "total_requests": 15000,
-  "active_requests": 5,
-  "streaming_requests": 12000,
-  "non_streaming_requests": 3000,
-  "prompt_tokens": 500000,
-  "completion_tokens": 1500000,
-  "total_tokens": 2000000,
-  "total_errors": 150,
-  "rate_limit_errors": 100,
-  "server_errors": 30,
-  "timeout_errors": 20,
-  "requests_per_second": 4.2,
-  "avg_latency_ms": 245.5,
-  "min_latency_ms": 50.0,
-  "max_latency_ms": 2500.0,
-  "model_requests": {
-    "gpt-5": 10000,
-    "gpt-4o": 5000
-  }
-}
-```
 
 ## Configuration
 

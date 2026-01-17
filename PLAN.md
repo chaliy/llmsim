@@ -194,13 +194,31 @@
 - [ ] Support Anthropic streaming format (different from OpenAI)
 - [ ] Handle Anthropic-specific headers (`x-api-key`, `anthropic-version`)
 
-### 5.2 OpenAI Responses API (Assistants)
+### 5.2 OpenAI Responses API
+- [x] Create Responses API specification (`specs/responses-api.md`)
+- [x] Define Responses API types (`src/openai/responses.rs`)
+  - [x] `ResponsesRequest` with input, model, instructions, etc.
+  - [x] `ResponsesResponse` with output items, usage, status
+  - [x] `InputItem` and `OutputItem` types
+  - [x] Streaming chunk types for SSE
+- [x] Implement `POST /v1/responses` endpoint
+  - [x] Parse string or array input
+  - [x] Generate simulated response with output items
+  - [x] Return token usage statistics
+- [x] Implement streaming for Responses API
+  - [x] SSE event types: response.created, response.output_text.delta, etc.
+  - [x] Proper sequence numbering for deltas
+- [x] Add examples for Responses API
+  - [x] Python example (`examples/responses_client.py`)
+  - [x] Rust example (`examples/responses_usage.rs`)
+
+### 5.3 OpenAI Assistants API (Threads)
 - [ ] Implement `/v1/threads` endpoints
 - [ ] Implement `/v1/threads/{thread_id}/messages`
 - [ ] Implement `/v1/threads/{thread_id}/runs`
 - [ ] Support run streaming
 
-### 5.3 Google Gemini API
+### 5.4 Google Gemini API
 - [ ] Create `llmsim/src/gemini/types.rs`
 - [ ] Implement Gemini message format
 - [ ] Add `/v1beta/models/{model}:generateContent` endpoint

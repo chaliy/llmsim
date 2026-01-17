@@ -11,7 +11,7 @@ This repo is intended to be runnable locally and easy for coding agents to work 
 
 ### Top level requirements
 
-....
+LLMSim is a lightweight, high-performance LLM API simulator for testing and development. It replicates realistic LLM API behavior without running actual models.
 
 ### Specs
 
@@ -40,7 +40,9 @@ When making changes that affect user-facing behavior or operations, update the r
 
 ### Local dev expectations
 
-....
+- Rust stable toolchain (edition 2021)
+- Run `cargo build` to build, `cargo run` to start the server
+- Default server runs on `http://localhost:3000`
 
 ### Cloud Agent environments
 
@@ -56,27 +58,54 @@ If `gh` tool is not available, use GitHub API with `GITHUB_TOKEN`.
 
 ### Conventions
 
+#### API Endpoints
+
+Provider-specific endpoints mirror their original API paths, prefixed with the provider name. This ensures compatibility with official SDKs when using the provider prefix as the base URL.
+
+**Pattern:** `/{provider}{original_path}`
+
+Examples:
+- OpenAI `/v1/chat/completions` → `/openai/v1/chat/completions`
+- OpenAI `/v1/responses` → `/openai/v1/responses`
+- Anthropic `/v1/messages` → `/anthropic/v1/messages` (future)
+
+**Current OpenAI endpoints:**
+- `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
+- `POST /openai/v1/responses` - Responses API (streaming supported)
+- `GET /openai/v1/models` - List available models
+- `GET /openai/v1/models/:id` - Get model details
+
+**System endpoints:**
+- `GET /health` - Health check
+- `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
+
+See `specs/api-endpoints.md` for the full specification.
+
 #### Code organization
 
-....
-
-#### Naming
-
-....
+- `src/` - Main source code (library and binary)
+- `src/openai/` - OpenAI API endpoint handlers
+- `src/cli/` - CLI argument parsing
+- `src/tui/` - Terminal UI components
+- `tests/` - Integration tests
+- `examples/` - Usage examples
+- `specs/` - Feature specifications
+- `benchmarks/` - Load testing scripts (k6)
 
 
 ### CI expectations
 
-- CI is implemented using GitHub Actions.
-....
+- CI is implemented using GitHub Actions
+- Runs on push to main and pull requests
+- Jobs: check, fmt, clippy, test, build (multi-platform)
 
 ### Pre-PR checklist
 
 Before creating a pull request, ensure:
 
-1. **Formatting**: Run ... to format all code
-2. **Linting**: Run ... and fix all warnings
-3. **Tests**: Run ... to ensure all tests pass
+1. **Formatting**: Run `cargo fmt` to format all code
+2. **Linting**: Run `cargo clippy` and fix all warnings
+3. **Tests**: Run `cargo test` to ensure all tests pass
 4. **Smoke tests**: Run smoke tests to verify the system works end-to-end
 5. **Update specs**: If your changes affect system behavior, update the relevant specs in `specs/`
 6. **Update docs**: If your changes affect usage or configuration, update public docs in `./docs` folder
@@ -150,5 +179,5 @@ High-level approach.
 
 ## Testing the system
 
-...
+Run `cargo test` for unit and integration tests. For load testing, see the `benchmarks/` folder and the `/load-test` skill.
 
