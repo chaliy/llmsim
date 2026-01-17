@@ -20,6 +20,7 @@ LLMSim is a lightweight, high-performance LLM API simulator for testing and deve
 Available specs:
 - `specs/architecture.md` - System architecture and module organization
 - `specs/load-testing.md` - Load testing framework and benchmarks
+- `specs/release-process.md` - Release workflow and versioning
 
 Specification format: Abstract and Requirements sections.
 
