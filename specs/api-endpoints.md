@@ -35,6 +35,17 @@ This specification defines the URL structure and routing conventions for LLMSim 
 
 **R2.2**: These endpoints accept the same request/response formats as the official OpenAI API.
 
+**R2.3**: The models endpoint (`/openai/v1/models`) returns extended model information sourced from [models.dev](https://models.dev):
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Model identifier (e.g., "gpt-5") |
+| `object` | string | Always "model" |
+| `created` | integer | Unix timestamp of model release |
+| `owned_by` | string | Model owner (e.g., "openai", "anthropic") |
+| `context_window` | integer | Maximum input tokens (e.g., 400000 for GPT-5) |
+| `max_output_tokens` | integer | Maximum output tokens (e.g., 128000 for GPT-5) |
+
 ### R3: Anthropic Endpoints (Future)
 
 **R3.1**: When implemented, Anthropic endpoints MUST follow the same pattern:
