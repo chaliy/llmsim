@@ -27,6 +27,17 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Verify release tag matches Cargo.toml
+        run: |
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          TAG_VERSION="${{ github.event.release.tag_name }}"
+          TAG_VERSION="${TAG_VERSION#v}"
+          if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
+            echo "::error::Cargo.toml version ($CARGO_VERSION) does not match release tag ($TAG_VERSION)"
+            exit 1
+          fi
+          echo "Version verified: $CARGO_VERSION"
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -36,8 +47,8 @@ jobs:
       - name: Run tests
         run: cargo test
 
-      - name: Verify package
-        run: cargo package --list
+      - name: Dry-run publish
+        run: cargo publish --dry-run
 
   publish:
     name: Publish to crates.io

@@ -4,15 +4,20 @@ on:
   push:
     branches:
       - main
+  workflow_dispatch:
 
 jobs:
   release:
     runs-on: ubuntu-latest
-    # Only run if commit message matches release pattern
-    if: ${{ startsWith(github.event.head_commit.message, 'chore(release): prepare v') }}
+    # On push: only run if commit message matches release pattern
+    # On workflow_dispatch: always run (version read from Cargo.toml)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      startsWith(github.event.head_commit.message, 'chore(release): prepare v')
 
     permissions:
       contents: write
+      actions: write
 
     steps:
       - name: Checkout
@@ -20,13 +25,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract version from commit message
+      - name: Extract version
         id: version
         run: |
-          # Extract version from commit message like "chore(release): prepare v0.1.0"
-          VERSION=$(echo "${{ github.event.head_commit.message }}" | grep -oP 'prepare v\K[0-9]+\.[0-9]+\.[0-9]+')
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            # Manual dispatch: read version from Cargo.toml
+            VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+            echo "Source: Cargo.toml (manual dispatch)"
+          else
+            # Push trigger: extract version from commit message
+            VERSION=$(echo "${{ github.event.head_commit.message }}" | grep -oP 'prepare v\K[0-9]+\.[0-9]+\.[0-9]+')
+          fi
+
           if [ -z "$VERSION" ]; then
-            echo "::error::Could not extract version from commit message"
+            echo "::error::Could not extract version"
             exit 1
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
