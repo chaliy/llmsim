@@ -54,9 +54,8 @@ When asked to create a release, the agent:
    - Set `version = "X.Y.Z"`
 
 4. **Run verification**
-   - `cargo fmt --check`
-   - `cargo clippy`
-   - `cargo test`
+   - `just release-check` (runs fmt, clippy, test, and dry-run publish)
+   - Or manually: `cargo fmt --check`, `cargo clippy`, `cargo test`, `cargo publish --dry-run`
 
 5. **Commit and push**
    - Commit message: `chore(release): prepare vX.Y.Z`
@@ -72,9 +71,12 @@ When asked to create a release, the agent:
 - Detects commit message `chore(release): prepare vX.Y.Z`
 - Extracts release notes from CHANGELOG.md
 - Creates GitHub Release with tag `vX.Y.Z`
+- Also supports `workflow_dispatch` for manual re-runs (reads version from Cargo.toml)
 
 **On GitHub Release created** (publish.yml):
+- Verifies release tag matches Cargo.toml version
 - Runs verification (fmt, clippy, tests)
+- Runs `cargo publish --dry-run` before actual publish
 - Publishes to crates.io
 
 ## Pre-Release Checklist
@@ -85,7 +87,19 @@ The agent verifies before creating a release PR:
 - [ ] `cargo fmt` - code is formatted
 - [ ] `cargo clippy` - no warnings
 - [ ] `cargo test` - all tests pass
+- [ ] `cargo publish --dry-run` - package is valid
 - [ ] CHANGELOG.md has entries for changes since last release
+
+## Justfile Recipes
+
+The project provides `just` recipes for common release tasks:
+
+| Recipe | Description |
+|--------|-------------|
+| `just release-prepare <version>` | Bumps Cargo.toml version and shows next steps |
+| `just release-check` | Runs fmt, clippy, test, and dry-run publish |
+| `just release-tag` | Creates and pushes a git tag (with safety checks) |
+| `just check` | Runs pre-PR checks (fmt, clippy, test) |
 
 ## Changelog Format
 
@@ -141,18 +155,35 @@ Example:
     ```
 ```
 
+## CI Security & Quality Checks
+
+CI runs the following checks on every push and PR:
+
+| Check | Tool | Purpose |
+|-------|------|---------|
+| Vulnerability audit | `cargo-audit` | Detects known vulnerabilities in dependencies |
+| License compliance | `cargo-deny` | Ensures all dependencies use permissive licenses |
+| Documentation | `cargo doc -D warnings` | Catches broken doc links and warnings |
+| Formatting | `cargo fmt --check` | Consistent code style |
+| Linting | `cargo clippy -D warnings` | Code quality and correctness |
+| Tests | `cargo test` | Unit and integration tests |
+| Cross-platform build | `cargo build --release` | Linux, macOS, Windows |
+
+Configuration for `cargo-deny` is in `deny.toml` at the repository root.
+
 ## Workflows
 
 ### release.yml
 
-- **Trigger**: Push to `main` with commit message starting with `chore(release): prepare v`
+- **Trigger**: Push to `main` with commit message starting with `chore(release): prepare v`, or manual `workflow_dispatch`
 - **Actions**: Creates GitHub Release with tag and release notes
+- **Permissions**: `contents: write`, `actions: write`
 - **File**: `.github/workflows/release.yml`
 
 ### publish.yml
 
 - **Trigger**: GitHub Release published
-- **Actions**: Verifies and publishes to crates.io
+- **Actions**: Verifies tag/version match, runs checks, dry-run publish, then publishes to crates.io
 - **File**: `.github/workflows/publish.yml`
 - **Secret required**: `CARGO_REGISTRY_TOKEN`
 
@@ -164,7 +195,7 @@ Human: Create release v0.2.0
 Agent: I'll prepare the v0.2.0 release. Let me:
 1. Update CHANGELOG.md with the v0.2.0 section
 2. Update Cargo.toml version to 0.2.0
-3. Run verification checks
+3. Run `just release-check` for verification
 4. Create the release PR
 
 [Agent performs steps...]
