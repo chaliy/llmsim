@@ -193,6 +193,9 @@ fn default_models() -> Vec<String> {
         "gpt-5.1-codex-mini".to_string(),
         "gpt-5.1-codex-max".to_string(),
         "gpt-5.2".to_string(),
+        "gpt-5.2-pro".to_string(),
+        "gpt-5.2-codex".to_string(),
+        "gpt-5.3-codex".to_string(),
         // O-series reasoning models
         "o3".to_string(),
         "o3-mini".to_string(),
@@ -209,7 +212,9 @@ fn default_models() -> Vec<String> {
         "claude-sonnet-4".to_string(),
         "claude-sonnet-4.5".to_string(),
         "claude-opus-4".to_string(),
+        "claude-opus-4.1".to_string(),
         "claude-opus-4.5".to_string(),
+        "claude-opus-4.6".to_string(),
         "claude-haiku-4.5".to_string(),
     ]
 }

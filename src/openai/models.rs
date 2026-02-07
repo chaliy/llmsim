@@ -126,13 +126,23 @@ fn o_series_capabilities() -> ModelCapabilities {
     }
 }
 
-/// Standard capabilities for Claude models
+/// Standard capabilities for Claude models (without extended thinking)
 fn claude_capabilities() -> ModelCapabilities {
     ModelCapabilities {
         function_calling: true,
         vision: true,
         json_mode: true,
         reasoning: false,
+    }
+}
+
+/// Capabilities for Claude models with extended thinking/reasoning
+fn claude_reasoning_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: true,
+        vision: true,
+        json_mode: true,
+        reasoning: true,
     }
 }
 
@@ -191,6 +201,19 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         // GPT-5.2
         ModelProfile::new("gpt-5.2", "GPT-5.2", "openai", 400_000, 128_000)
             .with_created(1765411200) // 2025-12-11
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new("gpt-5.2-pro", "GPT-5.2 Pro", "openai", 400_000, 128_000)
+            .with_created(1765411200) // 2025-12-11
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new("gpt-5.2-codex", "GPT-5.2 Codex", "openai", 400_000, 128_000)
+            .with_created(1765411200) // 2025-12-11
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        // GPT-5.3
+        ModelProfile::new("gpt-5.3-codex", "GPT-5.3 Codex", "openai", 400_000, 128_000)
+            .with_created(1770249600) // 2026-02-05
             .with_capabilities(gpt5_capabilities())
             .with_knowledge_cutoff("2025-08-31"),
     ];
@@ -261,12 +284,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             64_000,
         )
         .with_created(1740355200) // 2025-02-24
-        .with_capabilities(ModelCapabilities {
-            function_calling: true,
-            vision: true,
-            json_mode: true,
-            reasoning: true, // Extended thinking
-        })
+        .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2024-11-01"),
         // Claude Sonnet 4
         ModelProfile::new(
@@ -276,7 +294,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             200_000,
             64_000,
         )
-        .with_created(1747958400) // 2025-05-23
+        .with_created(1747958400) // 2025-05-14
         .with_capabilities(claude_capabilities())
         .with_knowledge_cutoff("2025-03-01"),
         // Claude Sonnet 4.5
@@ -287,9 +305,9 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             200_000,
             64_000,
         )
-        .with_created(1756684800) // 2025-09-01
-        .with_capabilities(claude_capabilities())
-        .with_knowledge_cutoff("2025-05-01"),
+        .with_created(1759104000) // 2025-09-29
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-07-31"),
         // Claude Opus 4
         ModelProfile::new(
             "claude-opus-4",
@@ -298,9 +316,20 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             200_000,
             64_000,
         )
-        .with_created(1747958400) // 2025-05-23
+        .with_created(1747958400) // 2025-05-14
         .with_capabilities(claude_capabilities())
         .with_knowledge_cutoff("2025-03-01"),
+        // Claude Opus 4.1
+        ModelProfile::new(
+            "claude-opus-4.1",
+            "Claude Opus 4.1",
+            "anthropic",
+            200_000,
+            32_000,
+        )
+        .with_created(1754352000) // 2025-08-05
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-03-31"),
         // Claude Opus 4.5
         ModelProfile::new(
             "claude-opus-4.5",
@@ -309,9 +338,20 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             200_000,
             64_000,
         )
-        .with_created(1756684800) // 2025-09-01
-        .with_capabilities(claude_capabilities())
-        .with_knowledge_cutoff("2025-05-01"),
+        .with_created(1763942400) // 2025-11-24
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-03-31"),
+        // Claude Opus 4.6
+        ModelProfile::new(
+            "claude-opus-4.6",
+            "Claude Opus 4.6",
+            "anthropic",
+            200_000,
+            128_000,
+        )
+        .with_created(1770249600) // 2026-02-05
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-05-31"),
         // Claude Haiku 4.5
         ModelProfile::new(
             "claude-haiku-4.5",
@@ -320,9 +360,9 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             200_000,
             64_000,
         )
-        .with_created(1756684800) // 2025-09-01
-        .with_capabilities(claude_capabilities())
-        .with_knowledge_cutoff("2025-05-01"),
+        .with_created(1760486400) // 2025-10-15
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-02-28"),
     ];
 
     // Add all models to registry
@@ -429,6 +469,26 @@ mod tests {
         let profile = get_model_profile("claude-opus-4.5").expect("claude-opus-4.5 should exist");
         assert_eq!(profile.owned_by, "anthropic");
         assert_eq!(profile.context_window, 200_000);
+    }
+
+    #[test]
+    fn test_claude_opus_4_6_profile() {
+        let profile = get_model_profile("claude-opus-4.6").expect("claude-opus-4.6 should exist");
+        assert_eq!(profile.owned_by, "anthropic");
+        assert_eq!(profile.context_window, 200_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert!(profile.capabilities.reasoning);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-05-31"));
+    }
+
+    #[test]
+    fn test_gpt_5_3_codex_profile() {
+        let profile = get_model_profile("gpt-5.3-codex").expect("gpt-5.3-codex should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.context_window, 400_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert!(profile.capabilities.reasoning);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-08-31"));
     }
 
     #[test]
