@@ -3,6 +3,12 @@ name: Publish
 on:
   release:
     types: [published]
+  workflow_call:
+    inputs:
+      tag_name:
+        description: 'Release tag name (e.g., v0.2.1)'
+        required: true
+        type: string
 
 env:
   CARGO_TERM_COLOR: always
@@ -30,7 +36,7 @@ jobs:
       - name: Verify release tag matches Cargo.toml
         run: |
           CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
-          TAG_VERSION="${{ github.event.release.tag_name }}"
+          TAG_VERSION="${{ inputs.tag_name || github.event.release.tag_name }}"
           TAG_VERSION="${TAG_VERSION#v}"
           if [ "$CARGO_VERSION" != "$TAG_VERSION" ]; then
             echo "::error::Cargo.toml version ($CARGO_VERSION) does not match release tag ($TAG_VERSION)"
