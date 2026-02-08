@@ -99,6 +99,7 @@ See `specs/api-endpoints.md` for the full specification.
 - CI is implemented using GitHub Actions
 - Runs on push to main and pull requests
 - Jobs: check, fmt, clippy, test, build (multi-platform)
+- **Never merge a PR when CI is not green.** Wait for all checks to pass before merging.
 
 ### Pre-PR checklist
 
