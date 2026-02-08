@@ -56,7 +56,7 @@ pub async fn run_server_with_stats(
             post(handlers::chat_completions),
         )
         .route("/openai/v1/models", get(handlers::list_models))
-        .route("/openai/v1/models/:model_id", get(handlers::get_model))
+        .route("/openai/v1/models/{model_id}", get(handlers::get_model))
         .route("/openai/v1/responses", post(handlers::create_response))
         // OpenResponses API routes (https://www.openresponses.org)
         .route(
