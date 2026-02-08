@@ -146,6 +146,46 @@ fn claude_reasoning_capabilities() -> ModelCapabilities {
     }
 }
 
+/// Standard capabilities for Gemini models
+fn gemini_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: true,
+        vision: true,
+        json_mode: true,
+        reasoning: false,
+    }
+}
+
+/// Capabilities for Gemini models with reasoning
+fn gemini_reasoning_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: true,
+        vision: true,
+        json_mode: true,
+        reasoning: true,
+    }
+}
+
+/// Standard capabilities for DeepSeek models
+fn deepseek_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: true,
+        vision: false,
+        json_mode: true,
+        reasoning: false,
+    }
+}
+
+/// Capabilities for DeepSeek reasoning models
+fn deepseek_reasoning_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: true,
+        vision: false,
+        json_mode: true,
+        reasoning: true,
+    }
+}
+
 /// Build the static model registry with profiles from models.dev
 fn build_model_registry() -> HashMap<String, ModelProfile> {
     let mut registry = HashMap::new();
@@ -155,6 +195,10 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
     let gpt5_models = vec![
         ModelProfile::new("gpt-5", "GPT-5", "openai", 400_000, 128_000)
             .with_created(1754524800) // 2025-08-07
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2024-09-30"),
+        ModelProfile::new("gpt-5-pro", "GPT-5 Pro", "openai", 400_000, 272_000)
+            .with_created(1759104000) // 2025-09
             .with_capabilities(gpt5_capabilities())
             .with_knowledge_cutoff("2024-09-30"),
         ModelProfile::new("gpt-5-mini", "GPT-5 Mini", "openai", 400_000, 128_000)
@@ -220,6 +264,19 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
 
     // O-series reasoning models
     let o_series_models = vec![
+        ModelProfile::new("o1", "O1", "openai", 200_000, 100_000)
+            .with_created(1726099200) // 2024-09-12
+            .with_capabilities(o_series_capabilities())
+            .with_knowledge_cutoff("2023-10-01"),
+        ModelProfile::new("o1-mini", "O1 Mini", "openai", 128_000, 65_536)
+            .with_created(1726099200) // 2024-09-12
+            .with_capabilities(ModelCapabilities {
+                function_calling: false,
+                vision: false,
+                json_mode: true,
+                reasoning: true,
+            })
+            .with_knowledge_cutoff("2023-10-01"),
         ModelProfile::new("o3", "O3", "openai", 200_000, 100_000)
             .with_created(1765411200) // 2025-12-11
             .with_capabilities(o_series_capabilities())
@@ -255,8 +312,16 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_created(1678838400) // 2023-03-15
             .with_capabilities(gpt4_capabilities())
             .with_knowledge_cutoff("2023-04-01"),
-        // GPT-4.1 (April 2025)
+        // GPT-4.1 family (April 2025)
         ModelProfile::new("gpt-4.1", "GPT-4.1", "openai", 1_047_576, 32_768)
+            .with_created(1744675200) // 2025-04-14
+            .with_capabilities(gpt4o_capabilities())
+            .with_knowledge_cutoff("2024-06-01"),
+        ModelProfile::new("gpt-4.1-mini", "GPT-4.1 Mini", "openai", 1_047_576, 32_768)
+            .with_created(1744675200) // 2025-04-14
+            .with_capabilities(gpt4o_capabilities())
+            .with_knowledge_cutoff("2024-06-01"),
+        ModelProfile::new("gpt-4.1-nano", "GPT-4.1 Nano", "openai", 1_047_576, 32_768)
             .with_created(1744675200) // 2025-04-14
             .with_capabilities(gpt4o_capabilities())
             .with_knowledge_cutoff("2024-06-01"),
@@ -346,7 +411,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             "claude-opus-4.6",
             "Claude Opus 4.6",
             "anthropic",
-            200_000,
+            1_000_000,
             128_000,
         )
         .with_created(1770249600) // 2026-02-05
@@ -365,12 +430,67 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_knowledge_cutoff("2025-02-28"),
     ];
 
+    // Gemini family (Google)
+    let gemini_models = vec![
+        ModelProfile::new(
+            "gemini-2.0-flash",
+            "Gemini 2.0 Flash",
+            "google",
+            1_000_000,
+            8_192,
+        )
+        .with_created(1738368000) // 2025-02
+        .with_capabilities(gemini_capabilities()),
+        ModelProfile::new(
+            "gemini-2.5-flash",
+            "Gemini 2.5 Flash",
+            "google",
+            1_000_000,
+            65_536,
+        )
+        .with_created(1735689600) // 2025-01
+        .with_capabilities(gemini_capabilities()),
+        ModelProfile::new(
+            "gemini-2.5-pro",
+            "Gemini 2.5 Pro",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1735689600) // 2025-01
+        .with_capabilities(gemini_reasoning_capabilities()),
+    ];
+
+    // DeepSeek family
+    let deepseek_models = vec![
+        ModelProfile::new(
+            "deepseek-chat",
+            "DeepSeek Chat (V3)",
+            "deepseek",
+            128_000,
+            8_192,
+        )
+        .with_created(1719792000) // 2024-07
+        .with_capabilities(deepseek_capabilities()),
+        ModelProfile::new(
+            "deepseek-reasoner",
+            "DeepSeek Reasoner (R1)",
+            "deepseek",
+            128_000,
+            128_000,
+        )
+        .with_created(1735689600) // 2025-01
+        .with_capabilities(deepseek_reasoning_capabilities()),
+    ];
+
     // Add all models to registry
     for model in gpt5_models
         .into_iter()
         .chain(o_series_models)
         .chain(gpt4_models)
         .chain(claude_models)
+        .chain(gemini_models)
+        .chain(deepseek_models)
     {
         registry.insert(model.id.clone(), model);
     }
@@ -409,19 +529,25 @@ pub fn infer_model_owner(model_id: &str) -> &'static str {
             "openai" => "openai",
             "anthropic" => "anthropic",
             "google" => "google",
+            "deepseek" => "deepseek",
             _ => "llmsim",
         };
     }
 
     // Fallback to pattern matching for custom models
     let model_lower = model_id.to_lowercase();
-    if model_lower.contains("gpt") || model_lower.starts_with("o3") || model_lower.starts_with("o4")
+    if model_lower.contains("gpt")
+        || model_lower.starts_with("o1")
+        || model_lower.starts_with("o3")
+        || model_lower.starts_with("o4")
     {
         "openai"
     } else if model_lower.contains("claude") {
         "anthropic"
     } else if model_lower.contains("gemini") {
         "google"
+    } else if model_lower.contains("deepseek") {
+        "deepseek"
     } else {
         "llmsim"
     }
@@ -475,7 +601,7 @@ mod tests {
     fn test_claude_opus_4_6_profile() {
         let profile = get_model_profile("claude-opus-4.6").expect("claude-opus-4.6 should exist");
         assert_eq!(profile.owned_by, "anthropic");
-        assert_eq!(profile.context_window, 200_000);
+        assert_eq!(profile.context_window, 1_000_000);
         assert_eq!(profile.max_output_tokens, 128_000);
         assert!(profile.capabilities.reasoning);
         assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-05-31"));
@@ -496,7 +622,48 @@ mod tests {
         assert_eq!(infer_model_owner("gpt-5"), "openai");
         assert_eq!(infer_model_owner("claude-opus-4.5"), "anthropic");
         assert_eq!(infer_model_owner("o3-mini"), "openai");
+        assert_eq!(infer_model_owner("o1"), "openai");
+        assert_eq!(infer_model_owner("gemini-2.5-pro"), "google");
+        assert_eq!(infer_model_owner("deepseek-chat"), "deepseek");
         assert_eq!(infer_model_owner("custom-model"), "llmsim");
+    }
+
+    #[test]
+    fn test_gpt5_pro_profile() {
+        let profile = get_model_profile("gpt-5-pro").expect("gpt-5-pro should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.max_output_tokens, 272_000);
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_gpt4_1_mini_profile() {
+        let profile = get_model_profile("gpt-4.1-mini").expect("gpt-4.1-mini should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.context_window, 1_047_576);
+    }
+
+    #[test]
+    fn test_gemini_profile() {
+        let profile = get_model_profile("gemini-2.5-pro").expect("gemini-2.5-pro should exist");
+        assert_eq!(profile.owned_by, "google");
+        assert_eq!(profile.context_window, 1_048_576);
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_deepseek_profile() {
+        let profile =
+            get_model_profile("deepseek-reasoner").expect("deepseek-reasoner should exist");
+        assert_eq!(profile.owned_by, "deepseek");
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_o1_profile() {
+        let profile = get_model_profile("o1").expect("o1 should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert!(profile.capabilities.reasoning);
     }
 
     #[test]

@@ -51,6 +51,10 @@ impl Config {
                 "claude-haiku" | "haiku" => LatencyProfile::claude_haiku(),
                 // Gemini
                 "gemini" | "gemini-pro" => LatencyProfile::gemini_pro(),
+                "gemini-flash" => LatencyProfile::gemini_flash(),
+                // DeepSeek
+                "deepseek" | "deepseek-chat" => LatencyProfile::deepseek(),
+                "deepseek-reasoner" => LatencyProfile::deepseek_reasoner(),
                 // Special profiles
                 "instant" => LatencyProfile::instant(),
                 "fast" => LatencyProfile::fast(),
@@ -185,6 +189,7 @@ fn default_models() -> Vec<String> {
     vec![
         // GPT-5 family (from models.dev)
         "gpt-5".to_string(),
+        "gpt-5-pro".to_string(),
         "gpt-5-mini".to_string(),
         "gpt-5-nano".to_string(),
         "gpt-5-codex".to_string(),
@@ -197,6 +202,8 @@ fn default_models() -> Vec<String> {
         "gpt-5.2-codex".to_string(),
         "gpt-5.3-codex".to_string(),
         // O-series reasoning models
+        "o1".to_string(),
+        "o1-mini".to_string(),
         "o3".to_string(),
         "o3-mini".to_string(),
         "o4-mini".to_string(),
@@ -206,6 +213,8 @@ fn default_models() -> Vec<String> {
         "gpt-4o".to_string(),
         "gpt-4o-mini".to_string(),
         "gpt-4.1".to_string(),
+        "gpt-4.1-mini".to_string(),
+        "gpt-4.1-nano".to_string(),
         // Claude family
         "claude-3.5-sonnet".to_string(),
         "claude-3.7-sonnet".to_string(),
@@ -216,6 +225,13 @@ fn default_models() -> Vec<String> {
         "claude-opus-4.5".to_string(),
         "claude-opus-4.6".to_string(),
         "claude-haiku-4.5".to_string(),
+        // Gemini family
+        "gemini-2.0-flash".to_string(),
+        "gemini-2.5-flash".to_string(),
+        "gemini-2.5-pro".to_string(),
+        // DeepSeek family
+        "deepseek-chat".to_string(),
+        "deepseek-reasoner".to_string(),
     ]
 }
 

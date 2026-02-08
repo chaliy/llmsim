@@ -276,11 +276,12 @@ curl http://localhost:8080/llmsim/stats
 
 | Family | Models |
 |--------|--------|
-| GPT-5 | gpt-5, gpt-5-mini, gpt-5.1, gpt-5.2, gpt-5-codex |
-| O-Series | o3, o3-mini, o4, o4-mini |
-| GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1 |
-| Claude | claude-opus, claude-sonnet, claude-haiku (with versions) |
-| Gemini | gemini-pro |
+| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex |
+| O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
+| GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano |
+| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-haiku-4.5 |
+| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro |
+| DeepSeek | deepseek-chat, deepseek-reasoner |
 
 ## Error Responses
 

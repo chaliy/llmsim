@@ -204,15 +204,19 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | Model | Context | Max Output | Capabilities |
 |-------|---------|------------|--------------|
 | gpt-5 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5-pro | 400K | 272K | Vision, Reasoning, Tools, JSON |
 | gpt-5-mini | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5-nano | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.1 | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.2 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.3-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 
 ### O-Series Reasoning Models
 | Model | Context | Max Output | Capabilities |
 |-------|---------|------------|--------------|
+| o1 | 200K | 100K | Vision, Reasoning, Tools, JSON |
+| o1-mini | 128K | 65K | Reasoning, JSON |
 | o3 | 200K | 100K | Vision, Reasoning, Tools, JSON |
 | o3-mini | 200K | 100K | Vision, Reasoning, Tools, JSON |
 | o4-mini | 200K | 100K | Vision, Reasoning, Tools, JSON |
@@ -225,6 +229,8 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-4-turbo | 128K | 4K | Tools, JSON |
 | gpt-4 | 8K | 8K | Tools, JSON |
 | gpt-4.1 | 1M | 32K | Vision, Tools, JSON |
+| gpt-4.1-mini | 1M | 32K | Vision, Tools, JSON |
+| gpt-4.1-nano | 1M | 32K | Vision, Tools, JSON |
 
 ### Claude Family
 | Model | Context | Max Output | Capabilities |
@@ -232,10 +238,24 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | claude-3.5-sonnet | 200K | 8K | Vision, Tools, JSON |
 | claude-3.7-sonnet | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-sonnet-4 | 200K | 64K | Vision, Tools, JSON |
-| claude-sonnet-4.5 | 200K | 64K | Vision, Tools, JSON |
+| claude-sonnet-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4 | 200K | 64K | Vision, Tools, JSON |
-| claude-opus-4.5 | 200K | 64K | Vision, Tools, JSON |
-| claude-haiku-4.5 | 200K | 64K | Vision, Tools, JSON |
+| claude-opus-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
+| claude-opus-4.6 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-haiku-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
+
+### Gemini Family
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| gemini-2.0-flash | 1M | 8K | Vision, Tools, JSON |
+| gemini-2.5-flash | 1M | 65K | Vision, Tools, JSON |
+| gemini-2.5-pro | 1M | 65K | Vision, Reasoning, Tools, JSON |
+
+### DeepSeek Family
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| deepseek-chat | 128K | 8K | Tools, JSON |
+| deepseek-reasoner | 128K | 128K | Reasoning, Tools, JSON |
 
 ### Context Window Emulation (Future)
 
