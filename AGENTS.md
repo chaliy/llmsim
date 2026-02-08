@@ -19,8 +19,11 @@ LLMSim is a lightweight, high-performance LLM API simulator for testing and deve
 
 Available specs:
 - `specs/architecture.md` - System architecture and module organization
+- `specs/api-endpoints.md` - API endpoint structure and routing conventions
+- `specs/responses-api.md` - OpenAI Responses API simulation
 - `specs/load-testing.md` - Load testing framework and benchmarks
 - `specs/release-process.md` - Release workflow and versioning
+- `specs/maintenance.md` - Routine maintenance process
 
 Specification format: Abstract and Requirements sections.
 
@@ -76,6 +79,9 @@ Examples:
 - `GET /openai/v1/models` - List available models
 - `GET /openai/v1/models/:id` - Get model details
 
+**OpenResponses endpoints:**
+- `POST /openresponses/v1/responses` - OpenResponses API (streaming supported)
+
 **System endpoints:**
 - `GET /health` - Health check
 - `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
@@ -85,13 +91,15 @@ See `specs/api-endpoints.md` for the full specification.
 #### Code organization
 
 - `src/` - Main source code (library and binary)
-- `src/openai/` - OpenAI API endpoint handlers
-- `src/cli/` - CLI argument parsing
+- `src/openai/` - OpenAI API types and model profiles
+- `src/openresponses/` - OpenResponses API types and streaming
+- `src/cli/` - CLI server, configuration, and HTTP handlers
 - `src/tui/` - Terminal UI components
 - `tests/` - Integration tests
-- `examples/` - Usage examples
+- `examples/` - Usage examples (Rust, Python, TypeScript)
 - `specs/` - Feature specifications
 - `benchmarks/` - Load testing scripts (k6)
+- `docs/` - Public-facing user documentation
 
 
 ### CI expectations

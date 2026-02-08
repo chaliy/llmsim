@@ -18,6 +18,7 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
     // o200k_base: GPT-5, GPT-4o, O-series and newer models
     if model_lower.contains("gpt-5")
         || model_lower.contains("gpt-4o")
+        || model_lower.starts_with("o1")
         || model_lower.starts_with("o3")
         || model_lower.starts_with("o4")
         || model_lower.contains("chatgpt-4o")
@@ -25,11 +26,12 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
         return o200k_base().map_err(|e| TokenError::InitError(e.to_string()));
     }
 
-    // cl100k_base: GPT-4, text-embedding, Claude, Gemini
+    // cl100k_base: GPT-4, text-embedding, Claude, Gemini, DeepSeek
     if model_lower.contains("gpt-4")
         || model_lower.contains("text-embedding")
         || model_lower.contains("claude")
         || model_lower.contains("gemini")
+        || model_lower.contains("deepseek")
     {
         return cl100k_base().map_err(|e| TokenError::InitError(e.to_string()));
     }

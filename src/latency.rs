@@ -126,6 +126,36 @@ impl LatencyProfile {
         }
     }
 
+    /// Gemini Flash profile - fast inference
+    pub fn gemini_flash() -> Self {
+        Self {
+            ttft_mean_ms: 200,
+            ttft_stddev_ms: 50,
+            tbt_mean_ms: 15,
+            tbt_stddev_ms: 5,
+        }
+    }
+
+    /// DeepSeek profile - general chat model
+    pub fn deepseek() -> Self {
+        Self {
+            ttft_mean_ms: 500,
+            ttft_stddev_ms: 120,
+            tbt_mean_ms: 30,
+            tbt_stddev_ms: 10,
+        }
+    }
+
+    /// DeepSeek Reasoner profile - reasoning model with chain-of-thought
+    pub fn deepseek_reasoner() -> Self {
+        Self {
+            ttft_mean_ms: 1500,
+            ttft_stddev_ms: 400,
+            tbt_mean_ms: 25,
+            tbt_stddev_ms: 8,
+        }
+    }
+
     /// Instant profile - no delay (for fast tests)
     pub fn instant() -> Self {
         Self {
@@ -155,8 +185,11 @@ impl LatencyProfile {
             Self::gpt5_mini()
         } else if model_lower.contains("gpt-5") {
             Self::gpt5()
-        // O-series reasoning models (o3, o4)
-        } else if model_lower.starts_with("o3") || model_lower.starts_with("o4") {
+        // O-series reasoning models (o1, o3, o4)
+        } else if model_lower.starts_with("o1")
+            || model_lower.starts_with("o3")
+            || model_lower.starts_with("o4")
+        {
             Self::o_series()
         // GPT-4 family
         } else if model_lower.contains("gpt-4o") {
@@ -170,9 +203,16 @@ impl LatencyProfile {
             Self::claude_sonnet()
         } else if model_lower.contains("haiku") {
             Self::claude_haiku()
-        // Gemini
+        // Gemini family
+        } else if model_lower.contains("gemini") && model_lower.contains("flash") {
+            Self::gemini_flash()
         } else if model_lower.contains("gemini") {
             Self::gemini_pro()
+        // DeepSeek family
+        } else if model_lower.contains("deepseek-reasoner") || model_lower.contains("deepseek-r") {
+            Self::deepseek_reasoner()
+        } else if model_lower.contains("deepseek") {
+            Self::deepseek()
         } else {
             // Default to GPT-5-like latency
             Self::gpt5()
