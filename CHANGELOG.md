@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.2] - 2026-02-08
+
+### Highlights
+
+- Updated dependencies and model profiles for routine maintenance
+- Fixed CI release workflow to call publish workflow directly
+
+### What's Changed
+
+* chore: routine maintenance - update deps, models, and specs ([#23](https://github.com/chaliy/llmsim/pull/23)) by @chaliy
+* fix(ci): call publish workflow directly from release workflow ([#22](https://github.com/chaliy/llmsim/pull/22)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.2.1...v0.2.2
+
 ## [0.2.1] - 2026-02-08
 
 ### Highlights
@@ -58,6 +72,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.1...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.2...HEAD
+[0.2.2]: https://github.com/chaliy/llmsim/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/chaliy/llmsim/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/chaliy/llmsim/releases/tag/v0.2.0
