@@ -379,7 +379,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
 }
 
 /// Static registry of all known model profiles
-/// Sourced from https://models.dev
+/// Sourced from <https://models.dev>
 pub static MODEL_REGISTRY: LazyLock<HashMap<String, ModelProfile>> =
     LazyLock::new(build_model_registry);
 
