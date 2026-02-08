@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-02-08
+
+### Highlights
+
+- New model profiles: Claude Opus 4.6, GPT-5.3 Codex
+
+### What's Changed
+
+* docs: adopt changelog format with highlights and full changelog link ([#21](https://github.com/chaliy/llmsim/pull/21)) by @chaliy
+* fix(ci): fix failing build and add CI merge policy ([#20](https://github.com/chaliy/llmsim/pull/20)) by @chaliy
+* feat(models): add Claude Opus 4.6, GPT-5.3 Codex, and update model profiles ([#17](https://github.com/chaliy/llmsim/pull/17)) by @chaliy
+* fix(ci): wrap if condition in expression syntax for YAML parsing ([#16](https://github.com/chaliy/llmsim/pull/16)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.2.0...v0.2.1
+
 ## [0.2.0] - 2026-01-17
 
 ### Highlights
@@ -43,5 +58,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/chaliy/llmsim/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/chaliy/llmsim/releases/tag/v0.2.0
