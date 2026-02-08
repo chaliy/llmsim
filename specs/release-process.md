@@ -46,8 +46,10 @@ When asked to create a release, the agent:
 2. **Update CHANGELOG.md**
    - Move items from `[Unreleased]` to new version section
    - Add release date: `## [X.Y.Z] - YYYY-MM-DD`
+   - Add **Highlights** section with 2-5 user-facing bullet points
    - Add breaking changes section if applicable (see format below)
-   - List commits in GitHub-style format with PR links and contributors
+   - List changes in descending PR order with type(scope) prefix
+   - End section with `**Full Changelog**` link
    - Update comparison links at bottom of file
 
 3. **Update Cargo.toml**
@@ -103,12 +105,17 @@ The project provides `just` recipes for common release tasks:
 
 ## Changelog Format
 
-The changelog follows [Keep a Changelog](https://keepachangelog.com/) with GitHub-style commit listings.
+Each release entry includes Highlights, optional Breaking Changes, and a full list of changes. PRs are listed in descending order (newest first).
 
 ### Structure
 
 ```markdown
 ## [X.Y.Z] - YYYY-MM-DD
+
+### Highlights
+
+- User-facing change one
+- User-facing change two
 
 ### Breaking Changes
 
@@ -118,11 +125,23 @@ The changelog follows [Keep a Changelog](https://keepachangelog.com/) with GitHu
 
 ### What's Changed
 
-- Commit message ([#PR](https://github.com/chaliy/llmsim/pull/PR)) by @contributor
-- Another commit ([#PR](https://github.com/chaliy/llmsim/pull/PR)) by @contributor
+* type(scope): description ([#N](https://github.com/chaliy/llmsim/pull/N)) by @contributor
+* type(scope): description ([#N](https://github.com/chaliy/llmsim/pull/N)) by @contributor
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/vPREV...vX.Y.Z
 ```
 
-### Generating Commit List
+### Section Details
+
+#### Highlights
+
+- 2-5 bullet points summarizing the most impactful changes
+- Focus on user-facing features and improvements
+- Include for every release
+
+#### What's Changed
+
+List PRs in **descending order** (newest first, by PR number).
 
 Get commits since last release, excluding chore/ci/bench commits:
 
@@ -132,10 +151,15 @@ git log --oneline | grep -v -E "^.{7} (chore|ci|bench)"
 
 Format each commit as:
 ```
-- <commit message> ([#<PR>](https://github.com/chaliy/llmsim/pull/<PR>)) by @<author>
+* <type>(<scope>): <description> ([#<PR>](https://github.com/chaliy/llmsim/pull/<PR>)) by @<author>
 ```
 
-### Breaking Changes Section
+End with:
+```
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/vPREV...vX.Y.Z
+```
+
+#### Breaking Changes
 
 Include when the release has breaking changes (typically MINOR or MAJOR versions):
 
