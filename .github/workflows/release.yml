@@ -14,6 +14,9 @@ jobs:
     if: >-
       github.event_name == 'workflow_dispatch' ||
       startsWith(github.event.head_commit.message, 'chore(release): prepare v')
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
 
     permissions:
       contents: write
@@ -100,3 +103,13 @@ jobs:
             --target "${{ github.sha }}"
 
           echo "Created release v${{ steps.version.outputs.version }}"
+
+  # Publish to crates.io by calling the publish workflow directly.
+  # GitHub Actions events created by GITHUB_TOKEN do not trigger other workflows,
+  # so the release event from the job above won't trigger publish.yml on its own.
+  publish:
+    needs: release
+    uses: ./.github/workflows/publish.yml
+    with:
+      tag_name: v${{ needs.release.outputs.version }}
+    secrets: inherit
