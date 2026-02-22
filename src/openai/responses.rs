@@ -225,6 +225,48 @@ impl ResponsesResponse {
             metadata: None,
         }
     }
+
+    /// Create a response with a reasoning output item before the message.
+    /// The reasoning item includes an optional summary when `summary_text` is provided.
+    pub fn with_reasoning(
+        model: String,
+        content: String,
+        summary_text: Option<String>,
+        usage: ResponsesUsage,
+    ) -> Self {
+        let reasoning_item = OutputItem::Reasoning {
+            id: format!("rs_{}", uuid::Uuid::new_v4()),
+            status: ItemStatus::Completed,
+            summary: summary_text.map(|text| {
+                vec![ReasoningSummary {
+                    summary_type: "summary_text".to_string(),
+                    text,
+                }]
+            }),
+        };
+
+        let message_item = OutputItem::Message {
+            id: format!("msg_{}", uuid::Uuid::new_v4()),
+            role: OutputRole::Assistant,
+            status: ItemStatus::Completed,
+            content: vec![OutputContentPart::OutputText {
+                text: content.clone(),
+            }],
+        };
+
+        Self {
+            id: format!("resp_{}", uuid::Uuid::new_v4()),
+            object: "response".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+            model,
+            status: ResponseStatus::Completed,
+            output: vec![reasoning_item, message_item],
+            output_text: Some(content),
+            usage: Some(usage),
+            error: None,
+            metadata: None,
+        }
+    }
 }
 
 /// An output item in the response
@@ -513,6 +555,76 @@ impl ResponsesStreamEvent {
         format!("event: response.completed\ndata: {}\n\n", event)
     }
 
+    pub fn reasoning_summary_part_added(
+        output_index: u32,
+        summary_index: u32,
+        part: &ReasoningSummary,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_part.added",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "part": part
+        });
+        format!(
+            "event: response.reasoning_summary_part.added\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_text_delta(
+        output_index: u32,
+        summary_index: u32,
+        delta: &str,
+        sequence_number: u32,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_text.delta",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "delta": delta,
+            "sequence_number": sequence_number
+        });
+        format!(
+            "event: response.reasoning_summary_text.delta\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_text_done(
+        output_index: u32,
+        summary_index: u32,
+        text: &str,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_text.done",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "text": text
+        });
+        format!(
+            "event: response.reasoning_summary_text.done\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_part_done(
+        output_index: u32,
+        summary_index: u32,
+        part: &ReasoningSummary,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_part.done",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "part": part
+        });
+        format!(
+            "event: response.reasoning_summary_part.done\ndata: {}\n\n",
+            event
+        )
+    }
+
     pub fn error(error: ResponsesError) -> String {
         let event = serde_json::json!({
             "type": "error",
@@ -638,5 +750,138 @@ mod tests {
         let error_response = ResponsesErrorResponse { error };
         let json = serde_json::to_string(&error_response).unwrap();
         assert!(json.contains("\"type\":\"rate_limit_error\""));
+    }
+
+    #[test]
+    fn test_responses_response_with_reasoning() {
+        let usage = ResponsesUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 90,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 60,
+            }),
+        };
+        let response = ResponsesResponse::with_reasoning(
+            "o3".to_string(),
+            "The answer is 4.".to_string(),
+            Some("The model considered the arithmetic.".to_string()),
+            usage,
+        );
+
+        assert_eq!(response.output.len(), 2);
+
+        // First item should be reasoning
+        match &response.output[0] {
+            OutputItem::Reasoning {
+                id,
+                status,
+                summary,
+                ..
+            } => {
+                assert!(id.starts_with("rs_"));
+                assert_eq!(*status, ItemStatus::Completed);
+                let summary = summary.as_ref().unwrap();
+                assert_eq!(summary.len(), 1);
+                assert_eq!(summary[0].summary_type, "summary_text");
+                assert_eq!(summary[0].text, "The model considered the arithmetic.");
+            }
+            _ => panic!("Expected Reasoning variant"),
+        }
+
+        // Second item should be message
+        match &response.output[1] {
+            OutputItem::Message { id, role, .. } => {
+                assert!(id.starts_with("msg_"));
+                assert_eq!(*role, OutputRole::Assistant);
+            }
+            _ => panic!("Expected Message variant"),
+        }
+    }
+
+    #[test]
+    fn test_responses_response_with_reasoning_no_summary() {
+        let usage = ResponsesUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 90,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 60,
+            }),
+        };
+        let response = ResponsesResponse::with_reasoning(
+            "o3".to_string(),
+            "The answer.".to_string(),
+            None,
+            usage,
+        );
+
+        assert_eq!(response.output.len(), 2);
+
+        // First item: reasoning with no summary
+        match &response.output[0] {
+            OutputItem::Reasoning { summary, .. } => {
+                assert!(summary.is_none());
+            }
+            _ => panic!("Expected Reasoning variant"),
+        }
+    }
+
+    #[test]
+    fn test_reasoning_output_item_serialization() {
+        let item = OutputItem::Reasoning {
+            id: "rs_test123".to_string(),
+            status: ItemStatus::Completed,
+            summary: Some(vec![ReasoningSummary {
+                summary_type: "summary_text".to_string(),
+                text: "Analyzing the problem.".to_string(),
+            }]),
+        };
+
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"type\":\"reasoning\""));
+        assert!(json.contains("\"id\":\"rs_test123\""));
+        assert!(json.contains("\"summary_text\""));
+        assert!(json.contains("Analyzing the problem."));
+    }
+
+    #[test]
+    fn test_reasoning_stream_event_helpers() {
+        let summary = ReasoningSummary {
+            summary_type: "summary_text".to_string(),
+            text: String::new(),
+        };
+
+        let event = ResponsesStreamEvent::reasoning_summary_part_added(0, 0, &summary);
+        assert!(event.contains("event: response.reasoning_summary_part.added"));
+        assert!(event.contains("\"output_index\":0"));
+
+        let delta = ResponsesStreamEvent::reasoning_summary_text_delta(0, 0, "Thinking", 0);
+        assert!(delta.contains("event: response.reasoning_summary_text.delta"));
+        assert!(delta.contains("\"delta\":\"Thinking\""));
+        assert!(delta.contains("\"sequence_number\":0"));
+
+        let done = ResponsesStreamEvent::reasoning_summary_text_done(0, 0, "Full summary.");
+        assert!(done.contains("event: response.reasoning_summary_text.done"));
+        assert!(done.contains("\"text\":\"Full summary.\""));
+
+        let part_done = ResponsesStreamEvent::reasoning_summary_part_done(0, 0, &summary);
+        assert!(part_done.contains("event: response.reasoning_summary_part.done"));
+    }
+
+    #[test]
+    fn test_reasoning_config_deserialization() {
+        let json = r#"{
+            "model": "o3",
+            "input": "Hello",
+            "reasoning": {
+                "effort": "high",
+                "summary": "auto"
+            }
+        }"#;
+        let request: ResponsesRequest = serde_json::from_str(json).unwrap();
+        let reasoning = request.reasoning.unwrap();
+        assert_eq!(reasoning.effort, Some("high".to_string()));
+        assert_eq!(reasoning.summary, Some("auto".to_string()));
     }
 }
