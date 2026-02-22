@@ -295,25 +295,126 @@ async fn main() {
     );
     println!();
 
-    // 7. Serialization Examples
-    println!("7. Serialization Examples");
-    println!("-------------------------");
+    // 7. Reasoning / Thinking Output
+    println!("7. Reasoning / Thinking Output");
+    println!("------------------------------");
 
-    // Serialize a full response
-    let example_response = ResponsesResponse::new(
-        "gpt-5".to_string(),
-        "This is a test response.".to_string(),
-        ResponsesUsage {
-            input_tokens: 5,
-            output_tokens: 6,
-            total_tokens: 11,
-            output_tokens_details: None,
-        },
+    // Create a response with reasoning output item
+    let reasoning_usage = ResponsesUsage {
+        input_tokens: 8,
+        output_tokens: 10,
+        total_tokens: 48,
+        output_tokens_details: Some(OutputTokensDetails {
+            reasoning_tokens: 30,
+        }),
+    };
+
+    let reasoning_response = ResponsesResponse::with_reasoning(
+        "o3".to_string(),
+        "The answer is 8.".to_string(),
+        Some("The model considered evaluating the arithmetic expression.".to_string()),
+        reasoning_usage,
     );
 
-    let json = serde_json::to_string_pretty(&example_response).unwrap();
+    println!("Response ID: {}", reasoning_response.id);
+    println!("Output items: {}", reasoning_response.output.len());
+    for item in &reasoning_response.output {
+        match item {
+            OutputItem::Reasoning {
+                id,
+                status,
+                summary,
+            } => {
+                println!("  [Thinking]");
+                println!("    ID: {}", id);
+                println!("    Status: {:?}", status);
+                if let Some(summaries) = summary {
+                    for s in summaries {
+                        println!("    Summary: {}", s.text);
+                    }
+                }
+            }
+            OutputItem::Message {
+                id, role, content, ..
+            } => {
+                println!("  [Response]");
+                println!("    ID: {}", id);
+                println!("    Role: {:?}", role);
+                if let Some(OutputContentPart::OutputText { text }) = content.first() {
+                    println!("    Text: {}", text);
+                }
+            }
+            _ => {}
+        }
+    }
+    if let Some(usage) = &reasoning_response.usage {
+        println!(
+            "  Tokens: input={}, output={}, reasoning={}, total={}",
+            usage.input_tokens,
+            usage.output_tokens,
+            usage
+                .output_tokens_details
+                .as_ref()
+                .map(|d| d.reasoning_tokens)
+                .unwrap_or(0),
+            usage.total_tokens,
+        );
+    }
+    println!();
+
+    // 8. Streaming with Reasoning
+    println!("8. Streaming with Reasoning");
+    println!("---------------------------");
+
+    let reasoning_stream_usage = ResponsesUsage {
+        input_tokens: 5,
+        output_tokens: 8,
+        total_tokens: 37,
+        output_tokens_details: Some(OutputTokensDetails {
+            reasoning_tokens: 24,
+        }),
+    };
+
+    let stream_with_reasoning =
+        ResponsesTokenStreamBuilder::new("o3", "The sky is blue due to Rayleigh scattering.")
+            .latency(LatencyProfile::fast())
+            .usage(reasoning_stream_usage)
+            .reasoning(Some("Considering atmospheric physics.".to_string()))
+            .build();
+
+    let mut event_stream = stream_with_reasoning.into_stream();
+    while let Some(event) = event_stream.next().await {
+        if event.contains("output_item.added") {
+            if event.contains("\"reasoning\"") {
+                print!("[Thinking] ");
+            } else if event.contains("\"message\"") {
+                print!("\n[Response] ");
+            }
+        } else if event.contains("reasoning_summary_text.delta")
+            || event.contains("output_text.delta")
+        {
+            if let Some(start) = event.find("\"delta\":\"") {
+                let rest = &event[start + 9..];
+                if let Some(end) = rest.find('"') {
+                    print!("{}", &rest[..end]);
+                }
+            }
+        } else if event.contains("response.completed") {
+            println!();
+        }
+        use std::io::Write;
+        std::io::stdout().flush().unwrap();
+    }
+    println!();
+
+    // 9. Serialization Examples
+    println!("9. Serialization Examples");
+    println!("-------------------------");
+
+    // Serialize a full response with reasoning
+    let json = serde_json::to_string_pretty(&reasoning_response).unwrap();
     println!("Response JSON (truncated):");
-    for line in json.lines().take(15) {
+    for line in json.lines().take(20) {
         println!("  {}", line);
     }
     println!("  ...");

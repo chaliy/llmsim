@@ -204,6 +204,87 @@ def main() -> None:
         print(f"  - Status: {item.get('status')}")
     print()
 
+    # Example 7: Reasoning / Thinking (non-streaming)
+    print("7. Reasoning / Thinking (non-streaming)")
+    print("-" * 40)
+    response = create_response(
+        client,
+        model="o3",
+        input_data="What is 2 + 2?",
+        reasoning={"effort": "medium", "summary": "auto"},
+    )
+    print(f"Model: {response['model']}")
+    print(f"Output items: {len(response.get('output', []))}")
+    for item in response.get("output", []):
+        if item["type"] == "reasoning":
+            print(f"\n  [Thinking]")
+            print(f"  ID: {item['id']}")
+            print(f"  Status: {item['status']}")
+            if item.get("summary"):
+                for s in item["summary"]:
+                    print(f"  Summary: {s['text']}")
+            else:
+                print("  (no summary requested)")
+        elif item["type"] == "message":
+            print(f"\n  [Response]")
+            for content in item.get("content", []):
+                if content["type"] == "output_text":
+                    print(f"  Text: {content['text'][:100]}")
+    if response.get("usage"):
+        usage = response["usage"]
+        reasoning_tokens = usage.get("output_tokens_details", {}).get("reasoning_tokens", 0)
+        print(f"\n  Tokens: input={usage['input_tokens']}, output={usage['output_tokens']}, "
+              f"reasoning={reasoning_tokens}, total={usage['total_tokens']}")
+    print()
+
+    # Example 8: Reasoning with different effort levels
+    print("8. Reasoning Effort Levels")
+    print("-" * 40)
+    for effort in ["low", "medium", "high"]:
+        response = create_response(
+            client,
+            model="o3",
+            input_data="Explain gravity.",
+            reasoning={"effort": effort, "summary": "concise"},
+        )
+        usage = response.get("usage", {})
+        reasoning_tokens = usage.get("output_tokens_details", {}).get("reasoning_tokens", 0)
+        print(f"  effort={effort:6s} -> reasoning_tokens={reasoning_tokens}, total={usage.get('total_tokens', 0)}")
+    print()
+
+    # Example 9: Streaming with thinking visualization
+    print("9. Streaming with Thinking")
+    print("-" * 40)
+
+    for event in create_response(
+        client,
+        model="o3",
+        input_data="Why is the sky blue?",
+        stream=True,
+        reasoning={"effort": "medium", "summary": "auto"},
+    ):
+        event_type = event.get("event", "")
+        data = event.get("data", {})
+
+        if event_type == "response.output_item.added":
+            item = data.get("item", {})
+            if item.get("type") == "reasoning":
+                print("[Thinking] ", end="", flush=True)
+            elif item.get("type") == "message":
+                print("\n[Response] ", end="", flush=True)
+        elif event_type == "response.reasoning_summary_text.delta":
+            print(data.get("delta", ""), end="", flush=True)
+        elif event_type == "response.output_text.delta":
+            print(data.get("delta", ""), end="", flush=True)
+        elif event_type == "response.completed":
+            usage = data.get("response", {}).get("usage", {})
+            reasoning_tokens = usage.get("output_tokens_details", {}).get("reasoning_tokens", 0)
+            print(f"\n\n  Tokens: input={usage.get('input_tokens', 0)}, "
+                  f"output={usage.get('output_tokens', 0)}, "
+                  f"reasoning={reasoning_tokens}, "
+                  f"total={usage.get('total_tokens', 0)}")
+    print()
+
     print("=" * 60)
     print("Examples complete!")
     print("=" * 60)
