@@ -3,7 +3,6 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "langchain-openai>=0.3.0",
-#     "httpx>=0.28.0",
 # ]
 # ///
 """

@@ -84,6 +84,58 @@ curl http://localhost:8080/openai/v1/responses \
   }'
 ```
 
+#### Reasoning (Thinking) Emulation
+
+For reasoning models (o-series and GPT-5 family), LLMSim emulates the `reasoning` output item with optional summary text. Pass a `reasoning` configuration to control effort and summary:
+
+```bash
+curl http://localhost:8080/openai/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "o3",
+    "input": "What is 2+2?",
+    "reasoning": {
+      "effort": "medium",
+      "summary": "auto"
+    }
+  }'
+```
+
+The response includes a `reasoning` output item before the `message`:
+
+```json
+{
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_abc123",
+      "status": "completed",
+      "summary": [{"type": "summary_text", "text": "The model considered..."}]
+    },
+    {
+      "type": "message",
+      "id": "msg_xyz789",
+      "role": "assistant",
+      "status": "completed",
+      "content": [{"type": "output_text", "text": "2 + 2 = 4."}]
+    }
+  ],
+  "usage": {
+    "input_tokens": 5,
+    "output_tokens": 8,
+    "total_tokens": 37,
+    "output_tokens_details": {"reasoning_tokens": 24}
+  }
+}
+```
+
+| Parameter | Values | Description |
+|-----------|--------|-------------|
+| `reasoning.effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | Controls reasoning token count |
+| `reasoning.summary` | `auto`, `concise`, `detailed` | Controls summary text generation |
+
+When streaming, additional SSE events are emitted for the reasoning item (`response.reasoning_summary_text.delta`, etc.) before the message text deltas.
+
 ### List Models
 
 ```bash
@@ -202,6 +254,10 @@ curl http://localhost:8080/openresponses/v1/responses \
 | `response.created` | Response object created |
 | `response.in_progress` | Response generation started |
 | `response.output_item.added` | New output item added |
+| `response.reasoning_summary_part.added` | Reasoning summary part added (reasoning models) |
+| `response.reasoning_summary_text.delta` | Reasoning summary text chunk (reasoning models) |
+| `response.reasoning_summary_text.done` | Reasoning summary text complete (reasoning models) |
+| `response.reasoning_summary_part.done` | Reasoning summary part complete (reasoning models) |
 | `response.content_part.added` | New content part added |
 | `response.output_text.delta` | Text chunk (content delta) |
 | `response.output_text.done` | Text generation complete |

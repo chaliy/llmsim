@@ -52,6 +52,23 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 }
 ```
 
+**R3.2**: Generate reasoning output items for reasoning models (o-series and GPT-5 family) when reasoning tokens are produced (effort is not `"none"`). The reasoning item appears before the message item in the output array:
+```json
+{
+  "type": "reasoning",
+  "id": "rs_<uuid>",
+  "status": "completed",
+  "summary": [{"type": "summary_text", "text": "..."}]
+}
+```
+
+**R3.2.1**: The `summary` field is only present when the request's `reasoning.summary` is set to `"auto"`, `"concise"`, or `"detailed"`. When not requested, the reasoning item has `summary: null`.
+
+**R3.2.2**: Summary text length scales with the summary mode:
+- `"concise"`: ~5% of reasoning tokens as words
+- `"auto"`: ~10% of reasoning tokens as words
+- `"detailed"`: ~15% of reasoning tokens as words
+
 ### R4: Request Parameters
 
 **R4.1**: Support core parameters:
@@ -124,6 +141,15 @@ Support reasoning configuration for reasoning models (o-series and GPT-5 family)
 - `response.output_item.done`: Output item complete
 - `response.completed`: Response finished with usage
 
+**R5.1.1**: When reasoning is enabled, additional streaming events are emitted for the reasoning output item before the message output item:
+- `response.output_item.added`: Reasoning item at `output_index` 0
+- `response.reasoning_summary_part.added`: Summary part (when summary requested)
+- `response.reasoning_summary_text.delta`: Summary text chunks (when summary requested)
+- `response.reasoning_summary_text.done`: Summary text complete
+- `response.reasoning_summary_part.done`: Summary part complete
+- `response.output_item.done`: Reasoning item complete
+- The message output item follows at `output_index` 1
+
 **R5.2**: Each SSE event format:
 ```
 event: <event_type>
@@ -131,7 +157,7 @@ data: <json_payload>
 
 ```
 
-**R5.3**: Include `sequence_number` in delta events for ordering.
+**R5.3**: Include `sequence_number` in delta events for ordering. Sequence numbers are shared across reasoning summary deltas and message text deltas within the same response.
 
 ### R6: Usage Statistics
 
@@ -238,6 +264,67 @@ curl -X POST http://localhost:8080/openai/v1/responses \
     "total_tokens": 16,
     "output_tokens_details": {
       "reasoning_tokens": 0
+    }
+  }
+}
+```
+
+### Reasoning Request
+
+```bash
+curl -X POST http://localhost:8080/openai/v1/responses \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "o3",
+    "input": "What is 2+2?",
+    "reasoning": {
+      "effort": "medium",
+      "summary": "auto"
+    }
+  }'
+```
+
+### Reasoning Response
+
+```json
+{
+  "id": "resp_abc123",
+  "object": "response",
+  "created_at": 1234567890,
+  "model": "o3",
+  "status": "completed",
+  "output": [
+    {
+      "type": "reasoning",
+      "id": "rs_def456",
+      "status": "completed",
+      "summary": [
+        {
+          "type": "summary_text",
+          "text": "The model considered evaluating possible approaches..."
+        }
+      ]
+    },
+    {
+      "type": "message",
+      "id": "msg_xyz789",
+      "role": "assistant",
+      "status": "completed",
+      "content": [
+        {
+          "type": "output_text",
+          "text": "2 + 2 = 4."
+        }
+      ]
+    }
+  ],
+  "output_text": "2 + 2 = 4.",
+  "usage": {
+    "input_tokens": 5,
+    "output_tokens": 8,
+    "total_tokens": 37,
+    "output_tokens_details": {
+      "reasoning_tokens": 24
     }
   }
 }

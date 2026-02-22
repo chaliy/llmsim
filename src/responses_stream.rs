@@ -3,8 +3,8 @@
 
 use crate::latency::LatencyProfile;
 use crate::openai::{
-    ItemStatus, OutputContentPart, OutputItem, OutputRole, OutputTokensDetails, ResponseStatus,
-    ResponsesResponse, ResponsesStreamEvent, ResponsesUsage,
+    ItemStatus, OutputContentPart, OutputItem, OutputRole, OutputTokensDetails, ReasoningSummary,
+    ResponseStatus, ResponsesResponse, ResponsesStreamEvent, ResponsesUsage,
 };
 use async_stream::stream;
 use futures::Stream;
@@ -30,6 +30,10 @@ pub struct ResponsesTokenStream {
     content: String,
     /// Token usage
     usage: ResponsesUsage,
+    /// Whether to include a reasoning output item
+    include_reasoning: bool,
+    /// Optional reasoning summary text to stream
+    reasoning_summary: Option<String>,
     /// Callback to invoke when stream completes
     on_complete: Option<OnCompleteCallback>,
 }
@@ -49,6 +53,8 @@ impl ResponsesTokenStream {
             latency,
             content,
             usage,
+            include_reasoning: false,
+            reasoning_summary: None,
             on_complete: None,
         }
     }
@@ -61,12 +67,12 @@ impl ResponsesTokenStream {
         self
     }
 
-    /// Convert the content into chunks for streaming (word-level)
-    fn tokenize(&self) -> Vec<String> {
+    /// Convert text into chunks for streaming (word-level)
+    fn tokenize_text(text: &str) -> Vec<String> {
         let mut tokens = Vec::new();
         let mut current_word = String::new();
 
-        for ch in self.content.chars() {
+        for ch in text.chars() {
             if ch.is_whitespace() {
                 if !current_word.is_empty() {
                     tokens.push(current_word.clone());
@@ -87,7 +93,7 @@ impl ResponsesTokenStream {
 
     /// Create a streaming response as Server-Sent Events
     pub fn into_stream(self) -> Pin<Box<dyn Stream<Item = String> + Send>> {
-        let tokens = self.tokenize();
+        let content_tokens = Self::tokenize_text(&self.content);
         let response_id = self.response_id.clone();
         let message_id = self.message_id.clone();
         let model = self.model.clone();
@@ -95,6 +101,8 @@ impl ResponsesTokenStream {
         let latency = self.latency.clone();
         let usage = self.usage.clone();
         let content = self.content.clone();
+        let include_reasoning = self.include_reasoning;
+        let reasoning_summary = self.reasoning_summary.clone();
         let on_complete = self.on_complete;
 
         Box::pin(stream! {
@@ -124,6 +132,83 @@ impl ResponsesTokenStream {
             // response.in_progress event
             yield ResponsesStreamEvent::response_in_progress(initial_response.clone());
 
+            // Track output_index: reasoning item takes index 0 when present,
+            // message takes the next index
+            let mut sequence_number: u32 = 0;
+            let mut final_output_items: Vec<OutputItem> = Vec::new();
+
+            // --- Reasoning output item (if enabled) ---
+            if include_reasoning {
+                let reasoning_id = format!("rs_{}", uuid::Uuid::new_v4());
+                let reasoning_output_index: u32 = 0;
+
+                // Emit reasoning item added (in_progress, no summary yet)
+                let reasoning_item = OutputItem::Reasoning {
+                    id: reasoning_id.clone(),
+                    status: ItemStatus::InProgress,
+                    summary: None,
+                };
+                yield ResponsesStreamEvent::output_item_added(reasoning_output_index, &reasoning_item);
+
+                // If we have summary text, stream it
+                if let Some(ref summary_text) = reasoning_summary {
+                    let empty_summary = ReasoningSummary {
+                        summary_type: "summary_text".to_string(),
+                        text: String::new(),
+                    };
+
+                    // reasoning_summary_part.added
+                    yield ResponsesStreamEvent::reasoning_summary_part_added(
+                        reasoning_output_index, 0, &empty_summary,
+                    );
+
+                    // Stream summary text deltas
+                    let summary_tokens = Self::tokenize_text(summary_text);
+                    for token in summary_tokens.into_iter() {
+                        let tbt = latency.sample_tbt();
+                        if !tbt.is_zero() {
+                            sleep(tbt).await;
+                        }
+
+                        yield ResponsesStreamEvent::reasoning_summary_text_delta(
+                            reasoning_output_index, 0, &token, sequence_number,
+                        );
+                        sequence_number += 1;
+                    }
+
+                    // reasoning_summary_text.done
+                    yield ResponsesStreamEvent::reasoning_summary_text_done(
+                        reasoning_output_index, 0, summary_text,
+                    );
+
+                    // reasoning_summary_part.done
+                    let final_summary = ReasoningSummary {
+                        summary_type: "summary_text".to_string(),
+                        text: summary_text.clone(),
+                    };
+                    yield ResponsesStreamEvent::reasoning_summary_part_done(
+                        reasoning_output_index, 0, &final_summary,
+                    );
+                }
+
+                // Emit reasoning item done
+                let final_reasoning_item = OutputItem::Reasoning {
+                    id: reasoning_id,
+                    status: ItemStatus::Completed,
+                    summary: reasoning_summary.as_ref().map(|text| {
+                        vec![ReasoningSummary {
+                            summary_type: "summary_text".to_string(),
+                            text: text.clone(),
+                        }]
+                    }),
+                };
+                yield ResponsesStreamEvent::output_item_done(reasoning_output_index, &final_reasoning_item);
+                final_output_items.push(final_reasoning_item);
+            }
+
+            // --- Message output item ---
+            let message_output_index = if include_reasoning { 1 } else { 0 };
+
             // Create the output item (message) with in_progress status
             let message_item = OutputItem::Message {
                 id: message_id.clone(),
@@ -133,7 +218,7 @@ impl ResponsesTokenStream {
             };
 
             // response.output_item.added event
-            yield ResponsesStreamEvent::output_item_added(0, &message_item);
+            yield ResponsesStreamEvent::output_item_added(message_output_index, &message_item);
 
             // Create the content part
             let content_part = OutputContentPart::OutputText {
@@ -141,10 +226,10 @@ impl ResponsesTokenStream {
             };
 
             // response.content_part.added event
-            yield ResponsesStreamEvent::content_part_added(0, 0, &content_part);
+            yield ResponsesStreamEvent::content_part_added(message_output_index, 0, &content_part);
 
             // Stream content chunks with delta events
-            for (sequence_number, token) in tokens.into_iter().enumerate() {
+            for token in content_tokens.into_iter() {
                 // Inter-token delay
                 let tbt = latency.sample_tbt();
                 if !tbt.is_zero() {
@@ -152,17 +237,20 @@ impl ResponsesTokenStream {
                 }
 
                 // response.output_text.delta event
-                yield ResponsesStreamEvent::output_text_delta(0, 0, &token, sequence_number as u32);
+                yield ResponsesStreamEvent::output_text_delta(
+                    message_output_index, 0, &token, sequence_number,
+                );
+                sequence_number += 1;
             }
 
             // response.output_text.done event
-            yield ResponsesStreamEvent::output_text_done(0, 0, &content);
+            yield ResponsesStreamEvent::output_text_done(message_output_index, 0, &content);
 
             // response.content_part.done event
             let final_content_part = OutputContentPart::OutputText {
                 text: content.clone(),
             };
-            yield ResponsesStreamEvent::content_part_done(0, 0, &final_content_part);
+            yield ResponsesStreamEvent::content_part_done(message_output_index, 0, &final_content_part);
 
             // response.output_item.done event
             let final_message_item = OutputItem::Message {
@@ -171,7 +259,8 @@ impl ResponsesTokenStream {
                 status: ItemStatus::Completed,
                 content: vec![final_content_part],
             };
-            yield ResponsesStreamEvent::output_item_done(0, &final_message_item);
+            yield ResponsesStreamEvent::output_item_done(message_output_index, &final_message_item);
+            final_output_items.push(final_message_item);
 
             // response.completed event with full response
             let final_response = ResponsesResponse {
@@ -180,7 +269,7 @@ impl ResponsesTokenStream {
                 created_at,
                 model: model.clone(),
                 status: ResponseStatus::Completed,
-                output: vec![final_message_item],
+                output: final_output_items,
                 output_text: Some(content.clone()),
                 usage: Some(usage),
                 error: None,
@@ -202,6 +291,8 @@ pub struct ResponsesTokenStreamBuilder {
     content: String,
     latency: LatencyProfile,
     usage: ResponsesUsage,
+    include_reasoning: bool,
+    reasoning_summary: Option<String>,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -219,6 +310,8 @@ impl ResponsesTokenStreamBuilder {
                     reasoning_tokens: 0,
                 }),
             },
+            include_reasoning: false,
+            reasoning_summary: None,
             on_complete: None,
         }
     }
@@ -230,6 +323,15 @@ impl ResponsesTokenStreamBuilder {
 
     pub fn usage(mut self, usage: ResponsesUsage) -> Self {
         self.usage = usage;
+        self
+    }
+
+    /// Enable reasoning output item with optional summary text.
+    /// When `summary_text` is `Some`, the reasoning item will include a streamed summary.
+    /// When `summary_text` is `None`, the reasoning item appears without summary content.
+    pub fn reasoning(mut self, summary_text: Option<String>) -> Self {
+        self.include_reasoning = true;
+        self.reasoning_summary = summary_text;
         self
     }
 
@@ -245,6 +347,8 @@ impl ResponsesTokenStreamBuilder {
     pub fn build(self) -> ResponsesTokenStream {
         let mut stream =
             ResponsesTokenStream::new(self.model, self.content, self.latency, self.usage);
+        stream.include_reasoning = self.include_reasoning;
+        stream.reasoning_summary = self.reasoning_summary;
         if let Some(on_complete) = self.on_complete {
             stream = stream.with_on_complete(on_complete);
         }
@@ -357,5 +461,211 @@ mod tests {
         // Should start with created and end with completed
         assert_eq!(event_types.first(), Some(&"created"));
         assert_eq!(event_types.last(), Some(&"completed"));
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_with_reasoning_and_summary() {
+        let usage = ResponsesUsage {
+            input_tokens: 5,
+            output_tokens: 3,
+            total_tokens: 17,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 9,
+            }),
+        };
+
+        let stream = ResponsesTokenStreamBuilder::new("o3", "Answer here")
+            .latency(LatencyProfile::instant())
+            .usage(usage)
+            .reasoning(Some("Thinking about it.".to_string()))
+            .build();
+
+        let events: Vec<String> = stream.into_stream().collect().await;
+
+        // Should contain reasoning events
+        let reasoning_added: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("output_item.added") && e.contains("\"reasoning\""))
+            .collect();
+        assert_eq!(
+            reasoning_added.len(),
+            1,
+            "Should have one reasoning item added"
+        );
+
+        let summary_part_added: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("reasoning_summary_part.added"))
+            .collect();
+        assert_eq!(summary_part_added.len(), 1);
+
+        let summary_deltas: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("reasoning_summary_text.delta"))
+            .collect();
+        assert!(
+            !summary_deltas.is_empty(),
+            "Should have summary text deltas"
+        );
+
+        let summary_done: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("reasoning_summary_text.done"))
+            .collect();
+        assert_eq!(summary_done.len(), 1);
+
+        let summary_part_done: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("reasoning_summary_part.done"))
+            .collect();
+        assert_eq!(summary_part_done.len(), 1);
+
+        // Reasoning item done should come before message item added
+        let reasoning_done_idx = events
+            .iter()
+            .position(|e| e.contains("output_item.done") && e.contains("\"reasoning\""))
+            .expect("Should have reasoning item done");
+        let message_added_idx = events
+            .iter()
+            .position(|e| e.contains("output_item.added") && e.contains("\"message\""))
+            .expect("Should have message item added");
+        assert!(
+            reasoning_done_idx < message_added_idx,
+            "Reasoning item should complete before message starts"
+        );
+
+        // Message output_index should be 1
+        let message_event = &events[message_added_idx];
+        assert!(message_event.contains("\"output_index\":1"));
+
+        // response.completed should have both items in output
+        let completed = events.last().unwrap();
+        assert!(completed.contains("response.completed"));
+        assert!(completed.contains("\"reasoning\""));
+        assert!(completed.contains("\"message\""));
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_with_reasoning_no_summary() {
+        let usage = ResponsesUsage {
+            input_tokens: 5,
+            output_tokens: 3,
+            total_tokens: 17,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 9,
+            }),
+        };
+
+        let stream = ResponsesTokenStreamBuilder::new("o3", "Answer")
+            .latency(LatencyProfile::instant())
+            .usage(usage)
+            .reasoning(None)
+            .build();
+
+        let events: Vec<String> = stream.into_stream().collect().await;
+
+        // Should have reasoning output item but no summary events
+        let reasoning_added: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("output_item.added") && e.contains("\"reasoning\""))
+            .collect();
+        assert_eq!(reasoning_added.len(), 1);
+
+        let summary_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("reasoning_summary"))
+            .collect();
+        assert!(
+            summary_events.is_empty(),
+            "No summary events when summary not requested"
+        );
+
+        // Message should still be at output_index 1
+        let message_added = events
+            .iter()
+            .find(|e| e.contains("output_item.added") && e.contains("\"message\""))
+            .expect("Should have message item");
+        assert!(message_added.contains("\"output_index\":1"));
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_no_reasoning() {
+        let usage = ResponsesUsage {
+            input_tokens: 5,
+            output_tokens: 3,
+            total_tokens: 8,
+            output_tokens_details: None,
+        };
+
+        let stream = ResponsesTokenStreamBuilder::new("gpt-4o", "Hello")
+            .latency(LatencyProfile::instant())
+            .usage(usage)
+            .build();
+
+        let events: Vec<String> = stream.into_stream().collect().await;
+
+        // No reasoning events
+        let reasoning_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.contains("\"reasoning\""))
+            .collect();
+        assert!(
+            reasoning_events.is_empty(),
+            "Non-reasoning model should not have reasoning items"
+        );
+
+        // Message at output_index 0
+        let message_added = events
+            .iter()
+            .find(|e| e.contains("output_item.added") && e.contains("\"message\""))
+            .expect("Should have message item");
+        assert!(message_added.contains("\"output_index\":0"));
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_reasoning_sequence_numbers_continuous() {
+        let usage = ResponsesUsage {
+            input_tokens: 5,
+            output_tokens: 3,
+            total_tokens: 20,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 12,
+            }),
+        };
+
+        let stream = ResponsesTokenStreamBuilder::new("o3", "Hi")
+            .latency(LatencyProfile::instant())
+            .usage(usage)
+            .reasoning(Some("Thinking carefully.".to_string()))
+            .build();
+
+        let events: Vec<String> = stream.into_stream().collect().await;
+
+        // Collect all sequence numbers from both summary deltas and text deltas
+        let mut seq_numbers: Vec<u32> = Vec::new();
+        for event in &events {
+            if event.contains("reasoning_summary_text.delta") || event.contains("output_text.delta")
+            {
+                // Extract sequence_number from JSON
+                if let Some(data_start) = event.find("data: ") {
+                    let data = &event[data_start + 6..];
+                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data.trim()) {
+                        if let Some(seq) = json.get("sequence_number").and_then(|v| v.as_u64()) {
+                            seq_numbers.push(seq as u32);
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sequence numbers should be continuous starting from 0
+        assert!(!seq_numbers.is_empty());
+        for (i, seq) in seq_numbers.iter().enumerate() {
+            assert_eq!(
+                *seq, i as u32,
+                "Sequence numbers should be continuous: expected {}, got {}",
+                i, seq
+            );
+        }
     }
 }

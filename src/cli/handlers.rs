@@ -24,6 +24,7 @@ use axum::{
     Json,
 };
 use futures::StreamExt;
+use rand::prelude::IndexedRandom;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -477,6 +478,10 @@ pub async fn create_response(
         }),
     };
 
+    // Generate reasoning summary text if applicable
+    let reasoning_summary =
+        generate_reasoning_summary(&request.model, &request.reasoning, reasoning_tokens);
+
     if request.stream {
         // Streaming response
         // Clone stats for the streaming completion callback
@@ -484,13 +489,18 @@ pub async fn create_response(
         let input_tok = usage.input_tokens;
         let output_tok = usage.output_tokens;
 
-        let stream = ResponsesTokenStreamBuilder::new(&request.model, content)
+        let mut builder = ResponsesTokenStreamBuilder::new(&request.model, content)
             .latency(latency)
             .usage(usage)
             .on_complete(move || {
                 stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
-            })
-            .build();
+            });
+
+        if reasoning_tokens > 0 {
+            builder = builder.reasoning(reasoning_summary);
+        }
+
+        let stream = builder.build();
 
         let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
 
@@ -515,7 +525,16 @@ pub async fn create_response(
             usage.output_tokens,
         );
 
-        let response = ResponsesResponse::new(request.model.clone(), content, usage);
+        let response = if reasoning_tokens > 0 {
+            ResponsesResponse::with_reasoning(
+                request.model.clone(),
+                content,
+                reasoning_summary,
+                usage,
+            )
+        } else {
+            ResponsesResponse::new(request.model.clone(), content, usage)
+        };
         Ok(Json(response).into_response())
     }
 }
@@ -567,15 +586,115 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
     parts.join("\n")
 }
 
-/// Calculate simulated reasoning tokens for reasoning models (o-series and GPT-5)
-fn calculate_reasoning_tokens(
+/// Generate simulated reasoning summary text.
+/// Returns `Some(text)` when the model is a reasoning model and summary is requested.
+fn generate_reasoning_summary(
     model: &str,
     reasoning: &Option<ReasoningConfig>,
-    output_tokens: usize,
-) -> usize {
-    // Check if this is a reasoning model
-    // o-series: o1, o3, o4 (explicit reasoning models)
-    // GPT-5 family: gpt-5, gpt-5-mini, gpt-5-nano, gpt-5.1, gpt-5.2 (trained with RL for reasoning)
+    reasoning_tokens: usize,
+) -> Option<String> {
+    if reasoning_tokens == 0 {
+        return None;
+    }
+
+    // Check if summary is requested
+    let summary_mode = reasoning.as_ref().and_then(|r| r.summary.as_deref());
+    match summary_mode {
+        Some("auto") | Some("concise") | Some("detailed") => {}
+        _ => return None,
+    }
+
+    // Scale summary length based on mode and reasoning token count
+    let word_count = match summary_mode {
+        Some("concise") => (reasoning_tokens as f64 * 0.05).max(8.0) as usize,
+        Some("detailed") => (reasoning_tokens as f64 * 0.15).max(15.0) as usize,
+        _ => (reasoning_tokens as f64 * 0.1).max(10.0) as usize, // "auto"
+    };
+
+    Some(generate_reasoning_text(model, word_count))
+}
+
+/// Generate plausible reasoning summary text of the given word count.
+fn generate_reasoning_text(_model: &str, word_count: usize) -> String {
+    const REASONING_PHRASES: &[&str] = &[
+        "the model considered",
+        "analyzing the input",
+        "evaluating possible approaches",
+        "breaking down the problem",
+        "considering multiple perspectives",
+        "reviewing relevant context",
+        "weighing the alternatives",
+        "synthesizing information",
+        "formulating a response",
+        "assessing the requirements",
+        "identifying key factors",
+        "examining the constraints",
+        "reasoning through the steps",
+        "determining the best approach",
+        "processing the query",
+    ];
+
+    const FILLER_WORDS: &[&str] = &[
+        "and",
+        "then",
+        "next",
+        "also",
+        "before",
+        "after",
+        "while",
+        "during",
+        "through",
+        "carefully",
+        "thoroughly",
+        "systematically",
+        "logically",
+        "methodically",
+    ];
+
+    let mut rng = rand::rng();
+    let mut words = Vec::with_capacity(word_count);
+
+    // Start with a reasoning phrase
+    let phrase = REASONING_PHRASES.choose(&mut rng).unwrap();
+    words.extend(phrase.split_whitespace());
+
+    while words.len() < word_count {
+        // Alternate between filler words and reasoning phrases
+        if words.len() % 5 == 0 && words.len() + 3 < word_count {
+            let filler = FILLER_WORDS.choose(&mut rng).unwrap();
+            words.push(filler);
+        }
+        let phrase = REASONING_PHRASES.choose(&mut rng).unwrap();
+        for w in phrase.split_whitespace() {
+            if words.len() >= word_count {
+                break;
+            }
+            words.push(w);
+        }
+    }
+
+    words.truncate(word_count);
+
+    // Capitalize first word and join
+    let mut result = String::new();
+    for (i, word) in words.iter().enumerate() {
+        if i == 0 {
+            let mut chars = word.chars();
+            if let Some(first) = chars.next() {
+                result.push(first.to_ascii_uppercase());
+                result.extend(chars);
+            }
+        } else {
+            result.push(' ');
+            result.push_str(word);
+        }
+    }
+    result.push('.');
+    result
+}
+
+/// Check if a model is a reasoning model (o-series or GPT-5 family)
+fn is_reasoning_model(model: &str) -> bool {
     let is_o_series = model.starts_with("o1")
         || model.starts_with("o3")
         || model.starts_with("o4")
@@ -584,7 +703,16 @@ fn calculate_reasoning_tokens(
 
     let is_gpt5 = model.starts_with("gpt-5");
 
-    if !is_o_series && !is_gpt5 {
+    is_o_series || is_gpt5
+}
+
+/// Calculate simulated reasoning tokens for reasoning models (o-series and GPT-5)
+fn calculate_reasoning_tokens(
+    model: &str,
+    reasoning: &Option<ReasoningConfig>,
+    output_tokens: usize,
+) -> usize {
+    if !is_reasoning_model(model) {
         return 0;
     }
 
@@ -696,5 +824,129 @@ mod tests {
     async fn test_health_endpoint() {
         let response = health().await.into_response();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_is_reasoning_model() {
+        // o-series models
+        assert!(is_reasoning_model("o1"));
+        assert!(is_reasoning_model("o1-mini"));
+        assert!(is_reasoning_model("o3"));
+        assert!(is_reasoning_model("o3-mini"));
+        assert!(is_reasoning_model("o4-mini"));
+
+        // GPT-5 models
+        assert!(is_reasoning_model("gpt-5"));
+        assert!(is_reasoning_model("gpt-5-mini"));
+        assert!(is_reasoning_model("gpt-5.1"));
+        assert!(is_reasoning_model("gpt-5.2"));
+
+        // Non-reasoning models
+        assert!(!is_reasoning_model("gpt-4o"));
+        assert!(!is_reasoning_model("gpt-4o-mini"));
+        assert!(!is_reasoning_model("gpt-4"));
+        assert!(!is_reasoning_model("claude-sonnet-4"));
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_reasoning_model() {
+        // o3 with default (medium) effort
+        let tokens = calculate_reasoning_tokens("o3", &None, 100);
+        assert_eq!(tokens, 300); // 3.0x multiplier
+
+        // o3 with high effort
+        let config = Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("o3", &config, 100);
+        assert_eq!(tokens, 600); // 6.0x multiplier
+
+        // gpt-5 with none effort
+        let config = Some(ReasoningConfig {
+            effort: Some("none".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("gpt-5", &config, 100);
+        assert_eq!(tokens, 0); // 0.0x multiplier
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_non_reasoning_model() {
+        let tokens = calculate_reasoning_tokens("gpt-4o", &None, 100);
+        assert_eq!(tokens, 0);
+    }
+
+    #[test]
+    fn test_generate_reasoning_summary_with_summary() {
+        let config = Some(ReasoningConfig {
+            effort: Some("medium".to_string()),
+            summary: Some("auto".to_string()),
+        });
+        let summary = generate_reasoning_summary("o3", &config, 300);
+        assert!(summary.is_some());
+        let text = summary.unwrap();
+        assert!(!text.is_empty());
+        assert!(text.ends_with('.'));
+    }
+
+    #[test]
+    fn test_generate_reasoning_summary_without_summary() {
+        // No reasoning config
+        let summary = generate_reasoning_summary("o3", &None, 300);
+        assert!(summary.is_none());
+
+        // Reasoning config without summary
+        let config = Some(ReasoningConfig {
+            effort: Some("medium".to_string()),
+            summary: None,
+        });
+        let summary = generate_reasoning_summary("o3", &config, 300);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn test_generate_reasoning_summary_zero_tokens() {
+        let config = Some(ReasoningConfig {
+            effort: Some("none".to_string()),
+            summary: Some("auto".to_string()),
+        });
+        let summary = generate_reasoning_summary("o3", &config, 0);
+        assert!(summary.is_none());
+    }
+
+    #[test]
+    fn test_generate_reasoning_summary_modes() {
+        let reasoning_tokens = 200;
+
+        let concise_config = Some(ReasoningConfig {
+            effort: Some("medium".to_string()),
+            summary: Some("concise".to_string()),
+        });
+        let concise = generate_reasoning_summary("o3", &concise_config, reasoning_tokens).unwrap();
+
+        let detailed_config = Some(ReasoningConfig {
+            effort: Some("medium".to_string()),
+            summary: Some("detailed".to_string()),
+        });
+        let detailed =
+            generate_reasoning_summary("o3", &detailed_config, reasoning_tokens).unwrap();
+
+        // Detailed should generally be longer than concise
+        assert!(
+            detailed.len() > concise.len(),
+            "Detailed summary ({}) should be longer than concise ({})",
+            detailed.len(),
+            concise.len()
+        );
+    }
+
+    #[test]
+    fn test_generate_reasoning_text() {
+        let text = generate_reasoning_text("o3", 20);
+        assert!(!text.is_empty());
+        assert!(text.ends_with('.'));
+        // First character should be uppercase
+        assert!(text.chars().next().unwrap().is_uppercase());
     }
 }

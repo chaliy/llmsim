@@ -134,6 +134,90 @@ def main() -> None:
     print(f"Response: {response.choices[0].message.content}")
     print()
 
+    # Example 6: Responses API with Thinking
+    print("6. Responses API with Thinking (o3)")
+    print("-" * 30)
+
+    # Use httpx for Responses API since the OpenAI SDK uses a different interface
+    import json
+    import httpx
+
+    responses_url = base_url.replace("/openai/v1", "")
+    with httpx.Client(base_url=responses_url, timeout=60.0) as http_client:
+        resp = http_client.post(
+            "/openai/v1/responses",
+            json={
+                "model": "o3",
+                "input": "What is 15 * 37?",
+                "reasoning": {"effort": "medium", "summary": "auto"},
+            },
+        )
+        data = resp.json()
+        for item in data.get("output", []):
+            if item["type"] == "reasoning":
+                print("[Thinking]")
+                if item.get("summary"):
+                    for s in item["summary"]:
+                        print(f"  {s['text']}")
+            elif item["type"] == "message":
+                for c in item.get("content", []):
+                    if c["type"] == "output_text":
+                        print(f"[Response] {c['text'][:80]}")
+        usage = data.get("usage", {})
+        reasoning_tok = usage.get("output_tokens_details", {}).get("reasoning_tokens", 0)
+        print(f"Reasoning tokens: {reasoning_tok}, Total: {usage.get('total_tokens', 0)}")
+    print()
+
+    # Example 7: Streaming Thinking with Responses API
+    print("7. Streaming Thinking (Responses API)")
+    print("-" * 30)
+    with httpx.Client(base_url=responses_url, timeout=60.0) as http_client:
+        with http_client.stream(
+            "POST",
+            "/openai/v1/responses",
+            json={
+                "model": "o3",
+                "input": "Explain why 1+1=2",
+                "stream": True,
+                "reasoning": {"effort": "low", "summary": "concise"},
+            },
+        ) as stream_resp:
+            buf = ""
+            for chunk in stream_resp.iter_text():
+                buf += chunk
+                while "\n\n" in buf:
+                    event_str, buf = buf.split("\n\n", 1)
+                    if not event_str.strip():
+                        continue
+                    ev = {}
+                    for line in event_str.strip().split("\n"):
+                        if line.startswith("event: "):
+                            ev["event"] = line[7:]
+                        elif line.startswith("data: "):
+                            try:
+                                ev["data"] = json.loads(line[6:])
+                            except json.JSONDecodeError:
+                                pass
+                    if not ev:
+                        continue
+                    etype = ev.get("event", "")
+                    edata = ev.get("data", {})
+                    if etype == "response.output_item.added":
+                        item = edata.get("item", {})
+                        if item.get("type") == "reasoning":
+                            print("[Thinking] ", end="", flush=True)
+                        elif item.get("type") == "message":
+                            print("\n[Response] ", end="", flush=True)
+                    elif etype == "response.reasoning_summary_text.delta":
+                        print(edata.get("delta", ""), end="", flush=True)
+                    elif etype == "response.output_text.delta":
+                        print(edata.get("delta", ""), end="", flush=True)
+                    elif etype == "response.completed":
+                        usage = edata.get("response", {}).get("usage", {})
+                        rtok = usage.get("output_tokens_details", {}).get("reasoning_tokens", 0)
+                        print(f"\n  Tokens: reasoning={rtok}, total={usage.get('total_tokens', 0)}")
+    print()
+
     print("=" * 50)
     print("Examples complete!")
     print("=" * 50)
