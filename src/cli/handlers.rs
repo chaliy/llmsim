@@ -6,15 +6,16 @@ use crate::{
     create_generator,
     openai::{
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
-        MessageContent, Model, ModelsResponse, OutputTokensDetails, ReasoningConfig,
-        ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
-        ResponsesUsage, Usage,
+        ItemStatus, MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem,
+        OutputRole, OutputTokensDetails, ReasoningConfig, ReasoningSummary, ResponsesErrorResponse,
+        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
     },
     openresponses::{
         self, OpenResponsesStreamBuilder, Response as OpenResponsesResponse, ResponseRequest,
         Usage as OpenResponsesUsage,
     },
-    EndpointType, ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
+    EndpointType, ErrorInjector, LatencyProfile, ReasoningStreamConfig,
+    ResponsesTokenStreamBuilder, TokenStreamBuilder,
 };
 use axum::{
     body::Body,
@@ -477,6 +478,15 @@ pub async fn create_response(
         }),
     };
 
+    // Generate reasoning summary text if reasoning is active
+    let reasoning_config = if reasoning_tokens > 0 {
+        let summary_text =
+            generate_reasoning_summary(&request.model, &request.reasoning, &input_text);
+        Some(ReasoningStreamConfig { summary_text })
+    } else {
+        None
+    };
+
     if request.stream {
         // Streaming response
         // Clone stats for the streaming completion callback
@@ -484,13 +494,18 @@ pub async fn create_response(
         let input_tok = usage.input_tokens;
         let output_tok = usage.output_tokens;
 
-        let stream = ResponsesTokenStreamBuilder::new(&request.model, content)
+        let mut builder = ResponsesTokenStreamBuilder::new(&request.model, content)
             .latency(latency)
             .usage(usage)
             .on_complete(move || {
                 stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
-            })
-            .build();
+            });
+
+        if let Some(rc) = reasoning_config {
+            builder = builder.reasoning(rc);
+        }
+
+        let stream = builder.build();
 
         let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
 
@@ -515,7 +530,8 @@ pub async fn create_response(
             usage.output_tokens,
         );
 
-        let response = ResponsesResponse::new(request.model.clone(), content, usage);
+        let response =
+            build_responses_response(request.model.clone(), content, usage, reasoning_config);
         Ok(Json(response).into_response())
     }
 }
@@ -611,6 +627,86 @@ fn calculate_reasoning_tokens(
     (output_tokens as f64 * multiplier) as usize
 }
 
+/// Generate simulated reasoning summary text based on model and reasoning config
+fn generate_reasoning_summary(
+    _model: &str,
+    reasoning: &Option<ReasoningConfig>,
+    _input_text: &str,
+) -> Option<String> {
+    // Only generate summary when summary mode is set
+    let summary_mode = reasoning
+        .as_ref()
+        .and_then(|r| r.summary.as_deref())
+        .unwrap_or("auto");
+
+    match summary_mode {
+        "concise" => {
+            Some("Analyzed the request and determined the appropriate response.".to_string())
+        }
+        "detailed" => Some(
+            "The model carefully analyzed the user's request, considering multiple approaches \
+             and evaluating potential responses. After weighing the available information and \
+             applying relevant reasoning strategies, it determined the most appropriate and \
+             helpful response to provide."
+                .to_string(),
+        ),
+        "auto" => Some(
+            "Considered the request and formulated a response based on the available context."
+                .to_string(),
+        ),
+        _ => None,
+    }
+}
+
+/// Build a ResponsesResponse with optional reasoning output item
+fn build_responses_response(
+    model: String,
+    content: String,
+    usage: ResponsesUsage,
+    reasoning_config: Option<ReasoningStreamConfig>,
+) -> ResponsesResponse {
+    let mut output = Vec::new();
+
+    // Add reasoning output item if reasoning was used
+    if let Some(rc) = reasoning_config {
+        let summary = rc.summary_text.map(|text| {
+            vec![ReasoningSummary {
+                summary_type: "summary_text".to_string(),
+                text,
+            }]
+        });
+
+        output.push(OutputItem::Reasoning {
+            id: format!("rs_{}", uuid::Uuid::new_v4()),
+            status: ItemStatus::Completed,
+            summary,
+        });
+    }
+
+    // Add message output item
+    output.push(OutputItem::Message {
+        id: format!("msg_{}", uuid::Uuid::new_v4()),
+        role: OutputRole::Assistant,
+        status: ItemStatus::Completed,
+        content: vec![OutputContentPart::OutputText {
+            text: content.clone(),
+        }],
+    });
+
+    ResponsesResponse {
+        id: format!("resp_{}", uuid::Uuid::new_v4()),
+        object: "response".to_string(),
+        created_at: chrono::Utc::now().timestamp(),
+        model,
+        status: crate::openai::ResponseStatus::Completed,
+        output,
+        output_text: Some(content),
+        usage: Some(usage),
+        error: None,
+        metadata: None,
+    }
+}
+
 /// Count tokens in a chat request
 fn count_request_tokens(request: &ChatCompletionRequest) -> usize {
     let mut total = 0;
@@ -696,5 +792,161 @@ mod tests {
     async fn test_health_endpoint() {
         let response = health().await.into_response();
         assert_eq!(response.status(), StatusCode::OK);
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_o_series() {
+        // o3 model with default effort (medium)
+        let tokens = calculate_reasoning_tokens("o3", &None, 100);
+        assert_eq!(tokens, 300); // 3x multiplier for medium
+
+        // o3 with high effort
+        let config = Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("o3", &config, 100);
+        assert_eq!(tokens, 600); // 6x multiplier
+
+        // o4-mini with low effort
+        let config = Some(ReasoningConfig {
+            effort: Some("low".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("o4-mini", &config, 100);
+        assert_eq!(tokens, 150); // 1.5x multiplier
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_gpt5() {
+        // GPT-5 with none effort
+        let config = Some(ReasoningConfig {
+            effort: Some("none".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("gpt-5", &config, 100);
+        assert_eq!(tokens, 0);
+
+        // GPT-5 with minimal effort
+        let config = Some(ReasoningConfig {
+            effort: Some("minimal".to_string()),
+            summary: None,
+        });
+        let tokens = calculate_reasoning_tokens("gpt-5", &config, 100);
+        assert_eq!(tokens, 50); // 0.5x multiplier
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_non_reasoning() {
+        // Non-reasoning model should return 0
+        let tokens = calculate_reasoning_tokens("gpt-4o", &None, 100);
+        assert_eq!(tokens, 0);
+
+        let tokens = calculate_reasoning_tokens("gpt-4.1", &None, 100);
+        assert_eq!(tokens, 0);
+    }
+
+    #[test]
+    fn test_generate_reasoning_summary() {
+        // Auto mode
+        let config = Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: Some("auto".to_string()),
+        });
+        let summary = generate_reasoning_summary("o3", &config, "test");
+        assert!(summary.is_some());
+
+        // Concise mode
+        let config = Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: Some("concise".to_string()),
+        });
+        let summary = generate_reasoning_summary("o3", &config, "test");
+        assert!(summary.is_some());
+        assert!(summary.unwrap().len() < 100);
+
+        // Detailed mode
+        let config = Some(ReasoningConfig {
+            effort: Some("high".to_string()),
+            summary: Some("detailed".to_string()),
+        });
+        let summary = generate_reasoning_summary("o3", &config, "test");
+        assert!(summary.is_some());
+        assert!(summary.unwrap().len() > 100);
+
+        // No reasoning config (default auto)
+        let summary = generate_reasoning_summary("o3", &None, "test");
+        assert!(summary.is_some());
+    }
+
+    #[test]
+    fn test_build_responses_response_with_reasoning() {
+        let usage = ResponsesUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 50,
+            output_tokens_details: Some(OutputTokensDetails {
+                reasoning_tokens: 20,
+            }),
+        };
+
+        let reasoning_config = Some(ReasoningStreamConfig {
+            summary_text: Some("Analyzed the request.".to_string()),
+        });
+
+        let response = build_responses_response(
+            "o3".to_string(),
+            "Hello!".to_string(),
+            usage,
+            reasoning_config,
+        );
+
+        // Should have 2 output items: reasoning + message
+        assert_eq!(response.output.len(), 2);
+
+        // First should be reasoning
+        match &response.output[0] {
+            OutputItem::Reasoning {
+                summary, status, ..
+            } => {
+                assert_eq!(*status, ItemStatus::Completed);
+                assert!(summary.is_some());
+                let summaries = summary.as_ref().unwrap();
+                assert_eq!(summaries.len(), 1);
+                assert_eq!(summaries[0].text, "Analyzed the request.");
+            }
+            _ => panic!("Expected Reasoning output item"),
+        }
+
+        // Second should be message
+        match &response.output[1] {
+            OutputItem::Message { content, .. } => {
+                assert_eq!(content.len(), 1);
+            }
+            _ => panic!("Expected Message output item"),
+        }
+
+        assert_eq!(response.output_text, Some("Hello!".to_string()));
+    }
+
+    #[test]
+    fn test_build_responses_response_without_reasoning() {
+        let usage = ResponsesUsage {
+            input_tokens: 10,
+            output_tokens: 20,
+            total_tokens: 30,
+            output_tokens_details: None,
+        };
+
+        let response =
+            build_responses_response("gpt-4o".to_string(), "Hello!".to_string(), usage, None);
+
+        // Should have 1 output item: message only
+        assert_eq!(response.output.len(), 1);
+
+        match &response.output[0] {
+            OutputItem::Message { .. } => {}
+            _ => panic!("Expected Message output item"),
+        }
     }
 }

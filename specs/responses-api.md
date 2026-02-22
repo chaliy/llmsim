@@ -97,7 +97,24 @@ Support reasoning configuration for reasoning models (o-series and GPT-5 family)
 - `high`: ~6x output tokens as reasoning
 - `xhigh`: ~10x output tokens as reasoning (GPT-5.2 only, most thorough)
 
-**R4.3.2**: Include reasoning tokens in usage statistics:
+**R4.3.2**: Include reasoning output item in response when reasoning tokens > 0:
+- Add a `reasoning` output item before the `message` output item
+- Include reasoning summary when `reasoning.summary` is configured:
+  - `"auto"`: Include a moderate-length summary
+  - `"concise"`: Include a brief summary (1-2 sentences)
+  - `"detailed"`: Include a longer summary (paragraph)
+- Summary is an array of `ReasoningSummary` objects with `type: "summary_text"` and `text`
+
+**R4.3.3**: Stream reasoning events before message events when streaming:
+- `response.output_item.added` for reasoning item at `output_index: 0`
+- `response.reasoning_summary_part.added` (when summary configured)
+- `response.reasoning_summary_text.delta` (streaming summary text)
+- `response.reasoning_summary_text.done`
+- `response.reasoning_summary_part.done`
+- `response.output_item.done` for reasoning item
+- Message events follow at `output_index: 1`
+
+**R4.3.4**: Include reasoning tokens in usage statistics:
 ```json
 {
   "usage": {

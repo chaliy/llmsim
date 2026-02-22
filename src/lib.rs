@@ -64,7 +64,9 @@ pub use generator::{
     ResponseGenerator, SequenceGenerator,
 };
 pub use latency::LatencyProfile;
-pub use responses_stream::{ResponsesTokenStream, ResponsesTokenStreamBuilder};
+pub use responses_stream::{
+    ReasoningStreamConfig, ResponsesTokenStream, ResponsesTokenStreamBuilder,
+};
 pub use stats::{new_shared_stats, EndpointType, SharedStats, Stats, StatsSnapshot};
 pub use stream::{TokenStream, TokenStreamBuilder};
 pub use tokens::{count_tokens, count_tokens_default, TokenCounter, TokenError};

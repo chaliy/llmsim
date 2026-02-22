@@ -513,6 +513,76 @@ impl ResponsesStreamEvent {
         format!("event: response.completed\ndata: {}\n\n", event)
     }
 
+    pub fn reasoning_summary_part_added(
+        output_index: u32,
+        summary_index: u32,
+        part: &ReasoningSummary,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_part.added",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "part": part
+        });
+        format!(
+            "event: response.reasoning_summary_part.added\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_text_delta(
+        output_index: u32,
+        summary_index: u32,
+        delta: &str,
+        sequence_number: u32,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_text.delta",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "delta": delta,
+            "sequence_number": sequence_number
+        });
+        format!(
+            "event: response.reasoning_summary_text.delta\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_text_done(
+        output_index: u32,
+        summary_index: u32,
+        text: &str,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_text.done",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "text": text
+        });
+        format!(
+            "event: response.reasoning_summary_text.done\ndata: {}\n\n",
+            event
+        )
+    }
+
+    pub fn reasoning_summary_part_done(
+        output_index: u32,
+        summary_index: u32,
+        part: &ReasoningSummary,
+    ) -> String {
+        let event = serde_json::json!({
+            "type": "response.reasoning_summary_part.done",
+            "output_index": output_index,
+            "summary_index": summary_index,
+            "part": part
+        });
+        format!(
+            "event: response.reasoning_summary_part.done\ndata: {}\n\n",
+            event
+        )
+    }
+
     pub fn error(error: ResponsesError) -> String {
         let event = serde_json::json!({
             "type": "error",
@@ -638,5 +708,46 @@ mod tests {
         let error_response = ResponsesErrorResponse { error };
         let json = serde_json::to_string(&error_response).unwrap();
         assert!(json.contains("\"type\":\"rate_limit_error\""));
+    }
+
+    #[test]
+    fn test_reasoning_stream_events() {
+        let part = ReasoningSummary {
+            summary_type: "summary_text".to_string(),
+            text: String::new(),
+        };
+        let added = ResponsesStreamEvent::reasoning_summary_part_added(0, 0, &part);
+        assert!(added.contains("response.reasoning_summary_part.added"));
+
+        let delta = ResponsesStreamEvent::reasoning_summary_text_delta(0, 0, "thinking", 1);
+        assert!(delta.contains("response.reasoning_summary_text.delta"));
+        assert!(delta.contains("\"delta\":\"thinking\""));
+
+        let done = ResponsesStreamEvent::reasoning_summary_text_done(0, 0, "full thought");
+        assert!(done.contains("response.reasoning_summary_text.done"));
+        assert!(done.contains("\"text\":\"full thought\""));
+
+        let part_done = ReasoningSummary {
+            summary_type: "summary_text".to_string(),
+            text: "full thought".to_string(),
+        };
+        let pdone = ResponsesStreamEvent::reasoning_summary_part_done(0, 0, &part_done);
+        assert!(pdone.contains("response.reasoning_summary_part.done"));
+    }
+
+    #[test]
+    fn test_reasoning_output_item_serialization() {
+        let item = OutputItem::Reasoning {
+            id: "rs_test123".to_string(),
+            status: ItemStatus::Completed,
+            summary: Some(vec![ReasoningSummary {
+                summary_type: "summary_text".to_string(),
+                text: "The model analyzed the query.".to_string(),
+            }]),
+        };
+        let json = serde_json::to_string(&item).unwrap();
+        assert!(json.contains("\"type\":\"reasoning\""));
+        assert!(json.contains("\"summary_text\""));
+        assert!(json.contains("The model analyzed the query."));
     }
 }
