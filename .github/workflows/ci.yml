@@ -224,6 +224,9 @@ jobs:
       - name: Run LangChain Python example
         run: uv run examples/langchain_client.py
 
+      - name: Run LangChain Responses API Python example
+        run: uv run examples/langchain_responses_client.py
+
       - name: Run TypeScript example
         run: npx tsx openai_client.ts
         working-directory: examples/node

@@ -15,8 +15,11 @@ pub enum ResponsesInput {
     Items(Vec<InputItem>),
 }
 
-/// An input item in the Responses API
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// An input item in the Responses API.
+/// Accepts both tagged (`{"type": "message", ...}`) and shorthand
+/// (`{"role": "user", "content": "..."}`) formats for compatibility with
+/// the OpenAI API and SDKs like LangChain.
+#[derive(Debug, Clone, Serialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum InputItem {
     /// A message input item
@@ -26,6 +29,57 @@ pub enum InputItem {
     },
     /// A function call result (tool output)
     FunctionCallOutput { call_id: String, output: String },
+}
+
+impl<'de> serde::Deserialize<'de> for InputItem {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let value = serde_json::Value::deserialize(deserializer)?;
+        let obj = value
+            .as_object()
+            .ok_or_else(|| serde::de::Error::custom("expected an object"))?;
+
+        match obj.get("type").and_then(|v| v.as_str()) {
+            Some("message") | None if obj.contains_key("role") => {
+                // Tagged message or shorthand (no "type" but has "role")
+                let role: InputRole = serde_json::from_value(
+                    obj.get("role")
+                        .cloned()
+                        .ok_or_else(|| serde::de::Error::missing_field("role"))?,
+                )
+                .map_err(serde::de::Error::custom)?;
+                let content: MessageContent = serde_json::from_value(
+                    obj.get("content")
+                        .cloned()
+                        .ok_or_else(|| serde::de::Error::missing_field("content"))?,
+                )
+                .map_err(serde::de::Error::custom)?;
+                Ok(InputItem::Message { role, content })
+            }
+            Some("function_call_output") => {
+                let call_id = obj
+                    .get("call_id")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("call_id"))?
+                    .to_string();
+                let output = obj
+                    .get("output")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| serde::de::Error::missing_field("output"))?
+                    .to_string();
+                Ok(InputItem::FunctionCallOutput { call_id, output })
+            }
+            Some(other) => Err(serde::de::Error::unknown_variant(
+                other,
+                &["message", "function_call_output"],
+            )),
+            None => Err(serde::de::Error::custom(
+                "missing 'type' or 'role' field in input item",
+            )),
+        }
+    }
 }
 
 /// Role for input messages
@@ -658,6 +712,44 @@ mod tests {
             ResponsesInput::Items(items) => {
                 assert_eq!(items.len(), 1);
             }
+            _ => panic!("Expected Items variant"),
+        }
+    }
+
+    #[test]
+    fn test_responses_input_items_shorthand() {
+        // LangChain and other SDKs send items without "type" field
+        let json = r#"[
+            {"role": "user", "content": "Hello!"}
+        ]"#;
+        let input: ResponsesInput = serde_json::from_str(json).unwrap();
+        match input {
+            ResponsesInput::Items(items) => {
+                assert_eq!(items.len(), 1);
+                match &items[0] {
+                    InputItem::Message { role, content } => {
+                        assert_eq!(*role, InputRole::User);
+                        match content {
+                            MessageContent::Text(t) => assert_eq!(t, "Hello!"),
+                            _ => panic!("Expected Text content"),
+                        }
+                    }
+                    _ => panic!("Expected Message variant"),
+                }
+            }
+            _ => panic!("Expected Items variant"),
+        }
+    }
+
+    #[test]
+    fn test_responses_input_items_shorthand_multi() {
+        let json = r#"[
+            {"role": "system", "content": "You are helpful."},
+            {"role": "user", "content": "Hi!"}
+        ]"#;
+        let input: ResponsesInput = serde_json::from_str(json).unwrap();
+        match input {
+            ResponsesInput::Items(items) => assert_eq!(items.len(), 2),
             _ => panic!("Expected Items variant"),
         }
     }
