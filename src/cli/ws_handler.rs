@@ -140,14 +140,11 @@ async fn handle_ws_connection(mut socket: WebSocket, state: Arc<AppState>) {
                             tracing::warn!("Injecting error on WebSocket: {:?}", error);
                             state.stats.record_error(error.status_code());
 
-                            let error_event = serde_json::json!({
-                                "type": "error",
-                                "error": {
-                                    "type": error.to_error_response().error.error_type,
-                                    "message": error.to_error_response().error.message,
-                                    "code": error.to_error_response().error.error_type
-                                }
-                            });
+                            let err_resp = error.to_error_response();
+                            let error_event = ServerEvent::from_error(
+                                &err_resp.error.error_type,
+                                &err_resp.error.message,
+                            );
                             let _ = socket
                                 .send(Message::Text(
                                     serde_json::to_string(&error_event).unwrap().into(),

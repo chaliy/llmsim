@@ -244,7 +244,7 @@ async fn test_ws_previous_response_id_not_found() {
         Ok(Some(Ok(Message::Text(text)))) => {
             let event: Value = serde_json::from_str(&text).unwrap();
             assert_eq!(event["type"], "error");
-            assert!(event["error"]["type"]
+            assert!(event["code"]
                 .as_str()
                 .unwrap()
                 .contains("previous_response_not_found"));
@@ -268,7 +268,7 @@ async fn test_ws_invalid_message() {
         Ok(Some(Ok(Message::Text(text)))) => {
             let event: Value = serde_json::from_str(&text).unwrap();
             assert_eq!(event["type"], "error");
-            assert!(event["error"]["message"]
+            assert!(event["message"]
                 .as_str()
                 .unwrap()
                 .contains("Failed to parse"));
