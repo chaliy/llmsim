@@ -15,6 +15,7 @@ LLMSim provides two API providers:
 |----------|--------|-------------|
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming supported) |
 | `/openai/v1/responses` | POST | Responses API (streaming supported) |
+| `/openai/v1/responses` | WS | WebSocket mode for Responses API |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
 
@@ -60,6 +61,14 @@ Using the OpenResponses specification with httpx:
 
 ```bash
 uv run examples/openresponses_client.py
+```
+
+### WebSocket Mode
+
+Using the WebSocket transport for the Responses API:
+
+```bash
+uv run examples/openai_websocket_client.py
 ```
 
 ### LangChain

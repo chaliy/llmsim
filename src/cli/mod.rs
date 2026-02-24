@@ -5,9 +5,11 @@
 mod config;
 mod handlers;
 mod state;
+mod ws_handler;
 
 pub use config::{Config, ConfigError};
 pub use state::AppState;
+pub use ws_handler::ws_responses;
 
 use crate::stats::{new_shared_stats, SharedStats};
 use axum::{
@@ -17,6 +19,33 @@ use axum::{
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal;
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
+
+/// Build the Axum router with all endpoints.
+/// Exposed for integration testing.
+pub fn build_router(state: Arc<AppState>) -> Router {
+    Router::new()
+        .route("/health", get(handlers::health))
+        .route("/llmsim/stats", get(handlers::get_stats))
+        // OpenAI API routes
+        .route(
+            "/openai/v1/chat/completions",
+            post(handlers::chat_completions),
+        )
+        .route("/openai/v1/models", get(handlers::list_models))
+        .route("/openai/v1/models/{model_id}", get(handlers::get_model))
+        .route(
+            "/openai/v1/responses",
+            post(handlers::create_response).get(ws_handler::ws_responses),
+        )
+        // OpenResponses API routes (https://www.openresponses.org)
+        .route(
+            "/openresponses/v1/responses",
+            post(handlers::create_openresponses_response),
+        )
+        .layer(TraceLayer::new_for_http())
+        .layer(CorsLayer::permissive())
+        .with_state(state)
+}
 
 /// Run the LLMSim server with the given configuration
 pub async fn run_server(config: Config) -> Result<(), Box<dyn std::error::Error>> {
@@ -41,31 +70,17 @@ pub async fn run_server_with_stats(
     );
     tracing::info!("OpenAI endpoints: /openai/v1/...");
     tracing::info!(
+        "WebSocket mode: ws://{}:{}/openai/v1/responses",
+        config.server.host,
+        config.server.port
+    );
+    tracing::info!(
         "OpenResponses endpoint: /openresponses/v1/responses (https://www.openresponses.org)"
     );
     tracing::info!("Stats endpoint: /llmsim/stats");
 
     let state = Arc::new(AppState::new(config, stats));
-
-    let app = Router::new()
-        .route("/health", get(handlers::health))
-        .route("/llmsim/stats", get(handlers::get_stats))
-        // OpenAI API routes
-        .route(
-            "/openai/v1/chat/completions",
-            post(handlers::chat_completions),
-        )
-        .route("/openai/v1/models", get(handlers::list_models))
-        .route("/openai/v1/models/{model_id}", get(handlers::get_model))
-        .route("/openai/v1/responses", post(handlers::create_response))
-        // OpenResponses API routes (https://www.openresponses.org)
-        .route(
-            "/openresponses/v1/responses",
-            post(handlers::create_openresponses_response),
-        )
-        .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
-        .with_state(state);
+    let app = build_router(state);
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
 

@@ -157,7 +157,11 @@ data: <json_payload>
 
 ```
 
-**R5.3**: Include `sequence_number` in delta events for ordering. Sequence numbers are shared across reasoning summary deltas and message text deltas within the same response.
+**R5.3**: Include `sequence_number` in all streaming events for ordering. Sequence numbers are monotonically increasing starting from 0 and shared across all events (reasoning, message, lifecycle) within the same response.
+
+**R5.4**: Include `logprobs: []` in `response.output_text.delta` and `response.output_text.done` events.
+
+**R5.5**: Include `annotations: []` in `output_text` content parts (`response.content_part.added`, `response.content_part.done`, and within completed output items).
 
 ### R6: Usage Statistics
 
@@ -212,6 +216,49 @@ data: <json_payload>
 - `"required"`: Force tool usage
 - `{"type": "function", "name": "..."}`: Force specific function
 
+### R10: WebSocket Mode
+
+**R10.1**: Support WebSocket transport on the same `/openai/v1/responses` endpoint via HTTP upgrade.
+
+**R10.2**: Client sends `response.create` events as JSON text frames. Both flat and nested formats are accepted:
+
+Flat format (used by the OpenAI SDK):
+```json
+{
+  "type": "response.create",
+  "model": "gpt-5",
+  "input": [{"role": "user", "content": "Hello"}],
+  "previous_response_id": "resp_abc123"
+}
+```
+
+Nested format (also accepted for compatibility):
+```json
+{
+  "type": "response.create",
+  "response": {
+    "model": "gpt-5",
+    "input": [{"role": "user", "content": "Hello"}],
+    "previous_response_id": "resp_abc123"
+  }
+}
+```
+
+**R10.3**: Server sends the same event types as SSE streaming (R5.1) but as plain JSON text frames without the `event:` / `data:` SSE envelope.
+
+**R10.4**: Sequential execution — one in-flight response per connection at a time.
+
+**R10.5**: Connection-local cache — the most recent completed response is cached per connection. When `previous_response_id` matches the cached response, continuation succeeds. Otherwise, return a `previous_response_not_found` error.
+
+**R10.6**: Connection timeout — WebSocket connections close after 60 minutes with a `websocket_connection_limit_reached` error event.
+
+**R10.7**: Support `generate: false` for warmup requests that prepare state without producing model output.
+
+**R10.8**: Error events over WebSocket:
+- `previous_response_not_found`: Referenced response not in cache
+- `websocket_connection_limit_reached`: 60-minute limit exceeded
+- `invalid_request_error`: Malformed client message
+
 ## Non-Requirements (Out of Scope for Simulation)
 
 - Actual tool execution (tools are parsed but responses are simulated)
@@ -219,7 +266,7 @@ data: <json_payload>
 - Image generation output (accepted but not produced)
 - Audio processing
 - Background processing polling (background flag accepted, returns immediately)
-- Conversation persistence (previous_response_id accepted but not stored)
+- Cross-connection conversation persistence (previous_response_id is only cached per WebSocket connection, not persisted globally)
 
 ## API Examples
 

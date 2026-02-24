@@ -23,7 +23,7 @@ path = "src/main.rs"
 tokio = { version = "1.49", features = ["full"] }
 
 # HTTP framework
-axum = { version = "0.8", features = ["macros"] }
+axum = { version = "0.8", features = ["macros", "ws"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "trace"] }
 
@@ -62,3 +62,4 @@ reqwest = { version = "0.13", features = ["json"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
+tokio-tungstenite = "0.28"
