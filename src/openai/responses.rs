@@ -280,6 +280,22 @@ impl ResponsesResponse {
         }
     }
 
+    /// Create a minimal response for WebSocket warmup (generate=false).
+    pub fn warmup(model: String) -> Self {
+        Self {
+            id: format!("resp_{}", uuid::Uuid::new_v4()),
+            object: "response".to_string(),
+            created_at: chrono::Utc::now().timestamp(),
+            model,
+            status: ResponseStatus::Completed,
+            output: vec![],
+            output_text: None,
+            usage: None,
+            error: None,
+            metadata: None,
+        }
+    }
+
     /// Create a response with a reasoning output item before the message.
     /// The reasoning item includes an optional summary when `summary_text` is provided.
     pub fn with_reasoning(

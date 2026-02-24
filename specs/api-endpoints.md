@@ -30,10 +30,13 @@ This specification defines the URL structure and routing conventions for LLMSim 
 |--------|------|-------------|
 | `POST` | `/openai/v1/chat/completions` | Chat Completions API |
 | `POST` | `/openai/v1/responses` | Responses API |
+| `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
 | `GET` | `/openai/v1/models` | List available models |
 | `GET` | `/openai/v1/models/:model_id` | Get model details |
 
 **R2.2**: These endpoints accept the same request/response formats as the official OpenAI API.
+
+**R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 
 **R2.3**: The models endpoint (`/openai/v1/models`) returns extended model information sourced from [models.dev](https://models.dev):
 

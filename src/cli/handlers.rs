@@ -36,43 +36,47 @@ pub(crate) struct ResponseGenerationResult {
     pub reasoning_tokens: usize,
     pub reasoning_summary: Option<String>,
     pub latency: LatencyProfile,
-    pub input_text: String,
+}
+
+/// Parameters for response generation.
+pub(crate) struct ResponseGenerationParams<'a> {
+    pub model: &'a str,
+    pub input: &'a ResponsesInput,
+    pub instructions: &'a Option<String>,
+    pub temperature: Option<f32>,
+    pub top_p: Option<f32>,
+    pub max_output_tokens: Option<u32>,
+    pub reasoning: &'a Option<ReasoningConfig>,
 }
 
 /// Generate a response for the Responses API.
 /// Extracts the common logic used by both HTTP POST and WebSocket handlers.
 pub(crate) fn generate_responses_result(
     state: &AppState,
-    model: &str,
-    input: &ResponsesInput,
-    instructions: &Option<String>,
-    temperature: Option<f32>,
-    top_p: Option<f32>,
-    max_output_tokens: Option<u32>,
-    reasoning: &Option<ReasoningConfig>,
+    params: &ResponseGenerationParams<'_>,
 ) -> ResponseGenerationResult {
     // Get latency profile
     let latency =
         if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
             state.config.latency_profile()
         } else {
-            LatencyProfile::from_model(model)
+            LatencyProfile::from_model(params.model)
         };
 
     // Extract text from input
-    let input_text = extract_input_text(input, instructions);
+    let input_text = extract_input_text(params.input, params.instructions);
 
     // Create a minimal ChatCompletionRequest for the generator
     let chat_request = crate::openai::ChatCompletionRequest {
-        model: model.to_string(),
+        model: params.model.to_string(),
         messages: vec![crate::openai::Message::user(&input_text)],
-        temperature,
-        top_p,
+        temperature: params.temperature,
+        top_p: params.top_p,
         n: None,
         stream: false,
         stop: None,
-        max_tokens: max_output_tokens,
-        max_completion_tokens: max_output_tokens,
+        max_tokens: params.max_output_tokens,
+        max_completion_tokens: params.max_output_tokens,
         presence_penalty: None,
         frequency_penalty: None,
         logit_bias: None,
@@ -96,7 +100,8 @@ pub(crate) fn generate_responses_result(
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
     // Reasoning tokens
-    let reasoning_tokens = calculate_reasoning_tokens(model, reasoning, output_tokens);
+    let reasoning_tokens =
+        calculate_reasoning_tokens(params.model, params.reasoning, output_tokens);
 
     let usage = ResponsesUsage {
         input_tokens: input_tokens as u32,
@@ -107,7 +112,8 @@ pub(crate) fn generate_responses_result(
         }),
     };
 
-    let reasoning_summary = generate_reasoning_summary(model, reasoning, reasoning_tokens);
+    let reasoning_summary =
+        generate_reasoning_summary(params.model, params.reasoning, reasoning_tokens);
 
     ResponseGenerationResult {
         content,
@@ -115,7 +121,6 @@ pub(crate) fn generate_responses_result(
         reasoning_tokens,
         reasoning_summary,
         latency,
-        input_text,
     }
 }
 
@@ -511,84 +516,36 @@ pub async fn create_response(
         return Ok(response);
     }
 
-    // Get latency profile (use model-specific if not configured)
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
-
-    // Extract text from input for response generation
-    let input_text = extract_input_text(&request.input, &request.instructions);
-
-    // Generate response using the configured generator
-    // Create a minimal ChatCompletionRequest for the generator
-    let chat_request = crate::openai::ChatCompletionRequest {
-        model: request.model.clone(),
-        messages: vec![crate::openai::Message::user(&input_text)],
-        temperature: request.temperature,
-        top_p: request.top_p,
-        n: None,
-        stream: request.stream,
-        stop: None,
-        max_tokens: request.max_output_tokens,
-        max_completion_tokens: request.max_output_tokens,
-        presence_penalty: None,
-        frequency_penalty: None,
-        logit_bias: None,
-        user: None,
-        tools: None,
-        tool_choice: None,
-        response_format: None,
-        seed: None,
-    };
-
-    let generator = create_generator(
-        &state.config.response.generator,
-        state.config.response.target_tokens,
+    // Generate response using shared logic
+    let result = generate_responses_result(
+        &state,
+        &ResponseGenerationParams {
+            model: &request.model,
+            input: &request.input,
+            instructions: &request.instructions,
+            temperature: request.temperature,
+            top_p: request.top_p,
+            max_output_tokens: request.max_output_tokens,
+            reasoning: &request.reasoning,
+        },
     );
-    let content = generator.generate(&chat_request);
-
-    // Count tokens
-    let input_tokens =
-        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
-    let output_tokens =
-        crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
-
-    // Simulate reasoning tokens for o-series and reasoning models
-    let reasoning_tokens =
-        calculate_reasoning_tokens(&request.model, &request.reasoning, output_tokens);
-
-    let usage = ResponsesUsage {
-        input_tokens: input_tokens as u32,
-        output_tokens: output_tokens as u32,
-        total_tokens: (input_tokens + output_tokens + reasoning_tokens) as u32,
-        output_tokens_details: Some(OutputTokensDetails {
-            reasoning_tokens: reasoning_tokens as u32,
-        }),
-    };
-
-    // Generate reasoning summary text if applicable
-    let reasoning_summary =
-        generate_reasoning_summary(&request.model, &request.reasoning, reasoning_tokens);
 
     if request.stream {
         // Streaming response
         // Clone stats for the streaming completion callback
         let stats = state.stats.clone();
-        let input_tok = usage.input_tokens;
-        let output_tok = usage.output_tokens;
+        let input_tok = result.usage.input_tokens;
+        let output_tok = result.usage.output_tokens;
 
-        let mut builder = ResponsesTokenStreamBuilder::new(&request.model, content)
-            .latency(latency)
-            .usage(usage)
+        let mut builder = ResponsesTokenStreamBuilder::new(&request.model, result.content)
+            .latency(result.latency)
+            .usage(result.usage)
             .on_complete(move || {
                 stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
             });
 
-        if reasoning_tokens > 0 {
-            builder = builder.reasoning(reasoning_summary);
+        if result.reasoning_tokens > 0 {
+            builder = builder.reasoning(result.reasoning_summary);
         }
 
         let stream = builder.build();
@@ -604,7 +561,7 @@ pub async fn create_response(
             .unwrap())
     } else {
         // Non-streaming response - simulate time to generate
-        let delay = latency.sample_ttft();
+        let delay = result.latency.sample_ttft();
         if !delay.is_zero() {
             tokio::time::sleep(delay).await;
         }
@@ -612,19 +569,19 @@ pub async fn create_response(
         // Record request completion
         state.stats.record_request_end(
             request_start.elapsed(),
-            usage.input_tokens,
-            usage.output_tokens,
+            result.usage.input_tokens,
+            result.usage.output_tokens,
         );
 
-        let response = if reasoning_tokens > 0 {
+        let response = if result.reasoning_tokens > 0 {
             ResponsesResponse::with_reasoning(
                 request.model.clone(),
-                content,
-                reasoning_summary,
-                usage,
+                result.content,
+                result.reasoning_summary,
+                result.usage,
             )
         } else {
-            ResponsesResponse::new(request.model.clone(), content, usage)
+            ResponsesResponse::new(request.model.clone(), result.content, result.usage)
         };
         Ok(Json(response).into_response())
     }

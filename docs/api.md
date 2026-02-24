@@ -17,6 +17,7 @@ LLMSim provides two API providers with provider-namespaced routes.
 |----------|--------|-------------|
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
+| `/openai/v1/responses` | WS | WebSocket mode for Responses API |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
 
@@ -135,6 +136,52 @@ The response includes a `reasoning` output item before the `message`:
 | `reasoning.summary` | `auto`, `concise`, `detailed` | Controls summary text generation |
 
 When streaming, additional SSE events are emitted for the reasoning item (`response.reasoning_summary_text.delta`, etc.) before the message text deltas.
+
+### WebSocket Mode
+
+The Responses API also supports WebSocket transport for persistent connections, ideal for multi-turn agentic workflows with many tool calls.
+
+**Connect:**
+```
+ws://localhost:8080/openai/v1/responses
+```
+
+**Send a `response.create` event:**
+```json
+{
+  "type": "response.create",
+  "response": {
+    "model": "gpt-5",
+    "input": [{"role": "user", "content": "Hello!"}]
+  }
+}
+```
+
+The server sends back the same streaming events as the SSE format, but as plain JSON text frames (no `event:`/`data:` envelope).
+
+**Multi-turn continuations:**
+```json
+{
+  "type": "response.create",
+  "response": {
+    "model": "gpt-5",
+    "input": [{"role": "user", "content": "Follow up question"}],
+    "previous_response_id": "resp_abc123"
+  }
+}
+```
+
+The most recent completed response is cached per connection. If `previous_response_id` doesn't match the cached response, a `previous_response_not_found` error is returned.
+
+**Connection behavior:**
+- Sequential execution (one response at a time per connection)
+- 60-minute connection limit
+- Supports `generate: false` for warmup requests
+
+**Python example:**
+```bash
+uv run examples/websocket_client.py
+```
 
 ### List Models
 

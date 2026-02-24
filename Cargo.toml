@@ -62,3 +62,4 @@ reqwest = { version = "0.13", features = ["json"] }
 
 [dev-dependencies]
 tokio-test = "0.4"
+tokio-tungstenite = "0.28"
