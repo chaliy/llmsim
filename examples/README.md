@@ -68,7 +68,7 @@ uv run examples/openresponses_client.py
 Using the WebSocket transport for the Responses API:
 
 ```bash
-uv run examples/websocket_client.py
+uv run examples/openai_websocket_client.py
 ```
 
 ### LangChain

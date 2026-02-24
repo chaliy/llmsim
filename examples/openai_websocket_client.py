@@ -27,7 +27,7 @@ Prerequisites:
         cargo run --release -- serve --port 8080
 
 Usage:
-    uv run examples/websocket_client.py
+    uv run examples/openai_websocket_client.py
 
 Environment variables:
     LLMSIM_URL: Server URL (default: http://localhost:8080/openai/v1)

@@ -180,7 +180,7 @@ The most recent completed response is cached per connection. If `previous_respon
 
 **Python example:**
 ```bash
-uv run examples/websocket_client.py
+uv run examples/openai_websocket_client.py
 ```
 
 ### List Models

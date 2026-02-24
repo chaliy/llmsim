@@ -263,6 +263,7 @@ impl ResponsesResponse {
             status: ItemStatus::Completed,
             content: vec![OutputContentPart::OutputText {
                 text: content.clone(),
+                annotations: vec![],
             }],
         };
 
@@ -321,6 +322,7 @@ impl ResponsesResponse {
             status: ItemStatus::Completed,
             content: vec![OutputContentPart::OutputText {
                 text: content.clone(),
+                annotations: vec![],
             }],
         };
 
@@ -388,7 +390,13 @@ pub enum ItemStatus {
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum OutputContentPart {
     /// Text output
-    OutputText { text: String },
+    OutputText {
+        text: String,
+        /// Annotations on this text content (e.g. citations).
+        /// Always present in the wire format as an array (defaults to empty).
+        #[serde(default)]
+        annotations: Vec<serde_json::Value>,
+    },
     /// Refusal output
     Refusal { refusal: String },
 }
@@ -593,6 +601,7 @@ impl ResponsesStreamEvent {
             "content_index": content_index,
             "item_id": item_id,
             "delta": delta,
+            "logprobs": [],
             "sequence_number": seq
         });
         format!("event: response.output_text.delta\ndata: {}\n\n", event)
@@ -611,6 +620,7 @@ impl ResponsesStreamEvent {
             "content_index": content_index,
             "item_id": item_id,
             "text": text,
+            "logprobs": [],
             "sequence_number": seq
         });
         format!("event: response.output_text.done\ndata: {}\n\n", event)

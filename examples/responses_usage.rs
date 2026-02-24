@@ -274,6 +274,7 @@ async fn main() {
         status: ItemStatus::Completed,
         content: vec![OutputContentPart::OutputText {
             text: "Hello, world!".to_string(),
+            annotations: vec![],
         }],
     };
     println!(
@@ -340,7 +341,7 @@ async fn main() {
                 println!("  [Response]");
                 println!("    ID: {}", id);
                 println!("    Role: {:?}", role);
-                if let Some(OutputContentPart::OutputText { text }) = content.first() {
+                if let Some(OutputContentPart::OutputText { text, .. }) = content.first() {
                     println!("    Text: {}", text);
                 }
             }

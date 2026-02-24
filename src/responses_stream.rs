@@ -233,6 +233,7 @@ impl ResponsesTokenStream {
             // Create the content part
             let content_part = OutputContentPart::OutputText {
                 text: String::new(),
+                annotations: vec![],
             };
 
             // response.content_part.added event
@@ -261,6 +262,7 @@ impl ResponsesTokenStream {
             // response.content_part.done event
             let final_content_part = OutputContentPart::OutputText {
                 text: content.clone(),
+                annotations: vec![],
             };
             yield ResponsesStreamEvent::content_part_done(message_output_index, 0, &message_id, &final_content_part, seq);
             seq += 1;
