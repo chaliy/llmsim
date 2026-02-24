@@ -18,6 +18,8 @@ pub enum EndpointType {
     ChatCompletions,
     /// Responses API (/openai/v1/responses)
     Responses,
+    /// WebSocket Responses API (/openai/v1/responses via WS)
+    WebSocketResponses,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -39,6 +41,10 @@ pub struct Stats {
     pub completions_requests: AtomicU64,
     /// Responses API requests
     pub responses_requests: AtomicU64,
+    /// WebSocket Responses API requests (individual response.create messages)
+    pub websocket_requests: AtomicU64,
+    /// Currently active WebSocket connections
+    pub active_websocket_connections: AtomicU64,
 
     // Token counters
     /// Total prompt tokens processed
@@ -90,6 +96,8 @@ impl Stats {
             non_streaming_requests: AtomicU64::new(0),
             completions_requests: AtomicU64::new(0),
             responses_requests: AtomicU64::new(0),
+            websocket_requests: AtomicU64::new(0),
+            active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
             total_errors: AtomicU64::new(0),
@@ -123,6 +131,9 @@ impl Stats {
             }
             EndpointType::Responses => {
                 self.responses_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::WebSocketResponses => {
+                self.websocket_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -207,6 +218,16 @@ impl Stats {
         }
     }
 
+    /// Record a new WebSocket connection being opened
+    pub fn record_ws_connect(&self) {
+        self.active_websocket_connections.fetch_add(1, ORDERING);
+    }
+
+    /// Record a WebSocket connection being closed
+    pub fn record_ws_disconnect(&self) {
+        self.active_websocket_connections.fetch_sub(1, ORDERING);
+    }
+
     /// Get the uptime of the server
     pub fn uptime(&self) -> Duration {
         self.start_time.elapsed()
@@ -288,6 +309,8 @@ impl Stats {
             non_streaming_requests: self.non_streaming_requests.load(ORDERING),
             completions_requests: self.completions_requests.load(ORDERING),
             responses_requests: self.responses_requests.load(ORDERING),
+            websocket_requests: self.websocket_requests.load(ORDERING),
+            active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
             total_tokens: self.total_tokens(),
@@ -314,6 +337,8 @@ pub struct StatsSnapshot {
     pub non_streaming_requests: u64,
     pub completions_requests: u64,
     pub responses_requests: u64,
+    pub websocket_requests: u64,
+    pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,
     pub total_tokens: u64,

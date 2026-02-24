@@ -28,6 +28,97 @@ use rand::prelude::IndexedRandom;
 use std::sync::Arc;
 use std::time::Instant;
 
+/// Result of response generation for the Responses API.
+/// Shared between the HTTP and WebSocket handlers.
+pub(crate) struct ResponseGenerationResult {
+    pub content: String,
+    pub usage: ResponsesUsage,
+    pub reasoning_tokens: usize,
+    pub reasoning_summary: Option<String>,
+    pub latency: LatencyProfile,
+    pub input_text: String,
+}
+
+/// Generate a response for the Responses API.
+/// Extracts the common logic used by both HTTP POST and WebSocket handlers.
+pub(crate) fn generate_responses_result(
+    state: &AppState,
+    model: &str,
+    input: &ResponsesInput,
+    instructions: &Option<String>,
+    temperature: Option<f32>,
+    top_p: Option<f32>,
+    max_output_tokens: Option<u32>,
+    reasoning: &Option<ReasoningConfig>,
+) -> ResponseGenerationResult {
+    // Get latency profile
+    let latency =
+        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
+            state.config.latency_profile()
+        } else {
+            LatencyProfile::from_model(model)
+        };
+
+    // Extract text from input
+    let input_text = extract_input_text(input, instructions);
+
+    // Create a minimal ChatCompletionRequest for the generator
+    let chat_request = crate::openai::ChatCompletionRequest {
+        model: model.to_string(),
+        messages: vec![crate::openai::Message::user(&input_text)],
+        temperature,
+        top_p,
+        n: None,
+        stream: false,
+        stop: None,
+        max_tokens: max_output_tokens,
+        max_completion_tokens: max_output_tokens,
+        presence_penalty: None,
+        frequency_penalty: None,
+        logit_bias: None,
+        user: None,
+        tools: None,
+        tool_choice: None,
+        response_format: None,
+        seed: None,
+    };
+
+    let generator = create_generator(
+        &state.config.response.generator,
+        state.config.response.target_tokens,
+    );
+    let content = generator.generate(&chat_request);
+
+    // Count tokens
+    let input_tokens =
+        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
+    let output_tokens =
+        crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
+
+    // Reasoning tokens
+    let reasoning_tokens = calculate_reasoning_tokens(model, reasoning, output_tokens);
+
+    let usage = ResponsesUsage {
+        input_tokens: input_tokens as u32,
+        output_tokens: output_tokens as u32,
+        total_tokens: (input_tokens + output_tokens + reasoning_tokens) as u32,
+        output_tokens_details: Some(OutputTokensDetails {
+            reasoning_tokens: reasoning_tokens as u32,
+        }),
+    };
+
+    let reasoning_summary = generate_reasoning_summary(model, reasoning, reasoning_tokens);
+
+    ResponseGenerationResult {
+        content,
+        usage,
+        reasoning_tokens,
+        reasoning_summary,
+        latency,
+        input_text,
+    }
+}
+
 /// Health check endpoint
 pub async fn health() -> impl IntoResponse {
     Json(serde_json::json!({
