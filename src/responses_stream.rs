@@ -106,6 +106,9 @@ impl ResponsesTokenStream {
         let on_complete = self.on_complete;
 
         Box::pin(stream! {
+            // Global sequence number — incremented for every event
+            let mut seq: u32 = 0;
+
             // Create initial response with in_progress status
             let initial_response = ResponsesResponse {
                 id: response_id.clone(),
@@ -121,7 +124,8 @@ impl ResponsesTokenStream {
             };
 
             // response.created event
-            yield ResponsesStreamEvent::response_created(initial_response.clone());
+            yield ResponsesStreamEvent::response_created(initial_response.clone(), seq);
+            seq += 1;
 
             // Initial delay (time to first token)
             let ttft = latency.sample_ttft();
@@ -130,11 +134,11 @@ impl ResponsesTokenStream {
             }
 
             // response.in_progress event
-            yield ResponsesStreamEvent::response_in_progress(initial_response.clone());
+            yield ResponsesStreamEvent::response_in_progress(initial_response.clone(), seq);
+            seq += 1;
 
             // Track output_index: reasoning item takes index 0 when present,
             // message takes the next index
-            let mut sequence_number: u32 = 0;
             let mut final_output_items: Vec<OutputItem> = Vec::new();
 
             // --- Reasoning output item (if enabled) ---
@@ -148,7 +152,8 @@ impl ResponsesTokenStream {
                     status: ItemStatus::InProgress,
                     summary: None,
                 };
-                yield ResponsesStreamEvent::output_item_added(reasoning_output_index, &reasoning_item);
+                yield ResponsesStreamEvent::output_item_added(reasoning_output_index, &reasoning_item, seq);
+                seq += 1;
 
                 // If we have summary text, stream it
                 if let Some(ref summary_text) = reasoning_summary {
@@ -159,8 +164,9 @@ impl ResponsesTokenStream {
 
                     // reasoning_summary_part.added
                     yield ResponsesStreamEvent::reasoning_summary_part_added(
-                        reasoning_output_index, 0, &empty_summary,
+                        reasoning_output_index, 0, &reasoning_id, &empty_summary, seq,
                     );
+                    seq += 1;
 
                     // Stream summary text deltas
                     let summary_tokens = Self::tokenize_text(summary_text);
@@ -171,15 +177,16 @@ impl ResponsesTokenStream {
                         }
 
                         yield ResponsesStreamEvent::reasoning_summary_text_delta(
-                            reasoning_output_index, 0, &token, sequence_number,
+                            reasoning_output_index, 0, &reasoning_id, &token, seq,
                         );
-                        sequence_number += 1;
+                        seq += 1;
                     }
 
                     // reasoning_summary_text.done
                     yield ResponsesStreamEvent::reasoning_summary_text_done(
-                        reasoning_output_index, 0, summary_text,
+                        reasoning_output_index, 0, &reasoning_id, summary_text, seq,
                     );
+                    seq += 1;
 
                     // reasoning_summary_part.done
                     let final_summary = ReasoningSummary {
@@ -187,8 +194,9 @@ impl ResponsesTokenStream {
                         text: summary_text.clone(),
                     };
                     yield ResponsesStreamEvent::reasoning_summary_part_done(
-                        reasoning_output_index, 0, &final_summary,
+                        reasoning_output_index, 0, &reasoning_id, &final_summary, seq,
                     );
+                    seq += 1;
                 }
 
                 // Emit reasoning item done
@@ -202,7 +210,8 @@ impl ResponsesTokenStream {
                         }]
                     }),
                 };
-                yield ResponsesStreamEvent::output_item_done(reasoning_output_index, &final_reasoning_item);
+                yield ResponsesStreamEvent::output_item_done(reasoning_output_index, &final_reasoning_item, seq);
+                seq += 1;
                 final_output_items.push(final_reasoning_item);
             }
 
@@ -218,7 +227,8 @@ impl ResponsesTokenStream {
             };
 
             // response.output_item.added event
-            yield ResponsesStreamEvent::output_item_added(message_output_index, &message_item);
+            yield ResponsesStreamEvent::output_item_added(message_output_index, &message_item, seq);
+            seq += 1;
 
             // Create the content part
             let content_part = OutputContentPart::OutputText {
@@ -226,7 +236,8 @@ impl ResponsesTokenStream {
             };
 
             // response.content_part.added event
-            yield ResponsesStreamEvent::content_part_added(message_output_index, 0, &content_part);
+            yield ResponsesStreamEvent::content_part_added(message_output_index, 0, &message_id, &content_part, seq);
+            seq += 1;
 
             // Stream content chunks with delta events
             for token in content_tokens.into_iter() {
@@ -238,19 +249,21 @@ impl ResponsesTokenStream {
 
                 // response.output_text.delta event
                 yield ResponsesStreamEvent::output_text_delta(
-                    message_output_index, 0, &token, sequence_number,
+                    message_output_index, 0, &message_id, &token, seq,
                 );
-                sequence_number += 1;
+                seq += 1;
             }
 
             // response.output_text.done event
-            yield ResponsesStreamEvent::output_text_done(message_output_index, 0, &content);
+            yield ResponsesStreamEvent::output_text_done(message_output_index, 0, &message_id, &content, seq);
+            seq += 1;
 
             // response.content_part.done event
             let final_content_part = OutputContentPart::OutputText {
                 text: content.clone(),
             };
-            yield ResponsesStreamEvent::content_part_done(message_output_index, 0, &final_content_part);
+            yield ResponsesStreamEvent::content_part_done(message_output_index, 0, &message_id, &final_content_part, seq);
+            seq += 1;
 
             // response.output_item.done event
             let final_message_item = OutputItem::Message {
@@ -259,7 +272,8 @@ impl ResponsesTokenStream {
                 status: ItemStatus::Completed,
                 content: vec![final_content_part],
             };
-            yield ResponsesStreamEvent::output_item_done(message_output_index, &final_message_item);
+            yield ResponsesStreamEvent::output_item_done(message_output_index, &final_message_item, seq);
+            seq += 1;
             final_output_items.push(final_message_item);
 
             // response.completed event with full response
@@ -275,7 +289,7 @@ impl ResponsesTokenStream {
                 error: None,
                 metadata: None,
             };
-            yield ResponsesStreamEvent::response_completed(final_response);
+            yield ResponsesStreamEvent::response_completed(final_response, seq);
 
             // Invoke completion callback
             if let Some(callback) = on_complete {
@@ -641,26 +655,27 @@ mod tests {
 
         let events: Vec<String> = stream.into_stream().collect().await;
 
-        // Collect all sequence numbers from both summary deltas and text deltas
-        let mut seq_numbers: Vec<u32> = Vec::new();
+        // Collect ALL sequence numbers from every event
+        let mut all_seq_numbers: Vec<u32> = Vec::new();
         for event in &events {
-            if event.contains("reasoning_summary_text.delta") || event.contains("output_text.delta")
-            {
-                // Extract sequence_number from JSON
-                if let Some(data_start) = event.find("data: ") {
-                    let data = &event[data_start + 6..];
-                    if let Ok(json) = serde_json::from_str::<serde_json::Value>(data.trim()) {
-                        if let Some(seq) = json.get("sequence_number").and_then(|v| v.as_u64()) {
-                            seq_numbers.push(seq as u32);
-                        }
+            if let Some(data_start) = event.find("data: ") {
+                let data = &event[data_start + 6..];
+                if let Ok(json) = serde_json::from_str::<serde_json::Value>(data.trim()) {
+                    if let Some(seq) = json.get("sequence_number").and_then(|v| v.as_u64()) {
+                        all_seq_numbers.push(seq as u32);
                     }
                 }
             }
         }
 
-        // Sequence numbers should be continuous starting from 0
-        assert!(!seq_numbers.is_empty());
-        for (i, seq) in seq_numbers.iter().enumerate() {
+        // Every event should have a sequence_number, and they should be
+        // strictly monotonically increasing starting from 0
+        assert_eq!(
+            all_seq_numbers.len(),
+            events.len(),
+            "Every event should have a sequence_number"
+        );
+        for (i, seq) in all_seq_numbers.iter().enumerate() {
             assert_eq!(
                 *seq, i as u32,
                 "Sequence numbers should be continuous: expected {}, got {}",

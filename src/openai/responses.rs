@@ -525,31 +525,39 @@ pub struct ErrorEventData {
     pub error: ResponsesError,
 }
 
-/// Helper to create streaming events
+/// Helper to create streaming events.
+///
+/// Every server event includes a `sequence_number` field — a monotonically
+/// increasing integer that allows the SDK to order events even if transport
+/// delivery is re-ordered. Content/text events also include `item_id` for
+/// correlating events to their parent output item.
 pub struct ResponsesStreamEvent;
 
 impl ResponsesStreamEvent {
-    pub fn response_created(response: ResponsesResponse) -> String {
+    pub fn response_created(response: ResponsesResponse, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "response.created",
-            "response": response
+            "response": response,
+            "sequence_number": seq
         });
         format!("event: response.created\ndata: {}\n\n", event)
     }
 
-    pub fn response_in_progress(response: ResponsesResponse) -> String {
+    pub fn response_in_progress(response: ResponsesResponse, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "response.in_progress",
-            "response": response
+            "response": response,
+            "sequence_number": seq
         });
         format!("event: response.in_progress\ndata: {}\n\n", event)
     }
 
-    pub fn output_item_added(output_index: u32, item: &OutputItem) -> String {
+    pub fn output_item_added(output_index: u32, item: &OutputItem, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "response.output_item.added",
             "output_index": output_index,
-            "item": item
+            "item": item,
+            "sequence_number": seq
         });
         format!("event: response.output_item.added\ndata: {}\n\n", event)
     }
@@ -557,13 +565,17 @@ impl ResponsesStreamEvent {
     pub fn content_part_added(
         output_index: u32,
         content_index: u32,
+        item_id: &str,
         part: &OutputContentPart,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.content_part.added",
             "output_index": output_index,
             "content_index": content_index,
-            "part": part
+            "item_id": item_id,
+            "part": part,
+            "sequence_number": seq
         });
         format!("event: response.content_part.added\ndata: {}\n\n", event)
     }
@@ -571,25 +583,35 @@ impl ResponsesStreamEvent {
     pub fn output_text_delta(
         output_index: u32,
         content_index: u32,
+        item_id: &str,
         delta: &str,
-        sequence_number: u32,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.output_text.delta",
             "output_index": output_index,
             "content_index": content_index,
+            "item_id": item_id,
             "delta": delta,
-            "sequence_number": sequence_number
+            "sequence_number": seq
         });
         format!("event: response.output_text.delta\ndata: {}\n\n", event)
     }
 
-    pub fn output_text_done(output_index: u32, content_index: u32, text: &str) -> String {
+    pub fn output_text_done(
+        output_index: u32,
+        content_index: u32,
+        item_id: &str,
+        text: &str,
+        seq: u32,
+    ) -> String {
         let event = serde_json::json!({
             "type": "response.output_text.done",
             "output_index": output_index,
             "content_index": content_index,
-            "text": text
+            "item_id": item_id,
+            "text": text,
+            "sequence_number": seq
         });
         format!("event: response.output_text.done\ndata: {}\n\n", event)
     }
@@ -597,30 +619,36 @@ impl ResponsesStreamEvent {
     pub fn content_part_done(
         output_index: u32,
         content_index: u32,
+        item_id: &str,
         part: &OutputContentPart,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.content_part.done",
             "output_index": output_index,
             "content_index": content_index,
-            "part": part
+            "item_id": item_id,
+            "part": part,
+            "sequence_number": seq
         });
         format!("event: response.content_part.done\ndata: {}\n\n", event)
     }
 
-    pub fn output_item_done(output_index: u32, item: &OutputItem) -> String {
+    pub fn output_item_done(output_index: u32, item: &OutputItem, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "response.output_item.done",
             "output_index": output_index,
-            "item": item
+            "item": item,
+            "sequence_number": seq
         });
         format!("event: response.output_item.done\ndata: {}\n\n", event)
     }
 
-    pub fn response_completed(response: ResponsesResponse) -> String {
+    pub fn response_completed(response: ResponsesResponse, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "response.completed",
-            "response": response
+            "response": response,
+            "sequence_number": seq
         });
         format!("event: response.completed\ndata: {}\n\n", event)
     }
@@ -628,13 +656,17 @@ impl ResponsesStreamEvent {
     pub fn reasoning_summary_part_added(
         output_index: u32,
         summary_index: u32,
+        item_id: &str,
         part: &ReasoningSummary,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.reasoning_summary_part.added",
             "output_index": output_index,
             "summary_index": summary_index,
-            "part": part
+            "item_id": item_id,
+            "part": part,
+            "sequence_number": seq
         });
         format!(
             "event: response.reasoning_summary_part.added\ndata: {}\n\n",
@@ -645,15 +677,17 @@ impl ResponsesStreamEvent {
     pub fn reasoning_summary_text_delta(
         output_index: u32,
         summary_index: u32,
+        item_id: &str,
         delta: &str,
-        sequence_number: u32,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.reasoning_summary_text.delta",
             "output_index": output_index,
             "summary_index": summary_index,
+            "item_id": item_id,
             "delta": delta,
-            "sequence_number": sequence_number
+            "sequence_number": seq
         });
         format!(
             "event: response.reasoning_summary_text.delta\ndata: {}\n\n",
@@ -664,13 +698,17 @@ impl ResponsesStreamEvent {
     pub fn reasoning_summary_text_done(
         output_index: u32,
         summary_index: u32,
+        item_id: &str,
         text: &str,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.reasoning_summary_text.done",
             "output_index": output_index,
             "summary_index": summary_index,
-            "text": text
+            "item_id": item_id,
+            "text": text,
+            "sequence_number": seq
         });
         format!(
             "event: response.reasoning_summary_text.done\ndata: {}\n\n",
@@ -681,13 +719,17 @@ impl ResponsesStreamEvent {
     pub fn reasoning_summary_part_done(
         output_index: u32,
         summary_index: u32,
+        item_id: &str,
         part: &ReasoningSummary,
+        seq: u32,
     ) -> String {
         let event = serde_json::json!({
             "type": "response.reasoning_summary_part.done",
             "output_index": output_index,
             "summary_index": summary_index,
-            "part": part
+            "item_id": item_id,
+            "part": part,
+            "sequence_number": seq
         });
         format!(
             "event: response.reasoning_summary_part.done\ndata: {}\n\n",
@@ -695,10 +737,13 @@ impl ResponsesStreamEvent {
         )
     }
 
-    pub fn error(error: ResponsesError) -> String {
+    pub fn error(error: ResponsesError, seq: u32) -> String {
         let event = serde_json::json!({
             "type": "error",
-            "error": error
+            "code": error.code.as_deref().unwrap_or(&error.error_type),
+            "message": error.message,
+            "param": null,
+            "sequence_number": seq
         });
         format!("event: error\ndata: {}\n\n", event)
     }
@@ -846,10 +891,11 @@ mod tests {
 
     #[test]
     fn test_stream_event_creation() {
-        let delta = ResponsesStreamEvent::output_text_delta(0, 0, "Hello", 1);
+        let delta = ResponsesStreamEvent::output_text_delta(0, 0, "msg_123", "Hello", 5);
         assert!(delta.contains("event: response.output_text.delta"));
         assert!(delta.contains("\"delta\":\"Hello\""));
-        assert!(delta.contains("\"sequence_number\":1"));
+        assert!(delta.contains("\"sequence_number\":5"));
+        assert!(delta.contains("\"item_id\":\"msg_123\""));
     }
 
     #[test]
@@ -960,21 +1006,28 @@ mod tests {
             text: String::new(),
         };
 
-        let event = ResponsesStreamEvent::reasoning_summary_part_added(0, 0, &summary);
+        let event = ResponsesStreamEvent::reasoning_summary_part_added(0, 0, "rs_123", &summary, 3);
         assert!(event.contains("event: response.reasoning_summary_part.added"));
         assert!(event.contains("\"output_index\":0"));
+        assert!(event.contains("\"item_id\":\"rs_123\""));
+        assert!(event.contains("\"sequence_number\":3"));
 
-        let delta = ResponsesStreamEvent::reasoning_summary_text_delta(0, 0, "Thinking", 0);
+        let delta =
+            ResponsesStreamEvent::reasoning_summary_text_delta(0, 0, "rs_123", "Thinking", 4);
         assert!(delta.contains("event: response.reasoning_summary_text.delta"));
         assert!(delta.contains("\"delta\":\"Thinking\""));
-        assert!(delta.contains("\"sequence_number\":0"));
+        assert!(delta.contains("\"sequence_number\":4"));
 
-        let done = ResponsesStreamEvent::reasoning_summary_text_done(0, 0, "Full summary.");
+        let done =
+            ResponsesStreamEvent::reasoning_summary_text_done(0, 0, "rs_123", "Full summary.", 5);
         assert!(done.contains("event: response.reasoning_summary_text.done"));
         assert!(done.contains("\"text\":\"Full summary.\""));
+        assert!(done.contains("\"sequence_number\":5"));
 
-        let part_done = ResponsesStreamEvent::reasoning_summary_part_done(0, 0, &summary);
+        let part_done =
+            ResponsesStreamEvent::reasoning_summary_part_done(0, 0, "rs_123", &summary, 6);
         assert!(part_done.contains("event: response.reasoning_summary_part.done"));
+        assert!(part_done.contains("\"sequence_number\":6"));
     }
 
     #[test]
