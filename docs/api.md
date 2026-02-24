@@ -146,14 +146,12 @@ The Responses API also supports WebSocket transport for persistent connections, 
 ws://localhost:8080/openai/v1/responses
 ```
 
-**Send a `response.create` event:**
+**Send a `response.create` event (flat format, used by the OpenAI SDK):**
 ```json
 {
   "type": "response.create",
-  "response": {
-    "model": "gpt-5",
-    "input": [{"role": "user", "content": "Hello!"}]
-  }
+  "model": "gpt-5",
+  "input": [{"role": "user", "content": "Hello!"}]
 }
 ```
 
@@ -163,11 +161,9 @@ The server sends back the same streaming events as the SSE format, but as plain 
 ```json
 {
   "type": "response.create",
-  "response": {
-    "model": "gpt-5",
-    "input": [{"role": "user", "content": "Follow up question"}],
-    "previous_response_id": "resp_abc123"
-  }
+  "model": "gpt-5",
+  "input": [{"role": "user", "content": "Follow up question"}],
+  "previous_response_id": "resp_abc123"
 }
 ```
 

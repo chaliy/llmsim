@@ -157,7 +157,11 @@ data: <json_payload>
 
 ```
 
-**R5.3**: Include `sequence_number` in delta events for ordering. Sequence numbers are shared across reasoning summary deltas and message text deltas within the same response.
+**R5.3**: Include `sequence_number` in all streaming events for ordering. Sequence numbers are monotonically increasing starting from 0 and shared across all events (reasoning, message, lifecycle) within the same response.
+
+**R5.4**: Include `logprobs: []` in `response.output_text.delta` and `response.output_text.done` events.
+
+**R5.5**: Include `annotations: []` in `output_text` content parts (`response.content_part.added`, `response.content_part.done`, and within completed output items).
 
 ### R6: Usage Statistics
 
@@ -216,7 +220,19 @@ data: <json_payload>
 
 **R10.1**: Support WebSocket transport on the same `/openai/v1/responses` endpoint via HTTP upgrade.
 
-**R10.2**: Client sends `response.create` events as JSON text frames:
+**R10.2**: Client sends `response.create` events as JSON text frames. Both flat and nested formats are accepted:
+
+Flat format (used by the OpenAI SDK):
+```json
+{
+  "type": "response.create",
+  "model": "gpt-5",
+  "input": [{"role": "user", "content": "Hello"}],
+  "previous_response_id": "resp_abc123"
+}
+```
+
+Nested format (also accepted for compatibility):
 ```json
 {
   "type": "response.create",
@@ -250,7 +266,7 @@ data: <json_payload>
 - Image generation output (accepted but not produced)
 - Audio processing
 - Background processing polling (background flag accepted, returns immediately)
-- Conversation persistence (previous_response_id accepted but not stored)
+- Cross-connection conversation persistence (previous_response_id is only cached per WebSocket connection, not persisted globally)
 
 ## API Examples
 
