@@ -34,6 +34,13 @@ Specification format: Abstract and Requirements sections.
 Available skills:
 - `load-test/` - Run load and stress tests for llmsim using k6
 
+### Commands
+
+`.claude/commands/` contains slash commands for common workflows.
+
+Available commands:
+- `ship` - Full shipping workflow: tests, artifacts, smoke test, PR, merge
+
 
 ### Public Documentation
 
@@ -186,6 +193,12 @@ High-level approach.
 - [ ] Tests added or updated
 - [ ] Backward compatibility considered
 ```
+
+### Shipping
+
+"Ship" means: implement with extensive test coverage (positive and negative paths), then complete the full Pre-PR Checklist (especially smoke testing impacted functionality), create PR, and merge when CI is green.
+
+Use the [`/ship`](.claude/commands/ship.md) command to execute the full shipping workflow. It covers test coverage verification, artifact updates (specs, docs), smoke testing, quality gates, PR creation, and merge. When asked to "fix and ship", implement the fix first, then run `/ship`.
 
 ## Testing the system
 
