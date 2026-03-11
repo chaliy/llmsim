@@ -8,6 +8,7 @@ This repo is intended to be runnable locally and easy for coding agents to work 
 - Code should be easily testable, smoke testable, runnable in local dev env.
 - Prefer small, incremental PR-sized changes with a runnable state at each step.
 - Avoid adding dependencies with non-permissive licenses. If a dependency is non-permissive or unclear, stop and ask the repo owner.
+- NEVER add links to Claude sessions in PR body or commits. Also never attribute commit or merge commit to coding agents, always use real user.
 
 ### Top level requirements
 
