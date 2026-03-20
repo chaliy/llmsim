@@ -31,7 +31,7 @@ cargo install llmsim
 
 ## Demo
 
-![Console UI Demo](/docs/images/tui.png)
+![Console UI Demo](https://raw.githubusercontent.com/chaliy/llmsim/main/docs/images/tui.png)
 
 ## Usage
 
