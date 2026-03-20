@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-03-20
+
+### Highlights
+
+- WebSocket mode for Responses API streaming
+- OpenAI thinking/reasoning emulation support
+- Fixed repository URLs for crates.io listing
+
+### What's Changed
+
+* chore: routine maintenance - update deps and align specs ([#30](https://github.com/chaliy/llmsim/pull/30)) by @chaliy
+* fix: correct repository URLs for crates.io listing ([#29](https://github.com/chaliy/llmsim/pull/29)) by @chaliy
+* chore: add attribution settings and agent guidance for commits/PRs ([#28](https://github.com/chaliy/llmsim/pull/28)) by @chaliy
+* feat: add /ship command for full shipping workflow ([#27](https://github.com/chaliy/llmsim/pull/27)) by @chaliy
+* feat(api): add WebSocket mode for Responses API ([#26](https://github.com/chaliy/llmsim/pull/26)) by @chaliy
+* feat(api): add OpenAI thinking/reasoning emulation ([#25](https://github.com/chaliy/llmsim/pull/25)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.2.2...v0.2.3
+
 ## [0.2.2] - 2026-02-08
 
 ### Highlights
@@ -72,7 +91,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/chaliy/llmsim/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/chaliy/llmsim/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/chaliy/llmsim/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/chaliy/llmsim/releases/tag/v0.2.0
