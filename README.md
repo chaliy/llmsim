@@ -1,3 +1,9 @@
+[![CI](https://github.com/chaliy/llmsim/actions/workflows/ci.yml/badge.svg)](https://github.com/chaliy/llmsim/actions/workflows/ci.yml)
+[![Crates.io](https://img.shields.io/crates/v/llmsim)](https://crates.io/crates/llmsim)
+[![Repo: Agent Friendly](https://img.shields.io/badge/repo-agent%20friendly-blue)](AGENTS.md)
+
+[![Stand With Ukraine](https://raw.githubusercontent.com/vshymanskyy/StandWithUkraine/main/banner2-direct.svg)](https://vshymanskyy.github.io/StandWithUkraine/)
+
 # LLMSim
 
 **LLM Traffic Simulator** - A lightweight, high-performance LLM API simulator for load testing, CI/CD, and local development.
