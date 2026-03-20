@@ -14,6 +14,7 @@ llmsim/
 │   │   ├── mod.rs      # Server runner
 │   │   ├── config.rs   # Configuration loading
 │   │   ├── handlers.rs # HTTP request handlers
+│   │   ├── ws_handler.rs # WebSocket request handler
 │   │   └── state.rs    # Application state (config + stats)
 │   ├── tui/            # Terminal UI dashboard
 │   │   ├── mod.rs      # TUI module entry point
@@ -21,7 +22,10 @@ llmsim/
 │   │   └── ui.rs       # Ratatui widget rendering
 │   ├── openai/         # OpenAI API types
 │   │   ├── mod.rs
-│   │   └── types.rs
+│   │   ├── types.rs
+│   │   ├── models.rs   # Model profiles from models.dev
+│   │   ├── responses.rs # Responses API types
+│   │   └── websocket.rs # WebSocket (Realtime) types
 │   ├── openresponses/  # OpenResponses API types (https://www.openresponses.org)
 │   │   ├── mod.rs
 │   │   ├── types.rs    # Request/response types
@@ -31,6 +35,7 @@ llmsim/
 │   ├── latency.rs      # Latency profile simulation
 │   ├── generator.rs    # Response generators
 │   ├── stream.rs       # SSE streaming engine
+│   ├── responses_stream.rs # Responses API streaming
 │   └── errors.rs       # Error injection
 ├── benchmarks/         # Load testing benchmarks (k6)
 │   ├── run-benchmark.sh    # Main benchmark runner
@@ -130,7 +135,7 @@ See `specs/responses-api.md` for detailed Responses API specification.
 
 ### Module Organization
 
-- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
+- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `responses_stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration
 - **TUI modules** (`tui/*`): Terminal dashboard, built with Ratatui
 
@@ -209,7 +214,12 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-5-nano | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.1 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.1-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.1-codex-mini | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.1-codex-max | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.2 | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.2-pro | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.2-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.3-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 
 ### O-Series Reasoning Models
@@ -240,6 +250,7 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | claude-sonnet-4 | 200K | 64K | Vision, Tools, JSON |
 | claude-sonnet-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4 | 200K | 64K | Vision, Tools, JSON |
+| claude-opus-4.1 | 200K | 32K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4.6 | 1M | 128K | Vision, Reasoning, Tools, JSON |
 | claude-haiku-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
