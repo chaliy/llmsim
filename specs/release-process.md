@@ -224,7 +224,7 @@ Agent: I'll prepare the v0.2.0 release. Let me:
 
 [Agent performs steps...]
 
-Done. PR created: https://github.com/llmsim/llmsim/pull/XX
+Done. PR created: https://github.com/chaliy/llmsim/pull/XX
 Please review and merge to trigger the release.
 ```
 
