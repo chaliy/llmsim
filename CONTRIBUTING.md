@@ -19,7 +19,7 @@ Thank you for your interest in contributing to LLMSim! This document provides gu
    ```
 3. Add the upstream remote:
    ```bash
-   git remote add upstream https://github.com/llmsim/llmsim.git
+   git remote add upstream https://github.com/chaliy/llmsim.git
    ```
 4. Build the project:
    ```bash
