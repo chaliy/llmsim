@@ -20,6 +20,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | OpenAI | `/openai` | `/v1/chat/completions` | `/openai/v1/chat/completions` |
 | OpenAI | `/openai` | `/v1/responses` | `/openai/v1/responses` |
 | OpenAI | `/openai` | `/v1/models` | `/openai/v1/models` |
+| OpenResponses | `/openresponses` | `/v1/responses` | `/openresponses/v1/responses` |
 | Anthropic | `/anthropic` | `/v1/messages` | `/anthropic/v1/messages` |
 
 ### R2: OpenAI Endpoints
@@ -49,26 +50,36 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `context_window` | integer | Maximum input tokens (e.g., 400000 for GPT-5) |
 | `max_output_tokens` | integer | Maximum output tokens (e.g., 128000 for GPT-5) |
 
-### R3: Anthropic Endpoints (Future)
+### R3: OpenResponses Endpoints
 
-**R3.1**: When implemented, Anthropic endpoints MUST follow the same pattern:
+**R3.1**: Implement the following [OpenResponses](https://www.openresponses.org)-compatible endpoints:
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/openresponses/v1/responses` | OpenResponses API (streaming and non-streaming) |
+
+**R3.2**: The endpoint accepts both text input and structured message input, and emits the OpenResponses lifecycle events (`response.created`, `response.output_text.delta`, `response.completed`, etc.) when streaming.
+
+### R4: Anthropic Endpoints (Future)
+
+**R4.1**: When implemented, Anthropic endpoints MUST follow the same pattern:
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/anthropic/v1/messages` | Messages API |
 
-### R4: System Endpoints
+### R5: System Endpoints
 
-**R4.1**: System endpoints are not provider-specific and use simple paths:
+**R5.1**: System endpoints are not provider-specific and use simple paths:
 
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/health` | Health check endpoint |
 | `GET` | `/llmsim/stats` | Server statistics (requests, tokens, latency) |
 
-### R5: SDK Compatibility
+### R6: SDK Compatibility
 
-**R5.1**: When using official SDKs, configure the base URL as follows:
+**R6.1**: When using official SDKs, configure the base URL as follows:
 
 ```python
 # OpenAI Python SDK

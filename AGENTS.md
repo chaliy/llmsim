@@ -59,8 +59,8 @@ When making changes that affect user-facing behavior or operations, update the r
 ### Local dev expectations
 
 - Rust stable toolchain (edition 2021)
-- Run `cargo build` to build, `cargo run` to start the server
-- Default server runs on `http://localhost:3000`
+- Run `cargo build` to build, `cargo run -- serve` to start the server
+- Default server runs on `http://0.0.0.0:8080`
 
 ### Cloud Agent environments
 
