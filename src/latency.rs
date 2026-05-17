@@ -1,7 +1,7 @@
 // Latency Profiles Module
 // Defines latency profiles for simulating realistic LLM response times.
 
-use rand::Rng;
+use rand::RngExt;
 use rand_distr::{Distribution, Normal};
 use std::time::Duration;
 

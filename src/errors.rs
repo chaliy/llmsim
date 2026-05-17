@@ -2,7 +2,7 @@
 // Simulates various API error conditions for testing error handling.
 
 use crate::openai::ErrorResponse;
-use rand::Rng;
+use rand::RngExt;
 use std::time::Duration;
 
 /// Configuration for error injection
