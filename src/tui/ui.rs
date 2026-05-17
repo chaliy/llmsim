@@ -390,7 +390,7 @@ fn draw_model_chart(f: &mut Frame, app: &App, area: Rect) {
 
     // Sort by count and take top models
     let mut model_vec: Vec<_> = model_requests.into_iter().collect();
-    model_vec.sort_by(|a, b| b.1.cmp(&a.1));
+    model_vec.sort_by_key(|m| std::cmp::Reverse(m.1));
     model_vec.truncate(8);
 
     // Create bars
