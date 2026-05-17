@@ -40,6 +40,7 @@ Specification format: Abstract and Requirements sections.
 
 Available skills:
 - `load-test/` - Run load and stress tests for llmsim using k6
+- `maintenance/` - Run the routine maintenance workflow (deps, models, code quality, specs)
 
 ### Commands
 
