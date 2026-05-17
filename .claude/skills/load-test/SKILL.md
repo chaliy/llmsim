@@ -75,7 +75,7 @@ Ultra-fast variant (3 iterations):
 ./benchmarks/run-benchmark.sh load --chaos
 
 # Custom llmsim config file
-./benchmarks/run-benchmark.sh load --config path/to/config.yaml
+./benchmarks/run-benchmark.sh load --config path/to/config.toml
 ```
 
 ### Error Injection (Chaos Mode)
@@ -137,8 +137,8 @@ Tests pass if thresholds are met:
 
 - `benchmarks/run-benchmark.sh` - Main runner script
 - `benchmarks/smoke-test.sh` - Quick smoke test
-- `benchmarks/config/benchmark.yaml` - Default config (no errors)
-- `benchmarks/config/chaos.yaml` - Chaos mode config (error injection)
+- `benchmarks/config/benchmark.toml` - Default config (no errors)
+- `benchmarks/config/chaos.toml` - Chaos mode config (error injection)
 - `benchmarks/k6/config.js` - k6 test configuration
 - `benchmarks/k6/*.js` - k6 test scripts
 - `specs/load-testing.md` - Full specification

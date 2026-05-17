@@ -60,7 +60,7 @@ llmsim serve --port 8080
 llmsim serve --tui
 
 # With a config file
-llmsim serve --config config.yaml
+llmsim serve --config config.toml
 
 # Full options
 llmsim serve \
