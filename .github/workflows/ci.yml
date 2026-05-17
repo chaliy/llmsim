@@ -215,11 +215,17 @@ jobs:
       - name: Run OpenAI Python example
         run: uv run examples/openai_client.py
 
+      - name: Run OpenAI WebSocket Python example
+        run: uv run examples/openai_websocket_client.py
+
       - name: Run List Models Python example
         run: uv run examples/list_models.py
 
       - name: Run Responses Python example
         run: uv run examples/responses_client.py
+
+      - name: Run OpenResponses Python example
+        run: uv run examples/openresponses_client.py
 
       - name: Run LangChain Python example
         run: uv run examples/langchain_client.py
