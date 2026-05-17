@@ -57,7 +57,7 @@ llmsim serve \
   --tui
 
 # Using config file
-llmsim serve --config config.yaml
+llmsim serve --config config.toml
 ```
 
 ### Stats Dashboard
@@ -122,38 +122,41 @@ When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 
 ## Configuration
 
-### YAML Config File
+### TOML Config File
 
-```yaml
-server:
-  port: 8080
-  host: "0.0.0.0"
+```toml
+[server]
+port = 8080
+host = "0.0.0.0"
 
-latency:
-  profile: "gpt5"
-  # Custom values (optional):
-  # ttft_mean_ms: 600
-  # ttft_stddev_ms: 150
-  # tbt_mean_ms: 40
-  # tbt_stddev_ms: 12
+[latency]
+profile = "gpt5"
+# Custom values (optional):
+# ttft_mean_ms = 600
+# ttft_stddev_ms = 150
+# tbt_mean_ms = 40
+# tbt_stddev_ms = 12
 
-response:
-  generator: "lorem"
-  target_tokens: 100
+[response]
+generator = "lorem"
+target_tokens = 100
 
-errors:
-  rate_limit_rate: 0.01
-  server_error_rate: 0.001
-  timeout_rate: 0.0
-  timeout_after_ms: 30000
+[errors]
+rate_limit_rate = 0.01
+server_error_rate = 0.001
+timeout_rate = 0.0
+timeout_after_ms = 30000
 
-models:
-  available:
-    - "gpt-5"
-    - "gpt-5-mini"
-    - "gpt-4o"
-    - "claude-opus"
+[models]
+available = [
+  "gpt-5",
+  "gpt-5-mini",
+  "gpt-4o",
+  "claude-opus",
+]
 ```
+
+> **Note:** The config file format moved from YAML to TOML in this release. To migrate an existing `config.yaml`, replace section headers like `server:` with `[server]`, change `key: value` to `key = value`, quote strings, and convert lists. See `benchmarks/config/*.toml` for working examples.
 
 ## Supported Models
 

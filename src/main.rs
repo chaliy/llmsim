@@ -5,7 +5,7 @@
 //!
 //! Examples:
 //!   llmsim serve --port 8080
-//!   llmsim serve --config config.yaml
+//!   llmsim serve --config config.toml
 //!   llmsim serve --generator echo --target-tokens 50
 //!   llmsim serve --tui              # Start with real-time stats dashboard
 
@@ -25,7 +25,7 @@ struct Cli {
 enum Commands {
     /// Start the LLMSim HTTP server
     Serve {
-        /// Configuration file path (YAML)
+        /// Configuration file path (TOML)
         #[arg(short, long)]
         config: Option<String>,
 

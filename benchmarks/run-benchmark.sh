@@ -135,10 +135,10 @@ if [ "$START_SERVER" = true ]; then
     if [ -n "$CUSTOM_CONFIG" ]; then
         CONFIG_FILE="$CUSTOM_CONFIG"
     elif [ "$CHAOS_MODE" = true ]; then
-        CONFIG_FILE="$SCRIPT_DIR/config/chaos.yaml"
+        CONFIG_FILE="$SCRIPT_DIR/config/chaos.toml"
         log_warn "Chaos mode enabled - error injection active"
     else
-        CONFIG_FILE="$SCRIPT_DIR/config/benchmark.yaml"
+        CONFIG_FILE="$SCRIPT_DIR/config/benchmark.toml"
     fi
 
     log_info "Starting llmsim server on port $PORT (config: $(basename $CONFIG_FILE))..."

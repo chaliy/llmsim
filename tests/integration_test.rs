@@ -164,21 +164,21 @@ mod config_tests {
     }
 
     #[test]
-    fn test_config_yaml_parsing() {
-        let yaml = r#"
-server:
-  port: 9000
-  host: "127.0.0.1"
+    fn test_config_toml_parsing() {
+        let toml_str = r#"
+[server]
+port = 9000
+host = "127.0.0.1"
 
-response:
-  generator: "echo"
-  target_tokens: 200
+[response]
+generator = "echo"
+target_tokens = 200
 
-errors:
-  rate_limit_rate: 0.1
-  server_error_rate: 0.05
+[errors]
+rate_limit_rate = 0.1
+server_error_rate = 0.05
 "#;
-        let config = Config::from_yaml(yaml).unwrap();
+        let config = Config::from_toml(toml_str).unwrap();
         assert_eq!(config.server.port, 9000);
         assert_eq!(config.server.host, "127.0.0.1");
         assert_eq!(config.response.generator, "echo");

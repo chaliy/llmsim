@@ -21,16 +21,16 @@ pub struct Config {
 }
 
 impl Config {
-    /// Load configuration from a YAML file
+    /// Load configuration from a TOML file
     pub fn from_file(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
         let content =
             std::fs::read_to_string(path.as_ref()).map_err(|e| ConfigError::Io(e.to_string()))?;
-        Self::from_yaml(&content)
+        Self::from_toml(&content)
     }
 
-    /// Parse configuration from YAML string
-    pub fn from_yaml(yaml: &str) -> Result<Self, ConfigError> {
-        serde_yaml::from_str(yaml).map_err(|e| ConfigError::Parse(e.to_string()))
+    /// Parse configuration from TOML string
+    pub fn from_toml(toml_str: &str) -> Result<Self, ConfigError> {
+        toml::from_str(toml_str).map_err(|e| ConfigError::Parse(e.to_string()))
     }
 
     /// Create a latency profile from the configuration
@@ -270,23 +270,23 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_yaml() {
-        let yaml = r#"
-server:
-  port: 9000
-  host: "127.0.0.1"
+    fn test_parse_toml() {
+        let toml_str = r#"
+[server]
+port = 9000
+host = "127.0.0.1"
 
-latency:
-  profile: "gpt4"
+[latency]
+profile = "gpt4"
 
-response:
-  generator: "echo"
-  target_tokens: 50
+[response]
+generator = "echo"
+target_tokens = 50
 
-errors:
-  rate_limit_rate: 0.01
+[errors]
+rate_limit_rate = 0.01
 "#;
-        let config = Config::from_yaml(yaml).unwrap();
+        let config = Config::from_toml(toml_str).unwrap();
         assert_eq!(config.server.port, 9000);
         assert_eq!(config.server.host, "127.0.0.1");
         assert_eq!(config.latency.profile, Some("gpt4".to_string()));
@@ -297,12 +297,12 @@ errors:
 
     #[test]
     fn test_custom_latency() {
-        let yaml = r#"
-latency:
-  ttft_mean_ms: 500
-  tbt_mean_ms: 25
+        let toml_str = r#"
+[latency]
+ttft_mean_ms = 500
+tbt_mean_ms = 25
 "#;
-        let config = Config::from_yaml(yaml).unwrap();
+        let config = Config::from_toml(toml_str).unwrap();
         let profile = config.latency_profile();
         assert_eq!(profile.ttft_mean_ms, 500);
         assert_eq!(profile.tbt_mean_ms, 25);
@@ -310,23 +310,23 @@ latency:
 
     #[test]
     fn test_latency_profile_from_name() {
-        let yaml = r#"
-latency:
-  profile: "instant"
+        let toml_str = r#"
+[latency]
+profile = "instant"
 "#;
-        let config = Config::from_yaml(yaml).unwrap();
+        let config = Config::from_toml(toml_str).unwrap();
         let profile = config.latency_profile();
         assert_eq!(profile.ttft_mean_ms, 0);
     }
 
     #[test]
     fn test_error_config() {
-        let yaml = r#"
-errors:
-  rate_limit_rate: 0.1
-  server_error_rate: 0.05
+        let toml_str = r#"
+[errors]
+rate_limit_rate = 0.1
+server_error_rate = 0.05
 "#;
-        let config = Config::from_yaml(yaml).unwrap();
+        let config = Config::from_toml(toml_str).unwrap();
         let error_config = config.error_config();
         assert_eq!(error_config.rate_limit_rate, 0.1);
         assert_eq!(error_config.server_error_rate, 0.05);

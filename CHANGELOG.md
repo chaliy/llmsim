@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Breaking changes
+
+- **Config file format moved from YAML to TOML.** The upstream `serde_yaml`
+  crate is archived (released as `0.9.34+deprecated`) and every successor
+  fork is stale, while `toml` is actively maintained by the Cargo team and
+  is the idiomatic format for Rust CLIs. To migrate an existing
+  `config.yaml`, replace section headers like `server:` with `[server]`,
+  change `key: value` to `key = value`, quote strings, and convert lists
+  to TOML arrays. See `benchmarks/config/*.toml` for working examples.
+  - `Config::from_yaml` is renamed to `Config::from_toml`.
+  - `Config::from_file` now expects TOML content (the `--config` flag is
+    unchanged).
+  - The bundled `benchmarks/config/benchmark.yaml` and `chaos.yaml`
+    examples have been replaced with `.toml` versions.
+
 ## [0.2.3] - 2026-03-20
 
 ### Highlights
