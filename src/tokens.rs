@@ -100,7 +100,7 @@ impl TokenCounter {
     /// Decode token IDs back to text
     pub fn decode(&self, tokens: &[u32]) -> Result<String, TokenError> {
         self.bpe
-            .decode(tokens.to_vec())
+            .decode(tokens)
             .map_err(|e| TokenError::InitError(e.to_string()))
     }
 

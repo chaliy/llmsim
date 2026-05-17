@@ -3,7 +3,7 @@
 
 use crate::openai::ChatCompletionRequest;
 use rand::prelude::IndexedRandom;
-use rand::Rng;
+use rand::RngExt;
 
 /// Trait for generating simulated responses
 pub trait ResponseGenerator: Send + Sync {
