@@ -249,10 +249,12 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | claude-3.7-sonnet | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-sonnet-4 | 200K | 64K | Vision, Tools, JSON |
 | claude-sonnet-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
+| claude-sonnet-4.6 | 1M | 64K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4 | 200K | 64K | Vision, Tools, JSON |
 | claude-opus-4.1 | 200K | 32K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4.6 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-opus-4.7 | 1M | 128K | Vision, Reasoning, Tools, JSON |
 | claude-haiku-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
 
 ### Gemini Family

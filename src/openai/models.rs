@@ -373,6 +373,17 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1759104000) // 2025-09-29
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2025-07-31"),
+        // Claude Sonnet 4.6
+        ModelProfile::new(
+            "claude-sonnet-4.6",
+            "Claude Sonnet 4.6",
+            "anthropic",
+            1_000_000,
+            64_000,
+        )
+        .with_created(1771027200) // 2026-02-15
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-10-31"),
         // Claude Opus 4
         ModelProfile::new(
             "claude-opus-4",
@@ -417,6 +428,17 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1770249600) // 2026-02-05
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2025-05-31"),
+        // Claude Opus 4.7
+        ModelProfile::new(
+            "claude-opus-4.7",
+            "Claude Opus 4.7",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1776470400) // 2026-04-15
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-01-31"),
         // Claude Haiku 4.5
         ModelProfile::new(
             "claude-haiku-4.5",
@@ -605,6 +627,27 @@ mod tests {
         assert_eq!(profile.max_output_tokens, 128_000);
         assert!(profile.capabilities.reasoning);
         assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-05-31"));
+    }
+
+    #[test]
+    fn test_claude_opus_4_7_profile() {
+        let profile = get_model_profile("claude-opus-4.7").expect("claude-opus-4.7 should exist");
+        assert_eq!(profile.owned_by, "anthropic");
+        assert_eq!(profile.context_window, 1_000_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert!(profile.capabilities.reasoning);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2026-01-31"));
+    }
+
+    #[test]
+    fn test_claude_sonnet_4_6_profile() {
+        let profile =
+            get_model_profile("claude-sonnet-4.6").expect("claude-sonnet-4.6 should exist");
+        assert_eq!(profile.owned_by, "anthropic");
+        assert_eq!(profile.context_window, 1_000_000);
+        assert_eq!(profile.max_output_tokens, 64_000);
+        assert!(profile.capabilities.reasoning);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-10-31"));
     }
 
     #[test]
