@@ -58,9 +58,14 @@ When making changes that affect user-facing behavior or operations, update the r
 
 ### Local dev expectations
 
-- Rust stable toolchain (edition 2021)
+- Rust stable toolchain (edition 2021), pinned to **1.95** via `rust-toolchain.toml`
 - Run `cargo build` to build, `cargo run -- serve` to start the server
 - Default server runs on `http://0.0.0.0:8080`
+
+> **Toolchain bumps:** The Rust version is pinned in `rust-toolchain.toml` and in
+> every `dtolnay/rust-toolchain@<version>` reference in `.github/workflows/`.
+> Bump both during routine maintenance — usually once or twice a year — so new
+> clippy lints surface in a controlled PR rather than mid-merge.
 
 ### Cloud Agent environments
 
