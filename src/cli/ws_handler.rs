@@ -9,7 +9,8 @@ use crate::openai::ResponsesResponse;
 use crate::{EndpointType, ErrorInjector, ResponsesTokenStreamBuilder};
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
-use axum::response::Response;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use futures_util::StreamExt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -19,6 +20,25 @@ const MAX_CONNECTION_DURATION: Duration = Duration::from_secs(60 * 60);
 
 /// GET /openai/v1/responses (WebSocket upgrade)
 pub async fn ws_responses(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
+    let active_connections = state
+        .stats
+        .active_websocket_connections
+        .load(std::sync::atomic::Ordering::Relaxed);
+    let max_connections = state.config.server.max_websocket_connections;
+
+    if active_connections >= max_connections {
+        tracing::warn!(
+            active_connections,
+            max_connections,
+            "WebSocket connection rejected: connection limit reached"
+        );
+        return (
+            StatusCode::SERVICE_UNAVAILABLE,
+            "WebSocket connection limit reached",
+        )
+            .into_response();
+    }
+
     tracing::info!("WebSocket connection upgrade request");
     ws.on_upgrade(move |socket| handle_ws_connection(socket, state))
 }
