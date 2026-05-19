@@ -23,7 +23,7 @@ use axum::{
     response::{IntoResponse, Response},
     Json,
 };
-use futures::StreamExt;
+use futures_util::StreamExt;
 use rand::prelude::IndexedRandom;
 use std::sync::Arc;
 use std::time::Instant;

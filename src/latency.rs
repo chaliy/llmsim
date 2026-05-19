@@ -2,7 +2,6 @@
 // Defines latency profiles for simulating realistic LLM response times.
 
 use rand::RngExt;
-use rand_distr::{Distribution, Normal};
 use std::time::Duration;
 
 /// Latency profile for simulating LLM response timing
@@ -226,14 +225,7 @@ impl LatencyProfile {
         }
 
         let mut rng = rand::rng();
-        let sample = if self.ttft_stddev_ms > 0 {
-            let normal = Normal::new(self.ttft_mean_ms as f64, self.ttft_stddev_ms as f64)
-                .unwrap_or_else(|_| Normal::new(self.ttft_mean_ms as f64, 1.0).unwrap());
-            // Ensure minimum of 1ms when mean is non-zero
-            normal.sample(&mut rng).max(1.0) as u64
-        } else {
-            self.ttft_mean_ms
-        };
+        let sample = sample_normal_ms(self.ttft_mean_ms, self.ttft_stddev_ms, &mut rng);
 
         Duration::from_millis(sample)
     }
@@ -245,14 +237,7 @@ impl LatencyProfile {
         }
 
         let mut rng = rand::rng();
-        let sample = if self.tbt_stddev_ms > 0 {
-            let normal = Normal::new(self.tbt_mean_ms as f64, self.tbt_stddev_ms as f64)
-                .unwrap_or_else(|_| Normal::new(self.tbt_mean_ms as f64, 1.0).unwrap());
-            // Ensure minimum of 1ms when mean is non-zero
-            normal.sample(&mut rng).max(1.0) as u64
-        } else {
-            self.tbt_mean_ms
-        };
+        let sample = sample_normal_ms(self.tbt_mean_ms, self.tbt_stddev_ms, &mut rng);
 
         Duration::from_millis(sample)
     }
@@ -263,6 +248,18 @@ impl LatencyProfile {
         let factor = rng.random_range(0.5..1.5);
         Duration::from_millis((base_ms as f64 * factor) as u64)
     }
+}
+
+fn sample_normal_ms(mean_ms: u64, stddev_ms: u64, rng: &mut impl rand::Rng) -> u64 {
+    if stddev_ms == 0 {
+        return mean_ms;
+    }
+
+    let u1: f64 = rng.random_range(f64::MIN_POSITIVE..1.0);
+    let u2: f64 = rng.random_range(0.0..1.0);
+    let z = (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos();
+
+    (mean_ms as f64 + stddev_ms as f64 * z).max(1.0) as u64
 }
 
 impl Default for LatencyProfile {

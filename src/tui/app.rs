@@ -10,6 +10,8 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 use std::time::{Duration, Instant};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream;
 
 /// Configuration for the dashboard
 #[derive(Debug, Clone)]
@@ -65,42 +67,124 @@ impl App {
 
     /// Update the stats by fetching from the server
     pub async fn update_stats(&mut self) {
-        let url = format!("{}/llmsim/stats", self.server_url);
-
-        match reqwest::get(&url).await {
-            Ok(response) => match response.json::<StatsSnapshot>().await {
-                Ok(snapshot) => {
-                    // Calculate token rate
-                    let elapsed = self.last_fetch.elapsed().as_secs_f64();
-                    if elapsed > 0.0 && self.last_total_tokens > 0 {
-                        let token_diff =
-                            snapshot.total_tokens.saturating_sub(self.last_total_tokens);
-                        let token_rate = token_diff as f64 / elapsed;
-                        self.tokens_history.push(token_rate);
-                        if self.tokens_history.len() > 60 {
-                            self.tokens_history.remove(0);
-                        }
+        match fetch_stats(&self.server_url).await {
+            Ok(snapshot) => {
+                // Calculate token rate
+                let elapsed = self.last_fetch.elapsed().as_secs_f64();
+                if elapsed > 0.0 && self.last_total_tokens > 0 {
+                    let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
+                    let token_rate = token_diff as f64 / elapsed;
+                    self.tokens_history.push(token_rate);
+                    if self.tokens_history.len() > 60 {
+                        self.tokens_history.remove(0);
                     }
-                    self.last_total_tokens = snapshot.total_tokens;
-
-                    // Update RPS history
-                    self.rps_history.push(snapshot.requests_per_second);
-                    if self.rps_history.len() > 60 {
-                        self.rps_history.remove(0);
-                    }
-
-                    self.stats = Some(snapshot);
-                    self.error = None;
-                    self.last_fetch = Instant::now();
                 }
-                Err(e) => {
-                    self.error = Some(format!("Failed to parse stats: {}", e));
+                self.last_total_tokens = snapshot.total_tokens;
+
+                // Update RPS history
+                self.rps_history.push(snapshot.requests_per_second);
+                if self.rps_history.len() > 60 {
+                    self.rps_history.remove(0);
                 }
-            },
+
+                self.stats = Some(snapshot);
+                self.error = None;
+                self.last_fetch = Instant::now();
+            }
             Err(e) => {
-                self.error = Some(format!("Failed to connect: {}", e));
+                self.error = Some(e);
             }
         }
+    }
+}
+
+async fn fetch_stats(server_url: &str) -> Result<StatsSnapshot, String> {
+    let endpoint = StatsEndpoint::parse(server_url)?;
+    let mut stream = TcpStream::connect(&endpoint.connect_addr)
+        .await
+        .map_err(|e| format!("Failed to connect: {}", e))?;
+    let request = format!(
+        "GET {} HTTP/1.1\r\nHost: {}\r\nAccept: application/json\r\nConnection: close\r\n\r\n",
+        endpoint.path, endpoint.host_header
+    );
+
+    stream
+        .write_all(request.as_bytes())
+        .await
+        .map_err(|e| format!("Failed to request stats: {}", e))?;
+
+    let mut response = Vec::new();
+    stream
+        .read_to_end(&mut response)
+        .await
+        .map_err(|e| format!("Failed to read stats: {}", e))?;
+
+    let header_end = response
+        .windows(4)
+        .position(|window| window == b"\r\n\r\n")
+        .ok_or_else(|| "Failed to parse stats response: missing headers".to_string())?;
+    let headers = std::str::from_utf8(&response[..header_end])
+        .map_err(|e| format!("Failed to parse stats response headers: {}", e))?;
+    let status_line = headers
+        .lines()
+        .next()
+        .ok_or_else(|| "Failed to parse stats response: missing status".to_string())?;
+
+    if !status_line.contains(" 200 ") {
+        return Err(format!("Stats endpoint returned {}", status_line));
+    }
+
+    serde_json::from_slice(&response[header_end + 4..])
+        .map_err(|e| format!("Failed to parse stats: {}", e))
+}
+
+struct StatsEndpoint {
+    connect_addr: String,
+    host_header: String,
+    path: String,
+}
+
+impl StatsEndpoint {
+    fn parse(server_url: &str) -> Result<Self, String> {
+        let server_url = server_url.trim().trim_end_matches('/');
+        let rest = server_url
+            .strip_prefix("http://")
+            .ok_or_else(|| "TUI stats fetching supports http:// server URLs".to_string())?;
+        let (authority, path_prefix) = rest.split_once('/').unwrap_or((rest, ""));
+
+        if authority.is_empty() {
+            return Err("TUI server URL is missing a host".to_string());
+        }
+
+        if path_prefix.contains('?') || path_prefix.contains('#') {
+            return Err("TUI server URL must not include query or fragment components".to_string());
+        }
+
+        let connect_addr = if authority.starts_with('[') {
+            if authority.contains("]:") {
+                authority.to_string()
+            } else if authority.ends_with(']') {
+                format!("{}:80", authority)
+            } else {
+                return Err("TUI server URL has an invalid IPv6 host".to_string());
+            }
+        } else if authority.contains(':') {
+            authority.to_string()
+        } else {
+            format!("{}:80", authority)
+        };
+
+        let path = if path_prefix.is_empty() {
+            "/llmsim/stats".to_string()
+        } else {
+            format!("/{}/llmsim/stats", path_prefix.trim_end_matches('/'))
+        };
+
+        Ok(Self {
+            connect_addr,
+            host_header: authority.to_string(),
+            path,
+        })
     }
 }
 

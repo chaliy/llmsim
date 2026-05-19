@@ -5,9 +5,10 @@
 use super::types::{
     format_sse, OutputContent, OutputItem, Response, ResponseStatus, Role, StreamEvent, Usage,
 };
+use crate::ids::{prefixed_compact_id, unix_timestamp};
 use crate::latency::LatencyProfile;
 use async_stream::stream;
-use futures::Stream;
+use futures_core::Stream;
 use std::pin::Pin;
 use tokio::time::sleep;
 
@@ -37,7 +38,7 @@ impl OpenResponsesTokenStream {
         Self {
             id,
             model,
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: unix_timestamp(),
             latency,
             content,
             usage: None,
@@ -94,7 +95,7 @@ impl OpenResponsesTokenStream {
 
         Box::pin(stream! {
             // Generate IDs for the output items
-            let item_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+            let item_id = prefixed_compact_id("msg_");
 
             // Initial delay (time to first token)
             let ttft = latency.sample_ttft();
@@ -184,7 +185,7 @@ impl OpenResponsesTokenStream {
             yield format_sse(&StreamEvent::output_item_done(0, completed_item));
 
             // 9. response.completed event
-            let completed_at = chrono::Utc::now().timestamp();
+            let completed_at = unix_timestamp();
             let completed_response = Response {
                 id: id.clone(),
                 object: "response".to_string(),
@@ -264,9 +265,7 @@ impl OpenResponsesStreamBuilder {
     }
 
     pub fn build(self) -> OpenResponsesTokenStream {
-        let id = self.id.unwrap_or_else(|| {
-            format!("resp_{}", uuid::Uuid::new_v4().to_string().replace("-", ""))
-        });
+        let id = self.id.unwrap_or_else(|| prefixed_compact_id("resp_"));
 
         let mut stream = OpenResponsesTokenStream::new(id, self.model, self.content, self.latency);
         if let Some(usage) = self.usage {
@@ -282,7 +281,7 @@ impl OpenResponsesStreamBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::StreamExt;
+    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn test_openresponses_stream_basic() {

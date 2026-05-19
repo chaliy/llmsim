@@ -1,10 +1,11 @@
 // Streaming Engine Module
 // Implements token-by-token streaming with realistic latency simulation.
 
+use crate::ids::{prefixed_id, unix_timestamp};
 use crate::latency::LatencyProfile;
 use crate::openai::{ChatCompletionChunk, Role, Usage};
 use async_stream::stream;
-use futures::Stream;
+use futures_core::Stream;
 use std::pin::Pin;
 use tokio::time::sleep;
 
@@ -34,7 +35,7 @@ impl TokenStream {
         Self {
             id,
             model,
-            created: chrono::Utc::now().timestamp(),
+            created: unix_timestamp(),
             latency,
             content,
             usage: None,
@@ -233,9 +234,7 @@ impl TokenStreamBuilder {
     }
 
     pub fn build(self) -> TokenStream {
-        let id = self
-            .id
-            .unwrap_or_else(|| format!("chatcmpl-{}", uuid::Uuid::new_v4()));
+        let id = self.id.unwrap_or_else(|| prefixed_id("chatcmpl-"));
 
         let mut stream = TokenStream::new(id, self.model, self.content, self.latency);
         if let Some(usage) = self.usage {
@@ -267,7 +266,7 @@ pub fn create_role_chunk(id: &str, model: &str, created: i64) -> ChatCompletionC
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::StreamExt;
+    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn test_token_stream_basic() {

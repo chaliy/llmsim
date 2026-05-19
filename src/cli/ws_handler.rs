@@ -10,7 +10,7 @@ use crate::{EndpointType, ErrorInjector, ResponsesTokenStreamBuilder};
 use axum::extract::ws::{Message, WebSocket};
 use axum::extract::{State, WebSocketUpgrade};
 use axum::response::Response;
-use futures::StreamExt;
+use futures_util::StreamExt;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
