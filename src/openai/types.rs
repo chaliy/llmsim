@@ -2,6 +2,7 @@
 // These types are designed to be compatible with the OpenAI Chat Completions API.
 // Reference: https://platform.openai.com/docs/api-reference/chat
 
+use crate::ids::{prefixed_id, unix_timestamp};
 use serde::{Deserialize, Serialize};
 
 /// Role of a message in a conversation
@@ -200,9 +201,9 @@ pub struct ChatCompletionResponse {
 impl ChatCompletionResponse {
     pub fn new(model: String, content: String, usage: Usage) -> Self {
         Self {
-            id: format!("chatcmpl-{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("chatcmpl-"),
             object: "chat.completion".to_string(),
-            created: chrono::Utc::now().timestamp(),
+            created: unix_timestamp(),
             model,
             choices: vec![Choice {
                 index: 0,
@@ -416,7 +417,7 @@ impl Model {
         Self {
             id: id.into(),
             object: "model".to_string(),
-            created: chrono::Utc::now().timestamp(),
+            created: unix_timestamp(),
             owned_by: owned_by.into(),
             context_window: None,
             max_output_tokens: None,

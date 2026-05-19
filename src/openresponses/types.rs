@@ -2,6 +2,7 @@
 // These types are designed to be compatible with the Open Responses API specification.
 // Reference: https://www.openresponses.org/specification
 
+use crate::ids::{prefixed_compact_id, unix_timestamp};
 use serde::{Deserialize, Serialize};
 
 /// Role of a message in a conversation
@@ -348,9 +349,9 @@ pub struct Response {
 
 impl Response {
     pub fn new(model: String, content: String, usage: Usage) -> Self {
-        let created_at = chrono::Utc::now().timestamp();
-        let id = format!("resp_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
-        let item_id = format!("msg_{}", uuid::Uuid::new_v4().to_string().replace("-", ""));
+        let created_at = unix_timestamp();
+        let id = prefixed_compact_id("resp_");
+        let item_id = prefixed_compact_id("msg_");
 
         Self {
             id,

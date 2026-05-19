@@ -2,6 +2,7 @@
 // These types are designed to be compatible with the OpenAI Responses API.
 // Reference: https://platform.openai.com/docs/api-reference/responses
 
+use crate::ids::{prefixed_id, unix_timestamp};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -258,7 +259,7 @@ pub struct ResponsesResponse {
 impl ResponsesResponse {
     pub fn new(model: String, content: String, usage: ResponsesUsage) -> Self {
         let output_item = OutputItem::Message {
-            id: format!("msg_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("msg_"),
             role: OutputRole::Assistant,
             status: ItemStatus::Completed,
             content: vec![OutputContentPart::OutputText {
@@ -268,9 +269,9 @@ impl ResponsesResponse {
         };
 
         Self {
-            id: format!("resp_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("resp_"),
             object: "response".to_string(),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: unix_timestamp(),
             model,
             status: ResponseStatus::Completed,
             output: vec![output_item],
@@ -284,9 +285,9 @@ impl ResponsesResponse {
     /// Create a minimal response for WebSocket warmup (generate=false).
     pub fn warmup(model: String) -> Self {
         Self {
-            id: format!("resp_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("resp_"),
             object: "response".to_string(),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: unix_timestamp(),
             model,
             status: ResponseStatus::Completed,
             output: vec![],
@@ -306,7 +307,7 @@ impl ResponsesResponse {
         usage: ResponsesUsage,
     ) -> Self {
         let reasoning_item = OutputItem::Reasoning {
-            id: format!("rs_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("rs_"),
             status: ItemStatus::Completed,
             summary: summary_text.map(|text| {
                 vec![ReasoningSummary {
@@ -317,7 +318,7 @@ impl ResponsesResponse {
         };
 
         let message_item = OutputItem::Message {
-            id: format!("msg_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("msg_"),
             role: OutputRole::Assistant,
             status: ItemStatus::Completed,
             content: vec![OutputContentPart::OutputText {
@@ -327,9 +328,9 @@ impl ResponsesResponse {
         };
 
         Self {
-            id: format!("resp_{}", uuid::Uuid::new_v4()),
+            id: prefixed_id("resp_"),
             object: "response".to_string(),
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: unix_timestamp(),
             model,
             status: ResponseStatus::Completed,
             output: vec![reasoning_item, message_item],

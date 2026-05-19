@@ -19,7 +19,7 @@ use llmsim::{
     responses_stream::ResponsesTokenStreamBuilder,
 };
 
-use futures::StreamExt;
+use futures_util::StreamExt;
 
 #[tokio::main]
 async fn main() {

@@ -227,7 +227,7 @@ mod generator_tests {
 }
 
 mod stream_tests {
-    use futures::StreamExt;
+    use futures_util::StreamExt;
     use llmsim::latency::LatencyProfile;
     use llmsim::openai::Usage;
     use llmsim::TokenStreamBuilder;
@@ -275,7 +275,7 @@ mod stream_tests {
 }
 
 mod openresponses_tests {
-    use futures::StreamExt;
+    use futures_util::StreamExt;
     use llmsim::latency::LatencyProfile;
     use llmsim::openresponses::{
         Input, InputMessage, MessageContent, OpenResponsesStreamBuilder, Response, ResponseRequest,

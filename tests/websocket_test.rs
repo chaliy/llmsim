@@ -1,7 +1,8 @@
 // WebSocket mode integration tests.
 // Tests the WebSocket transport for the Responses API.
 
-use futures::{SinkExt, StreamExt};
+use futures_util::stream::{SplitSink, SplitStream};
+use futures_util::{SinkExt, StreamExt};
 use llmsim::cli::{build_router, AppState, Config};
 use llmsim::stats::new_shared_stats;
 use serde_json::Value;
@@ -31,13 +32,13 @@ async fn start_server() -> SocketAddr {
 async fn ws_connect(
     addr: SocketAddr,
 ) -> (
-    futures::stream::SplitSink<
+    SplitSink<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
         >,
         Message,
     >,
-    futures::stream::SplitStream<
+    SplitStream<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
         >,
@@ -50,13 +51,13 @@ async fn ws_connect(
 
 /// Send a response.create event and collect all server events until response.completed.
 async fn send_and_collect(
-    sink: &mut futures::stream::SplitSink<
+    sink: &mut SplitSink<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
         >,
         Message,
     >,
-    stream: &mut futures::stream::SplitStream<
+    stream: &mut SplitStream<
         tokio_tungstenite::WebSocketStream<
             tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
         >,

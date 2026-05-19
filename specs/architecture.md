@@ -57,6 +57,7 @@ llmsim/
 llmsim serve --port 8080
 
 # Start with real-time stats dashboard
+# Requires building with `--features tui`
 llmsim serve --tui
 
 # With a config file
@@ -137,7 +138,7 @@ See `specs/responses-api.md` for detailed Responses API specification.
 
 - **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `responses_stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration
-- **TUI modules** (`tui/*`): Terminal dashboard, built with Ratatui
+- **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with Ratatui
 
 ### API Support
 
@@ -166,11 +167,11 @@ The `stats` module provides thread-safe metrics collection using atomic counters
 - **Latency**: average, min, max response times
 - **RPS**: rolling 60-second window calculation
 
-Stats are exposed via `/llmsim/stats` endpoint and consumed by the TUI dashboard.
+Stats are exposed via `/llmsim/stats` endpoint and consumed by the optional TUI dashboard.
 
 ### TUI Module
 
-The `tui` module provides a real-time terminal dashboard built with [Ratatui](https://ratatui.rs/):
+The `tui` feature enables a real-time terminal dashboard built with [Ratatui](https://ratatui.rs/):
 
 - **app.rs**: Event loop, state management, HTTP polling
 - **ui.rs**: Widget layout and rendering (tables, sparklines, bar charts)

@@ -31,6 +31,9 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ```bash
 cargo install llmsim
+
+# Include the optional terminal dashboard
+cargo install llmsim --features tui
 ```
 
 ## Demo
@@ -46,6 +49,7 @@ cargo install llmsim
 llmsim serve
 
 # Start with real-time stats dashboard (TUI)
+# Requires installing/building with `--features tui`
 llmsim serve --tui
 
 # All options

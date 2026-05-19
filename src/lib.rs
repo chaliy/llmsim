@@ -43,6 +43,7 @@
 // Core library modules
 pub mod errors;
 pub mod generator;
+mod ids;
 pub mod latency;
 pub mod openai;
 pub mod openresponses;
@@ -54,7 +55,8 @@ pub mod tokens;
 // CLI module (for `llmsim serve` command)
 pub mod cli;
 
-// TUI module (for `llmsim stats` command)
+// TUI module (for `llmsim serve --tui`)
+#[cfg(feature = "tui")]
 pub mod tui;
 
 // Re-export commonly used types

@@ -11,6 +11,7 @@
 
 use clap::{Parser, Subcommand};
 use llmsim::cli::{Config, ConfigError};
+#[cfg(feature = "tui")]
 use llmsim::tui::{run_dashboard, DashboardConfig};
 
 #[derive(Parser)]
@@ -46,6 +47,8 @@ enum Commands {
         target_tokens: usize,
 
         /// Show real-time stats dashboard (TUI)
+        ///
+        /// Requires building with `--features tui`.
         #[arg(long)]
         tui: bool,
     },
@@ -89,22 +92,32 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let config = build_config(config, port, host.clone(), generator, target_tokens)?;
 
             if tui {
-                // Run server and TUI concurrently
-                let stats = llmsim::new_shared_stats();
-                let server_url = format!("http://127.0.0.1:{}", port);
+                #[cfg(not(feature = "tui"))]
+                {
+                    return Err(
+                        "the --tui flag requires building llmsim with --features tui".into(),
+                    );
+                }
 
-                let dashboard_config = DashboardConfig {
-                    server_url,
-                    refresh_ms: 200,
-                };
+                #[cfg(feature = "tui")]
+                {
+                    // Run server and TUI concurrently
+                    let stats = llmsim::new_shared_stats();
+                    let server_url = format!("http://127.0.0.1:{}", port);
 
-                // Run both concurrently - TUI exit will shut down the app
-                tokio::select! {
-                    result = llmsim::cli::run_server_with_stats(config, stats) => {
-                        result?;
-                    }
-                    result = run_dashboard(dashboard_config) => {
-                        result?;
+                    let dashboard_config = DashboardConfig {
+                        server_url,
+                        refresh_ms: 200,
+                    };
+
+                    // Run both concurrently - TUI exit will shut down the app
+                    tokio::select! {
+                        result = llmsim::cli::run_server_with_stats(config, stats) => {
+                            result?;
+                        }
+                        result = run_dashboard(dashboard_config) => {
+                            result?;
+                        }
                     }
                 }
             } else {

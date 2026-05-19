@@ -3,6 +3,7 @@
 // These profiles contain realistic context windows, output limits, and capabilities
 // for use in simulating LLM API behavior.
 
+use crate::ids::unix_timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
@@ -61,7 +62,7 @@ impl ModelProfile {
             owned_by: owned_by.into(),
             context_window,
             max_output_tokens,
-            created: chrono::Utc::now().timestamp(),
+            created: unix_timestamp(),
             capabilities: ModelCapabilities::default(),
             knowledge_cutoff: None,
         }

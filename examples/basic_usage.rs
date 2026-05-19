@@ -16,7 +16,7 @@ use llmsim::{
     ErrorConfig, LoremGenerator, ResponseGenerator,
 };
 
-use futures::StreamExt;
+use futures_util::StreamExt;
 
 #[tokio::main]
 async fn main() {

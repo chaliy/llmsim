@@ -1,13 +1,14 @@
 // Responses API Streaming Engine
 // Implements streaming for the OpenAI Responses API format.
 
+use crate::ids::{prefixed_id, unix_timestamp};
 use crate::latency::LatencyProfile;
 use crate::openai::{
     ItemStatus, OutputContentPart, OutputItem, OutputRole, OutputTokensDetails, ReasoningSummary,
     ResponseStatus, ResponsesResponse, ResponsesStreamEvent, ResponsesUsage,
 };
 use async_stream::stream;
-use futures::Stream;
+use futures_core::Stream;
 use std::pin::Pin;
 use tokio::time::sleep;
 
@@ -46,10 +47,10 @@ impl ResponsesTokenStream {
         usage: ResponsesUsage,
     ) -> Self {
         Self {
-            response_id: format!("resp_{}", uuid::Uuid::new_v4()),
-            message_id: format!("msg_{}", uuid::Uuid::new_v4()),
+            response_id: prefixed_id("resp_"),
+            message_id: prefixed_id("msg_"),
             model,
-            created_at: chrono::Utc::now().timestamp(),
+            created_at: unix_timestamp(),
             latency,
             content,
             usage,
@@ -143,7 +144,7 @@ impl ResponsesTokenStream {
 
             // --- Reasoning output item (if enabled) ---
             if include_reasoning {
-                let reasoning_id = format!("rs_{}", uuid::Uuid::new_v4());
+                let reasoning_id = prefixed_id("rs_");
                 let reasoning_output_index: u32 = 0;
 
                 // Emit reasoning item added (in_progress, no summary yet)
@@ -375,7 +376,7 @@ impl ResponsesTokenStreamBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use futures::StreamExt;
+    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn test_responses_stream_basic() {
