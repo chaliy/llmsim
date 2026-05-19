@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Breaking changes
+## [0.3.0] - 2026-05-19
+
+### Highlights
+
+- Config file format migrated from YAML to TOML (breaking change)
+- Refreshed model catalog: Claude Opus 4.7, Sonnet 4.6, latest GPT-5.4/5.5, Gemini 3/3.1
+- Reduced default dependency graph for faster builds and smaller binaries
+- Rust toolchain pinned to 1.95 across CI and local dev
+- New maintenance skill for the routine maintenance workflow
+
+### Breaking Changes
 
 - **Config file format moved from YAML to TOML.** The upstream `serde_yaml`
   crate is archived (released as `0.9.34+deprecated`) and every successor
@@ -21,6 +31,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     unchanged).
   - The bundled `benchmarks/config/benchmark.yaml` and `chaos.yaml`
     examples have been replaced with `.toml` versions.
+
+### What's Changed
+
+* feat(models): refresh model catalog for maintenance ([#43](https://github.com/chaliy/llmsim/pull/43)) by @chaliy
+* perf(deps): reduce default dependency graph ([#42](https://github.com/chaliy/llmsim/pull/42)) by @chaliy
+* chore: remove stale inception docs PLAN.md and IDEA.md ([#41](https://github.com/chaliy/llmsim/pull/41)) by @chaliy
+* docs(skill): add maintenance skill for routine maintenance workflow ([#40](https://github.com/chaliy/llmsim/pull/40)) by @chaliy
+* ci(examples): cover openai_websocket_client and openresponses_client ([#39](https://github.com/chaliy/llmsim/pull/39)) by @chaliy
+* ci: pin Rust toolchain to 1.95 across CI and local dev ([#38](https://github.com/chaliy/llmsim/pull/38)) by @chaliy
+* chore(config)!: migrate config file format from YAML to TOML ([#37](https://github.com/chaliy/llmsim/pull/37)) by @chaliy
+* docs(specs): document OpenResponses endpoints and fix default port ([#36](https://github.com/chaliy/llmsim/pull/36)) by @chaliy
+* feat(models): add Claude Opus 4.7 and Sonnet 4.6 ([#35](https://github.com/chaliy/llmsim/pull/35)) by @chaliy
+* chore(deps): bump rand, rand_distr, tiktoken-rs, tokio-tungstenite ([#34](https://github.com/chaliy/llmsim/pull/34)) by @chaliy
+* chore: remove agent attribution with identity enforcement ([#33](https://github.com/chaliy/llmsim/pull/33)) by @chaliy
+* docs: add README badges for CI, crates.io, and agent friendly ([#32](https://github.com/chaliy/llmsim/pull/32)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.2.3...v0.3.0
 
 ## [0.2.3] - 2026-03-20
 
@@ -106,7 +133,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/chaliy/llmsim/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/chaliy/llmsim/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/chaliy/llmsim/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/chaliy/llmsim/compare/v0.2.0...v0.2.1
