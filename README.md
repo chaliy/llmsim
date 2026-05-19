@@ -166,11 +166,11 @@ available = [
 
 | Family | Models |
 |--------|--------|
-| GPT-5 | gpt-5, gpt-5-mini, gpt-5.1, gpt-5.2, gpt-5-codex |
-| O-Series | o3, o3-mini, o4, o4-mini |
+| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.4, gpt-5.5 |
+| O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1 |
-| Claude | claude-opus, claude-sonnet, claude-haiku (with versions) |
-| Gemini | gemini-pro |
+| Claude | claude-opus, claude-sonnet, claude-haiku (with 4.x versions through Opus 4.7 and Sonnet 4.6) |
+| Gemini | gemini-2.0-flash, gemini-2.5-pro, gemini-3 and gemini-3.1 previews |
 
 ## Latency Profiles
 

@@ -85,6 +85,12 @@ else
     echo_fail "Models endpoint failed: $MODELS"
     exit 1
 fi
+if echo "$MODELS" | grep -q '"id":"gpt-5.5"' && echo "$MODELS" | grep -q '"id":"gemini-3.1-flash-lite"'; then
+    echo_pass "Refreshed model catalog contains latest profiles"
+else
+    echo_fail "Refreshed model catalog is missing expected profiles: $MODELS"
+    exit 1
+fi
 
 # Test 4: Chat completion (non-streaming)
 echo_info "Testing /openai/v1/chat/completions (non-streaming)..."

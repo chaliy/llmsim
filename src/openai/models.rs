@@ -261,6 +261,52 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_created(1770249600) // 2026-02-05
             .with_capabilities(gpt5_capabilities())
             .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new(
+            "gpt-5.3-codex-spark",
+            "GPT-5.3 Codex Spark",
+            "openai",
+            128_000,
+            32_000,
+        )
+        .with_created(1770249600) // 2026-02-05
+        .with_capabilities(gpt5_capabilities())
+        .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new(
+            "gpt-5.3-chat-latest",
+            "GPT-5.3 Chat (latest)",
+            "openai",
+            128_000,
+            16_384,
+        )
+        .with_created(1772496000) // 2026-03-03
+        .with_capabilities(gpt4o_capabilities())
+        .with_knowledge_cutoff("2025-08-31"),
+        // GPT-5.4
+        ModelProfile::new("gpt-5.4", "GPT-5.4", "openai", 1_050_000, 128_000)
+            .with_created(1772668800) // 2026-03-05
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new("gpt-5.4-pro", "GPT-5.4 Pro", "openai", 1_050_000, 128_000)
+            .with_created(1772668800) // 2026-03-05
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new("gpt-5.4-mini", "GPT-5.4 Mini", "openai", 400_000, 128_000)
+            .with_created(1773705600) // 2026-03-17
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        ModelProfile::new("gpt-5.4-nano", "GPT-5.4 Nano", "openai", 400_000, 128_000)
+            .with_created(1773705600) // 2026-03-17
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-08-31"),
+        // GPT-5.5
+        ModelProfile::new("gpt-5.5", "GPT-5.5", "openai", 1_050_000, 128_000)
+            .with_created(1776902400) // 2026-04-23
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-12-01"),
+        ModelProfile::new("gpt-5.5-pro", "GPT-5.5 Pro", "openai", 1_050_000, 128_000)
+            .with_created(1776902400) // 2026-04-23
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2025-12-01"),
     ];
 
     // O-series reasoning models
@@ -384,7 +430,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         )
         .with_created(1771027200) // 2026-02-15
         .with_capabilities(claude_reasoning_capabilities())
-        .with_knowledge_cutoff("2025-10-31"),
+        .with_knowledge_cutoff("2025-08-31"),
         // Claude Opus 4
         ModelProfile::new(
             "claude-opus-4",
@@ -437,7 +483,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             1_000_000,
             128_000,
         )
-        .with_created(1776470400) // 2026-04-15
+        .with_created(1776297600) // 2026-04-16
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2026-01-31"),
         // Claude Haiku 4.5
@@ -482,6 +528,46 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         )
         .with_created(1735689600) // 2025-01
         .with_capabilities(gemini_reasoning_capabilities()),
+        ModelProfile::new(
+            "gemini-3-pro-preview",
+            "Gemini 3 Pro Preview",
+            "google",
+            1_000_000,
+            64_000,
+        )
+        .with_created(1763424000) // 2025-11-18
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-01-31"),
+        ModelProfile::new(
+            "gemini-3-flash-preview",
+            "Gemini 3 Flash Preview",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1765929600) // 2025-12-17
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-01-31"),
+        ModelProfile::new(
+            "gemini-3.1-pro-preview",
+            "Gemini 3.1 Pro Preview",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1771459200) // 2026-02-19
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-01-31"),
+        ModelProfile::new(
+            "gemini-3.1-flash-lite",
+            "Gemini 3.1 Flash Lite",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1778112000) // 2026-05-07
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-01-31"),
     ];
 
     // DeepSeek family
@@ -648,7 +734,7 @@ mod tests {
         assert_eq!(profile.context_window, 1_000_000);
         assert_eq!(profile.max_output_tokens, 64_000);
         assert!(profile.capabilities.reasoning);
-        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-10-31"));
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-08-31"));
     }
 
     #[test]
@@ -659,6 +745,36 @@ mod tests {
         assert_eq!(profile.max_output_tokens, 128_000);
         assert!(profile.capabilities.reasoning);
         assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-08-31"));
+    }
+
+    #[test]
+    fn test_gpt_5_3_codex_spark_profile() {
+        let profile =
+            get_model_profile("gpt-5.3-codex-spark").expect("gpt-5.3-codex-spark should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.context_window, 128_000);
+        assert_eq!(profile.max_output_tokens, 32_000);
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_gpt_5_4_profile() {
+        let profile = get_model_profile("gpt-5.4").expect("gpt-5.4 should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.context_window, 1_050_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-08-31"));
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_gpt_5_5_profile() {
+        let profile = get_model_profile("gpt-5.5").expect("gpt-5.5 should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.context_window, 1_050_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2025-12-01"));
+        assert!(profile.capabilities.reasoning);
     }
 
     #[test]
@@ -692,6 +808,16 @@ mod tests {
         let profile = get_model_profile("gemini-2.5-pro").expect("gemini-2.5-pro should exist");
         assert_eq!(profile.owned_by, "google");
         assert_eq!(profile.context_window, 1_048_576);
+        assert!(profile.capabilities.reasoning);
+    }
+
+    #[test]
+    fn test_gemini_3_1_flash_lite_profile() {
+        let profile =
+            get_model_profile("gemini-3.1-flash-lite").expect("gemini-3.1-flash-lite should exist");
+        assert_eq!(profile.owned_by, "google");
+        assert_eq!(profile.context_window, 1_048_576);
+        assert_eq!(profile.max_output_tokens, 65_536);
         assert!(profile.capabilities.reasoning);
     }
 

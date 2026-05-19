@@ -222,6 +222,14 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-5.2-pro | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.2-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.3-codex | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.3-codex-spark | 128K | 32K | Vision, Reasoning, Tools, JSON |
+| gpt-5.3-chat-latest | 128K | 16K | Vision, Tools, JSON |
+| gpt-5.4 | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.4-pro | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.4-mini | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.4-nano | 400K | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.5 | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.5-pro | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
 
 ### O-Series Reasoning Models
 | Model | Context | Max Output | Capabilities |
@@ -264,6 +272,10 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gemini-2.0-flash | 1M | 8K | Vision, Tools, JSON |
 | gemini-2.5-flash | 1M | 65K | Vision, Tools, JSON |
 | gemini-2.5-pro | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3-pro-preview | 1M | 64K | Vision, Reasoning, Tools, JSON |
+| gemini-3-flash-preview | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.1-pro-preview | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.1-flash-lite | 1M | 65K | Vision, Reasoning, Tools, JSON |
 
 ### DeepSeek Family
 | Model | Context | Max Output | Capabilities |
