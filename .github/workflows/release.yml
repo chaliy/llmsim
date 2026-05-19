@@ -30,14 +30,16 @@ jobs:
 
       - name: Extract version
         id: version
+        env:
+          RELEASE_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             # Manual dispatch: read version from Cargo.toml
             VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
             echo "Source: Cargo.toml (manual dispatch)"
           else
-            # Push trigger: extract version from commit message
-            VERSION=$(echo "${{ github.event.head_commit.message }}" | grep -oP 'prepare v\K[0-9]+\.[0-9]+\.[0-9]+')
+            # Push trigger: validate and extract version from commit message
+            VERSION=$(printf '%s\n' "$RELEASE_COMMIT_MESSAGE" | sed -nE 's/^chore\(release\): prepare v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p')
           fi
 
           if [ -z "$VERSION" ]; then
