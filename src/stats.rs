@@ -11,6 +11,13 @@ use std::time::{Duration, Instant};
 /// Relaxed ordering for stats - we don't need strict ordering guarantees
 const ORDERING: Ordering = Ordering::Relaxed;
 
+/// Maximum bytes kept for a model name in stats.
+const MAX_MODEL_NAME_BYTES: usize = 128;
+/// Maximum number of distinct model keys tracked before aggregating.
+const MAX_TRACKED_MODELS: usize = 128;
+/// Bucket for model names beyond tracking limits.
+const OTHER_MODELS_BUCKET: &str = "__other__";
+
 /// Type of API endpoint being called
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EndpointType {
@@ -137,9 +144,18 @@ impl Stats {
             }
         }
 
-        // Track per-model requests
+        // Track per-model requests with bounded key size/cardinality
         if let Ok(mut map) = self.model_requests.write() {
-            *map.entry(model.to_string()).or_insert(0) += 1;
+            let model_key = normalize_model_name(model);
+            let bucket = if map.contains_key(&model_key)
+                || map.len() < MAX_TRACKED_MODELS
+                || model_key == OTHER_MODELS_BUCKET
+            {
+                model_key
+            } else {
+                OTHER_MODELS_BUCKET.to_string()
+            };
+            *map.entry(bucket).or_insert(0) += 1;
         }
 
         // Add to rolling window
@@ -361,6 +377,23 @@ pub fn new_shared_stats() -> SharedStats {
     Arc::new(Stats::new())
 }
 
+fn normalize_model_name(model: &str) -> String {
+    let trimmed = model.trim();
+    if trimmed.is_empty() {
+        return OTHER_MODELS_BUCKET.to_string();
+    }
+
+    if trimmed.len() <= MAX_MODEL_NAME_BYTES {
+        return trimmed.to_string();
+    }
+
+    let mut end = MAX_MODEL_NAME_BYTES;
+    while !trimmed.is_char_boundary(end) {
+        end -= 1;
+    }
+    trimmed[..end].to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -428,6 +461,39 @@ mod tests {
         let model_counts = stats.model_requests();
         assert_eq!(model_counts.get("gpt-4"), Some(&2));
         assert_eq!(model_counts.get("claude-3"), Some(&1));
+    }
+
+    #[test]
+    fn test_model_requests_cardinality_is_bounded() {
+        let stats = Stats::new();
+
+        for i in 0..(MAX_TRACKED_MODELS + 10) {
+            stats.record_request_start(
+                &format!("attacker-model-{i}"),
+                false,
+                EndpointType::ChatCompletions,
+            );
+        }
+
+        let model_counts = stats.model_requests();
+        assert!(model_counts.len() <= MAX_TRACKED_MODELS + 1);
+        assert!(model_counts.contains_key(OTHER_MODELS_BUCKET));
+        assert_eq!(
+            model_counts.values().sum::<u64>(),
+            (MAX_TRACKED_MODELS + 10) as u64
+        );
+    }
+
+    #[test]
+    fn test_model_name_is_truncated() {
+        let stats = Stats::new();
+        let long_name = "a".repeat(MAX_MODEL_NAME_BYTES + 64);
+
+        stats.record_request_start(&long_name, false, EndpointType::ChatCompletions);
+
+        let model_counts = stats.model_requests();
+        let stored = model_counts.keys().next().expect("model key should exist");
+        assert!(stored.len() <= MAX_MODEL_NAME_BYTES);
     }
 
     #[test]
