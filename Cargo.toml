@@ -24,7 +24,7 @@ tui = ["dep:crossterm", "dep:ratatui", "tokio/io-util"]
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.49", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
 
 # HTTP framework
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"] }
@@ -46,7 +46,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
 
 # CLI
-clap = { version = "4.5", features = ["derive", "env"] }
+clap = { version = "4.6", features = ["derive", "env"] }
 
 # Utilities
 futures-core = "0.3"
