@@ -158,7 +158,7 @@ mod config_tests {
     fn test_default_config() {
         let config = Config::default();
         assert_eq!(config.server.port, 8080);
-        assert_eq!(config.server.host, "0.0.0.0");
+        assert_eq!(config.server.host, "127.0.0.1");
         assert_eq!(config.response.generator, "lorem");
         assert_eq!(config.response.target_tokens, 100);
     }

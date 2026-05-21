@@ -102,7 +102,7 @@ fn default_port() -> u16 {
 }
 
 fn default_host() -> String {
-    "0.0.0.0".to_string()
+    "127.0.0.1".to_string()
 }
 
 fn default_max_websocket_connections() -> u64 {
@@ -284,7 +284,7 @@ mod tests {
     fn test_default_config() {
         let config = Config::default();
         assert_eq!(config.server.port, 8080);
-        assert_eq!(config.server.host, "0.0.0.0");
+        assert_eq!(config.server.host, "127.0.0.1");
         assert_eq!(config.response.generator, "lorem");
         assert_eq!(config.response.target_tokens, 100);
     }

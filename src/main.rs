@@ -35,7 +35,7 @@ enum Commands {
         port: u16,
 
         /// Host to bind to
-        #[arg(long, default_value = "0.0.0.0")]
+        #[arg(long, default_value = "127.0.0.1")]
         host: String,
 
         /// Response generator (lorem, echo, random, fixed:text)

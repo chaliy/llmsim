@@ -18,7 +18,10 @@ use axum::{
 };
 use std::{net::SocketAddr, sync::Arc};
 use tokio::signal;
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
+use tower_http::{
+    cors::{Any, CorsLayer},
+    trace::TraceLayer,
+};
 
 /// Build the Axum router with all endpoints.
 /// Exposed for integration testing.
@@ -43,7 +46,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(handlers::create_openresponses_response),
         )
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
+        .layer(
+            CorsLayer::new()
+                .allow_methods([axum::http::Method::GET, axum::http::Method::POST])
+                .allow_headers(Any),
+        )
         .with_state(state)
 }
 

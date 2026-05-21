@@ -6,7 +6,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - LLMSIM_HOST=0.0.0.0
+      - LLMSIM_HOST=127.0.0.1
       - LLMSIM_PORT=8080
       - LLMSIM_LATENCY_PROFILE=gpt4
       - LLMSIM_GENERATOR=lorem

@@ -52,7 +52,7 @@ RUN useradd -m -s /bin/bash llmsim
 USER llmsim
 
 # Default configuration
-ENV LLMSIM_HOST=0.0.0.0
+ENV LLMSIM_HOST=127.0.0.1
 ENV LLMSIM_PORT=8080
 
 EXPOSE 8080
