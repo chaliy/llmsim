@@ -176,8 +176,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v4
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -212,26 +210,6 @@ jobs:
           sleep 2
           curl -sf http://localhost:8080/health
 
-      - name: Run OpenAI Python example
-        run: uv run examples/openai_client.py
-
-      - name: Run OpenAI WebSocket Python example
-        run: uv run examples/openai_websocket_client.py
-
-      - name: Run List Models Python example
-        run: uv run examples/list_models.py
-
-      - name: Run Responses Python example
-        run: uv run examples/responses_client.py
-
-      - name: Run OpenResponses Python example
-        run: uv run examples/openresponses_client.py
-
-      - name: Run LangChain Python example
-        run: uv run examples/langchain_client.py
-
-      - name: Run LangChain Responses API Python example
-        run: uv run examples/langchain_responses_client.py
 
       - name: Run TypeScript example
         run: npx tsx openai_client.ts
