@@ -156,8 +156,16 @@ impl StatsEndpoint {
             return Err("TUI server URL is missing a host".to_string());
         }
 
+        if contains_invalid_request_chars(authority) {
+            return Err("TUI server URL contains invalid host characters".to_string());
+        }
+
         if path_prefix.contains('?') || path_prefix.contains('#') {
             return Err("TUI server URL must not include query or fragment components".to_string());
+        }
+
+        if contains_invalid_request_chars(path_prefix) {
+            return Err("TUI server URL contains invalid path characters".to_string());
         }
 
         let connect_addr = if authority.starts_with('[') {
@@ -186,6 +194,12 @@ impl StatsEndpoint {
             path,
         })
     }
+}
+
+fn contains_invalid_request_chars(value: &str) -> bool {
+    value
+        .chars()
+        .any(|c| c.is_ascii_control() || c == ' ' || !c.is_ascii())
 }
 
 /// Run the TUI dashboard
@@ -250,4 +264,27 @@ pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
     terminal.show_cursor()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StatsEndpoint;
+
+    #[test]
+    fn parse_rejects_crlf_in_host() {
+        let err = match StatsEndpoint::parse("http://localhost\r\nX-Test: 1") {
+            Ok(_) => panic!("host containing CRLF should be rejected"),
+            Err(err) => err,
+        };
+        assert!(err.contains("invalid host characters"));
+    }
+
+    #[test]
+    fn parse_rejects_crlf_in_path_prefix() {
+        let err = match StatsEndpoint::parse("http://localhost/base\r\nX-Test: 1") {
+            Ok(_) => panic!("path containing CRLF should be rejected"),
+            Err(err) => err,
+        };
+        assert!(err.contains("invalid path characters"));
+    }
 }
