@@ -234,12 +234,17 @@ impl Stats {
         }
     }
 
-    /// Record a new WebSocket connection being opened
-    pub fn record_ws_connect(&self) {
-        self.active_websocket_connections.fetch_add(1, ORDERING);
+    /// Try to reserve capacity for a new WebSocket connection.
+    /// Returns true if a slot was successfully reserved, false if the cap is already reached.
+    pub fn try_reserve_ws_connection(&self, max_connections: u64) -> bool {
+        self.active_websocket_connections
+            .fetch_update(ORDERING, ORDERING, |current| {
+                (current < max_connections).then_some(current + 1)
+            })
+            .is_ok()
     }
 
-    /// Record a WebSocket connection being closed
+    /// Release a previously reserved/open WebSocket connection slot.
     pub fn record_ws_disconnect(&self) {
         self.active_websocket_connections.fetch_sub(1, ORDERING);
     }

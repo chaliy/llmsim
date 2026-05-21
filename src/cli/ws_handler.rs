@@ -20,13 +20,13 @@ const MAX_CONNECTION_DURATION: Duration = Duration::from_secs(60 * 60);
 
 /// GET /openai/v1/responses (WebSocket upgrade)
 pub async fn ws_responses(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> Response {
-    let active_connections = state
-        .stats
-        .active_websocket_connections
-        .load(std::sync::atomic::Ordering::Relaxed);
     let max_connections = state.config.server.max_websocket_connections;
 
-    if active_connections >= max_connections {
+    if !state.stats.try_reserve_ws_connection(max_connections) {
+        let active_connections = state
+            .stats
+            .active_websocket_connections
+            .load(std::sync::atomic::Ordering::Relaxed);
         tracing::warn!(
             active_connections,
             max_connections,
@@ -40,14 +40,20 @@ pub async fn ws_responses(ws: WebSocketUpgrade, State(state): State<Arc<AppState
     }
 
     tracing::info!("WebSocket connection upgrade request");
-    ws.on_upgrade(move |socket| handle_ws_connection(socket, state))
+    ws.on_failed_upgrade({
+        let state = Arc::clone(&state);
+        move |error| {
+            state.stats.record_ws_disconnect();
+            tracing::warn!("WebSocket upgrade failed: {}", error);
+        }
+    })
+    .on_upgrade(move |socket| handle_ws_connection(socket, state))
 }
 
 /// Handle a single WebSocket connection lifecycle.
 async fn handle_ws_connection(mut socket: WebSocket, state: Arc<AppState>) {
     let connection_start = Instant::now();
 
-    state.stats.record_ws_connect();
     tracing::info!("WebSocket connection established");
 
     // Connection-local cache: the most recent completed response
