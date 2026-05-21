@@ -92,6 +92,9 @@ pub struct ServerConfig {
     pub port: u16,
     #[serde(default = "default_host")]
     pub host: String,
+    /// Maximum number of active WebSocket connections allowed
+    #[serde(default = "default_max_websocket_connections")]
+    pub max_websocket_connections: u64,
 }
 
 fn default_port() -> u16 {
@@ -102,11 +105,16 @@ fn default_host() -> String {
     "0.0.0.0".to_string()
 }
 
+fn default_max_websocket_connections() -> u64 {
+    100
+}
+
 impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             port: default_port(),
             host: default_host(),
+            max_websocket_connections: default_max_websocket_connections(),
         }
     }
 }
