@@ -10,9 +10,9 @@ jobs:
   release:
     runs-on: ubuntu-latest
     # On push: only run if commit message matches release pattern
-    # On workflow_dispatch: always run (version read from Cargo.toml)
+    # On workflow_dispatch: only run from main (version read from Cargo.toml)
     if: >-
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       startsWith(github.event.head_commit.message, 'chore(release): prepare v')
     outputs:
       version: ${{ steps.version.outputs.version }}
