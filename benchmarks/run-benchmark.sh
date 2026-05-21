@@ -141,8 +141,8 @@ if [ "$START_SERVER" = true ]; then
         CONFIG_FILE="$SCRIPT_DIR/config/benchmark.toml"
     fi
 
-    log_info "Starting llmsim server on port $PORT (config: $(basename $CONFIG_FILE))..."
-    "$PROJECT_ROOT/target/release/llmsim" serve --port $PORT --config "$CONFIG_FILE" &
+    log_info "Starting llmsim server on 127.0.0.1:$PORT (config: $(basename $CONFIG_FILE))..."
+    "$PROJECT_ROOT/target/release/llmsim" serve --host 127.0.0.1 --port $PORT --config "$CONFIG_FILE" &
     LLMSIM_PID=$!
 
     # Wait for server to start
