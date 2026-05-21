@@ -39,7 +39,7 @@ jobs:
             echo "Source: Cargo.toml (manual dispatch)"
           else
             # Push trigger: validate and extract version from commit message
-            VERSION=$(printf '%s\n' "$RELEASE_COMMIT_MESSAGE" | sed -nE 's/^chore\(release\): prepare v([0-9]+\.[0-9]+\.[0-9]+)$/\1/p')
+            VERSION=$(printf '%s\n' "$RELEASE_COMMIT_MESSAGE" | sed -nE 's/^chore\(release\): prepare v([0-9]+\.[0-9]+\.[0-9]+)( \(#[0-9]+\))?$/\1/p')
           fi
 
           if [ -z "$VERSION" ]; then
