@@ -15,6 +15,29 @@ use tokio::time::sleep;
 /// Type alias for on-complete callback
 type OnCompleteCallback = Box<dyn FnOnce() + Send>;
 
+/// Ensures completion callback runs exactly once, including when stream is dropped early.
+struct CompletionGuard {
+    callback: Option<OnCompleteCallback>,
+}
+
+impl CompletionGuard {
+    fn new(callback: Option<OnCompleteCallback>) -> Self {
+        Self { callback }
+    }
+
+    fn complete(&mut self) {
+        if let Some(callback) = self.callback.take() {
+            callback();
+        }
+    }
+}
+
+impl Drop for CompletionGuard {
+    fn drop(&mut self) {
+        self.complete();
+    }
+}
+
 /// A streaming response for the Responses API
 pub struct ResponsesTokenStream {
     /// The response ID
@@ -107,6 +130,8 @@ impl ResponsesTokenStream {
         let on_complete = self.on_complete;
 
         Box::pin(stream! {
+            let mut completion_guard = CompletionGuard::new(on_complete);
+
             // Global sequence number — incremented for every event
             let mut seq: u32 = 0;
 
@@ -295,9 +320,7 @@ impl ResponsesTokenStream {
             yield ResponsesStreamEvent::response_completed(final_response, seq);
 
             // Invoke completion callback
-            if let Some(callback) = on_complete {
-                callback();
-            }
+            completion_guard.complete();
         })
     }
 }
@@ -377,6 +400,10 @@ impl ResponsesTokenStreamBuilder {
 mod tests {
     use super::*;
     use futures_util::StreamExt;
+    use std::sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    };
 
     #[tokio::test]
     async fn test_responses_stream_basic() {
@@ -685,5 +712,44 @@ mod tests {
                 i, seq
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_on_complete_called_on_drop() {
+        let callback_count = Arc::new(AtomicUsize::new(0));
+        let callback_count_clone = Arc::clone(&callback_count);
+
+        let stream = ResponsesTokenStreamBuilder::new("gpt-5", "Hello world")
+            .latency(LatencyProfile::instant())
+            .on_complete(move || {
+                callback_count_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .build();
+
+        let mut stream = stream.into_stream();
+
+        // Consume one event, then drop the stream early.
+        assert!(stream.next().await.is_some());
+        drop(stream);
+
+        assert_eq!(callback_count.load(Ordering::SeqCst), 1);
+    }
+
+    #[tokio::test]
+    async fn test_responses_stream_on_complete_called_once() {
+        let callback_count = Arc::new(AtomicUsize::new(0));
+        let callback_count_clone = Arc::clone(&callback_count);
+
+        let stream = ResponsesTokenStreamBuilder::new("gpt-5", "Hello world")
+            .latency(LatencyProfile::instant())
+            .on_complete(move || {
+                callback_count_clone.fetch_add(1, Ordering::SeqCst);
+            })
+            .build();
+
+        // Fully consume stream (normal completion path).
+        let _: Vec<String> = stream.into_stream().collect().await;
+
+        assert_eq!(callback_count.load(Ordering::SeqCst), 1);
     }
 }
