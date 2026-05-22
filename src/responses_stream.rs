@@ -399,11 +399,11 @@ impl ResponsesTokenStreamBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use futures_util::StreamExt;
     use std::sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     };
-    use futures_util::StreamExt;
 
     #[tokio::test]
     async fn test_responses_stream_basic() {
