@@ -117,6 +117,26 @@ Using `llmsim serve` allows for future expansion:
 - `llmsim mock` (future) - Run with mock configuration
 - `llmsim record` (future) - Proxy and record real API calls
 
+### Operational Defaults
+
+llmsim is a local development and load-testing tool, and its defaults
+are tuned for that use case rather than for hardened production deployment:
+
+- **Bind host**: defaults to `0.0.0.0` so the server is reachable from
+  containers (Docker/Compose), other hosts on a LAN, and load generators
+  running on a different machine without any extra configuration. Operators
+  who want a hardened posture can opt in via `LLMSIM_HOST=127.0.0.1` or
+  `--host 127.0.0.1`.
+- **CORS**: defaults to permissive so example browser clients and ad-hoc
+  fetches just work. Operators exposing llmsim outside trusted networks
+  should front it with an authenticating proxy rather than relying on
+  CORS as a security boundary.
+
+The project deliberately does not flip these defaults to "secure-by-default"
+values, because that would break the primary local-dev/benchmark workflows
+and shift effort onto every user. Hardening is opt-in, documented, and
+supported through configuration knobs (env vars, CLI flags, `config.toml`).
+
 ## API Endpoints
 
 Provider-specific endpoints mirror their original API paths, prefixed with the provider name.
