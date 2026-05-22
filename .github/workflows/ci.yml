@@ -176,7 +176,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.95.0
 
-
       - name: Cache cargo registry
         uses: actions/cache@v4
         with:
@@ -209,7 +208,6 @@ jobs:
           ./target/release/llmsim serve --port 8080 &
           sleep 2
           curl -sf http://localhost:8080/health
-
 
       - name: Run TypeScript example
         run: npx tsx openai_client.ts
