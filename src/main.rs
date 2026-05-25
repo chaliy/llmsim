@@ -35,8 +35,8 @@ enum Commands {
         port: u16,
 
         /// Host to bind to
-        #[arg(long, default_value = "0.0.0.0")]
-        host: String,
+        #[arg(long, env = "LLMSIM_HOST")]
+        host: Option<String>,
 
         /// Response generator (lorem, echo, random, fixed:text)
         #[arg(long, default_value = "lorem")]
@@ -57,7 +57,7 @@ enum Commands {
 fn build_config(
     config_file: Option<String>,
     port: u16,
-    host: String,
+    host: Option<String>,
     generator: String,
     target_tokens: usize,
 ) -> Result<Config, ConfigError> {
@@ -69,7 +69,9 @@ fn build_config(
 
     // Override with CLI arguments
     config.server.port = port;
-    config.server.host = host;
+    if let Some(host) = host {
+        config.server.host = host;
+    }
     config.response.generator = generator;
     config.response.target_tokens = target_tokens;
 
