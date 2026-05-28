@@ -141,7 +141,7 @@ pub enum ScriptError {
 ///
 /// The cursor advances on every `next_turn()` call; concurrent requests
 /// are serialised via an atomic counter so a 2-turn script driven by a
-/// 2-request agent yields turn[0] then turn[1] regardless of which
+/// 2-request agent yields `turn[0]` then `turn[1]` regardless of which
 /// task lands first.
 #[derive(Debug)]
 pub struct Script {
