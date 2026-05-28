@@ -7,17 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.4.0] - 2026-05-28
 
-- **Scripted response mode** for agent scenario tests. Point
-  `response.script_path` at a JSON file describing an ordered list of
-  assistant turns (plain text, tool calls, mixed, errors). llmsim
-  replays the script across requests with a configurable
-  `on_exhausted` policy (`repeat_last`, `error`, `loop`). Full
-  support for OpenAI Chat Completions (streaming + non-streaming,
-  including tool-call deltas); non-streaming support for the OpenAI
-  Responses API (function_call output items). See
-  `specs/scripted-mode.md` and `examples/scripted_demo.*`.
+### Highlights
+
+- **Scripted response mode** for agent scenario tests — replay an ordered
+  list of assistant turns (text, tool calls, mixed, errors) with a
+  configurable `on_exhausted` policy. See `specs/scripted-mode.md`.
+- CLI now honors `LLMSIM_HOST` and preserves the host configured in the
+  config file when not overridden on the command line.
+- Hardening across the streaming and WebSocket paths: stats callback
+  now finalizes on stream drop, WebSocket capacity is reserved before
+  upgrade, and a connection cap protects against runaway clients.
+- Security and reliability hardening in CI release/publish workflows
+  (commit-message injection, tag validation, action tampering) and
+  per-model stats tracking is bounded to prevent memory DoS.
+
+### What's Changed
+
+* docs(examples): add Rust scripted-mode example and CI smoke-test ([#61](https://github.com/chaliy/llmsim/pull/61)) by @chaliy
+* feat(script): add scripted response mode for agent scenario tests ([#60](https://github.com/chaliy/llmsim/pull/60)) by @chaliy
+* fix(cli): honor LLMSIM_HOST and preserve config host ([#59](https://github.com/chaliy/llmsim/pull/59)) by @chaliy
+* docs(specs): document operational defaults policy ([#58](https://github.com/chaliy/llmsim/pull/58)) by @chaliy
+* fix(ci): remove unpinned Python example execution from CI ([#56](https://github.com/chaliy/llmsim/pull/56)) by @chaliy
+* fix(benchmarks): bind local benchmark server to loopback ([#55](https://github.com/chaliy/llmsim/pull/55)) by @chaliy
+* fix(responses): finalize stats callback on stream drop ([#54](https://github.com/chaliy/llmsim/pull/54)) by @chaliy
+* fix(ws): reserve websocket capacity before upgrade ([#53](https://github.com/chaliy/llmsim/pull/53)) by @chaliy
+* fix(tui): reject invalid chars in stats endpoint URL ([#52](https://github.com/chaliy/llmsim/pull/52)) by @chaliy
+* fix(ci): restrict publish paths to release-tagged flows ([#51](https://github.com/chaliy/llmsim/pull/51)) by @chaliy
+* fix(stats): bound per-model request tracking to prevent memory DoS ([#50](https://github.com/chaliy/llmsim/pull/50)) by @chaliy
+* fix(ci): harden crates publish job against action tampering ([#49](https://github.com/chaliy/llmsim/pull/49)) by @chaliy
+* fix(ci): prevent release workflow commit message injection ([#48](https://github.com/chaliy/llmsim/pull/48)) by @chaliy
+* fix(ci): validate release tag safely in publish workflow ([#46](https://github.com/chaliy/llmsim/pull/46)) by @chaliy
+* fix(ws): enforce websocket connection cap ([#45](https://github.com/chaliy/llmsim/pull/45)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.3.0...v0.4.0
 
 ## [0.3.0] - 2026-05-19
 
@@ -145,7 +169,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/chaliy/llmsim/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/chaliy/llmsim/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/chaliy/llmsim/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/chaliy/llmsim/compare/v0.2.1...v0.2.2
