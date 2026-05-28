@@ -1,0 +1,38 @@
+{
+  "on_exhausted": "error",
+  "turns": [
+    {
+      "type": "tool_calls",
+      "calls": [
+        {
+          "name": "bash",
+          "arguments": { "command": "echo hello > /tmp/x.txt" }
+        }
+      ]
+    },
+    {
+      "type": "tool_calls",
+      "calls": [
+        {
+          "name": "bash",
+          "arguments": { "command": "sed -i s/hello/world/ /tmp/x.txt" }
+        }
+      ]
+    },
+    {
+      "type": "mixed",
+      "text": "All done — file now contains 'world'.",
+      "calls": [
+        {
+          "name": "bash",
+          "arguments": { "command": "cat /tmp/x.txt" },
+          "id": "call_verify"
+        }
+      ]
+    },
+    {
+      "type": "assistant",
+      "text": "done"
+    }
+  ]
+}
