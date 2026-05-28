@@ -200,6 +200,9 @@ jobs:
       - name: Run Rust example (responses)
         run: cargo run --example responses_usage
 
+      - name: Run Rust example (scripted)
+        run: cargo run --example scripted_demo
+
       - name: Build server
         run: cargo build --release
 
@@ -212,3 +215,49 @@ jobs:
       - name: Run TypeScript example
         run: npx tsx openai_client.ts
         working-directory: examples/node
+
+      - name: Smoke-test scripted server (examples/scripted_demo.json)
+        run: |
+          set -euo pipefail
+          ./target/release/llmsim serve \
+            --config examples/scripted_demo.toml \
+            --port 8090 &
+          SCRIPTED_PID=$!
+          trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT
+          sleep 2
+          curl -sf http://localhost:8090/health > /dev/null
+
+          # Turn 0: tool_calls(bash echo hello)
+          R0=$(curl -sf -X POST http://localhost:8090/openai/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"gpt-5","messages":[{"role":"user","content":"go"}]}')
+          echo "turn 0: $R0"
+          echo "$R0" | grep -q '"finish_reason":"tool_calls"'
+          echo "$R0" | grep -q '"name":"bash"'
+
+          # Turn 1: tool_calls(bash sed)
+          R1=$(curl -sf -X POST http://localhost:8090/openai/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"gpt-5","messages":[{"role":"user","content":"go"}]}')
+          echo "$R1" | grep -q '"finish_reason":"tool_calls"'
+
+          # Turn 2: mixed (streaming, should include tool_calls delta + DONE)
+          R2=$(curl -sN -X POST http://localhost:8090/openai/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"gpt-5","messages":[{"role":"user","content":"go"}],"stream":true}')
+          echo "$R2" | grep -q '"finish_reason":"tool_calls"'
+          echo "$R2" | grep -q '\[DONE\]'
+
+          # Turn 3: plain assistant "done"
+          R3=$(curl -sf -X POST http://localhost:8090/openai/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"gpt-5","messages":[{"role":"user","content":"go"}]}')
+          echo "$R3" | grep -q '"content":"done"'
+
+          # Turn 4: on_exhausted=error → HTTP 500
+          STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
+            http://localhost:8090/openai/v1/chat/completions \
+            -H 'Content-Type: application/json' \
+            -d '{"model":"gpt-5","messages":[{"role":"user","content":"go"}]}')
+          test "$STATUS" = "500"
+          echo "Scripted server smoke test OK"
