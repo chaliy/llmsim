@@ -2,18 +2,21 @@
 // Implements OpenAI-compatible and OpenResponses-compatible API endpoints.
 
 use super::state::AppState;
+use crate::ids::{prefixed_id, unix_timestamp};
 use crate::{
     create_generator,
     openai::{
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
-        MessageContent, Model, ModelsResponse, OutputTokensDetails, ReasoningConfig,
-        ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
-        ResponsesUsage, Usage,
+        MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem, OutputRole,
+        OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
+        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
     },
     openresponses::{
         self, OpenResponsesStreamBuilder, Response as OpenResponsesResponse, ResponseRequest,
         Usage as OpenResponsesUsage,
     },
+    script::{ScriptedResponse, SimError, SimTurn},
+    script_stream::{build_chat_completion_response, materialize_tool_calls, ScriptedChatStream},
     EndpointType, ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
 };
 use axum::{
@@ -66,32 +69,52 @@ pub(crate) fn generate_responses_result(
     // Extract text from input
     let input_text = extract_input_text(params.input, params.instructions);
 
-    // Create a minimal ChatCompletionRequest for the generator
-    let chat_request = crate::openai::ChatCompletionRequest {
-        model: params.model.to_string(),
-        messages: vec![crate::openai::Message::user(&input_text)],
-        temperature: params.temperature,
-        top_p: params.top_p,
-        n: None,
-        stream: false,
-        stop: None,
-        max_tokens: params.max_output_tokens,
-        max_completion_tokens: params.max_output_tokens,
-        presence_penalty: None,
-        frequency_penalty: None,
-        logit_bias: None,
-        user: None,
-        tools: None,
-        tool_choice: None,
-        response_format: None,
-        seed: None,
-    };
+    // Scripted mode: take the next turn and reduce it to a text body.
+    // (Tool calls in streaming Responses API aren't implemented in v1;
+    // see specs/scripted-mode.md.)
+    let content = if let Some(script) = state.script.as_ref() {
+        match script.next_turn() {
+            ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,
+            ScriptedResponse::Turn(SimTurn::Mixed { text, .. }) => text,
+            ScriptedResponse::Turn(SimTurn::ToolCalls { .. }) => String::new(),
+            ScriptedResponse::Turn(SimTurn::Error(err)) => {
+                // Surface the error as the response text in this code
+                // path; streaming Responses API doesn't have a clean
+                // way to abort mid-stream from this helper. Callers
+                // who need error semantics on this endpoint should use
+                // non-streaming requests.
+                format!("[llmsim scripted error: {}]", err.message())
+            }
+            ScriptedResponse::Exhausted => "[llmsim script exhausted]".to_string(),
+        }
+    } else {
+        // Create a minimal ChatCompletionRequest for the generator
+        let chat_request = crate::openai::ChatCompletionRequest {
+            model: params.model.to_string(),
+            messages: vec![crate::openai::Message::user(&input_text)],
+            temperature: params.temperature,
+            top_p: params.top_p,
+            n: None,
+            stream: false,
+            stop: None,
+            max_tokens: params.max_output_tokens,
+            max_completion_tokens: params.max_output_tokens,
+            presence_penalty: None,
+            frequency_penalty: None,
+            logit_bias: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+        };
 
-    let generator = create_generator(
-        &state.config.response.generator,
-        state.config.response.target_tokens,
-    );
-    let content = generator.generate(&chat_request);
+        let generator = create_generator(
+            &state.config.response.generator,
+            state.config.response.target_tokens,
+        );
+        generator.generate(&chat_request)
+    };
 
     // Count tokens
     let input_tokens =
@@ -193,6 +216,12 @@ pub async fn chat_completions(
             LatencyProfile::from_model(&request.model)
         };
 
+    // Scripted mode short-circuits the generator.
+    if let Some(script) = state.script.clone() {
+        return handle_scripted_chat_completions(state, request, request_start, latency, script)
+            .await;
+    }
+
     // Generate response
     let generator = create_generator(
         &state.config.response.generator,
@@ -251,6 +280,255 @@ pub async fn chat_completions(
         let response = ChatCompletionResponse::new(request.model.clone(), content, usage);
         Ok(Json(response).into_response())
     }
+}
+
+/// Drive the chat completions handler from the configured script.
+async fn handle_scripted_chat_completions(
+    state: Arc<AppState>,
+    request: ChatCompletionRequest,
+    request_start: Instant,
+    latency: LatencyProfile,
+    script: Arc<crate::script::Script>,
+) -> Result<Response, AppError> {
+    let turn_index = script.cursor();
+    let next = script.next_turn();
+
+    let turn = match next {
+        ScriptedResponse::Turn(t) => t,
+        ScriptedResponse::Exhausted => {
+            state.stats.record_error(500);
+            return Ok(sim_error_to_response(&SimError::Other {
+                message: "llmsim script exhausted (on_exhausted=error)".to_string(),
+                status_code: Some(500),
+            }));
+        }
+    };
+
+    let (text, tool_calls) = match turn {
+        SimTurn::Assistant { text } => (Some(text), Vec::new()),
+        SimTurn::ToolCalls { calls } => (None, calls),
+        SimTurn::Mixed { text, calls } => (Some(text), calls),
+        SimTurn::Error(err) => {
+            state.stats.record_error(err.status_code());
+            return Ok(sim_error_to_response(&err));
+        }
+    };
+
+    let prompt_tokens = count_request_tokens(&request);
+    let text_for_usage = text.clone().unwrap_or_default();
+    let completion_tokens = crate::count_tokens_default(&text_for_usage)
+        .unwrap_or(text_for_usage.split_whitespace().count());
+    let usage = Usage {
+        prompt_tokens: prompt_tokens as u32,
+        completion_tokens: completion_tokens as u32,
+        total_tokens: (prompt_tokens + completion_tokens) as u32,
+    };
+
+    let wire_calls = materialize_tool_calls(turn_index, &tool_calls);
+
+    if request.stream {
+        let stats = state.stats.clone();
+        let prompt_tok = usage.prompt_tokens;
+        let completion_tok = usage.completion_tokens;
+
+        let stream = ScriptedChatStream::new(
+            &request.model,
+            text.unwrap_or_default(),
+            tool_calls,
+            latency,
+        )
+        .with_usage(usage)
+        .with_on_complete(move || {
+            stats.record_request_end(request_start.elapsed(), prompt_tok, completion_tok);
+        });
+
+        let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header(header::CONNECTION, "keep-alive")
+            .body(body)
+            .unwrap())
+    } else {
+        let delay = latency.sample_ttft();
+        if !delay.is_zero() {
+            tokio::time::sleep(delay).await;
+        }
+        state.stats.record_request_end(
+            request_start.elapsed(),
+            usage.prompt_tokens,
+            usage.completion_tokens,
+        );
+        let resp = build_chat_completion_response(request.model.clone(), text, wire_calls, usage);
+        Ok(Json(resp).into_response())
+    }
+}
+
+/// Non-streaming scripted Responses API. Produces `OutputItem`s that
+/// match the OpenAI wire shape: a `message` item for text and one
+/// `function_call` item per scripted tool call.
+async fn handle_scripted_responses_api(
+    state: Arc<AppState>,
+    request: ResponsesRequest,
+    request_start: Instant,
+    script: Arc<crate::script::Script>,
+) -> Response {
+    let turn_index = script.cursor();
+    let next = script.next_turn();
+
+    let turn = match next {
+        ScriptedResponse::Turn(t) => t,
+        ScriptedResponse::Exhausted => {
+            state.stats.record_error(500);
+            return sim_error_to_responses_api_response(&SimError::Other {
+                message: "llmsim script exhausted (on_exhausted=error)".to_string(),
+                status_code: Some(500),
+            });
+        }
+    };
+
+    let (text, tool_calls) = match turn {
+        SimTurn::Assistant { text } => (Some(text), Vec::new()),
+        SimTurn::ToolCalls { calls } => (None, calls),
+        SimTurn::Mixed { text, calls } => (Some(text), calls),
+        SimTurn::Error(err) => {
+            state.stats.record_error(err.status_code());
+            return sim_error_to_responses_api_response(&err);
+        }
+    };
+
+    let input_text = extract_input_text(&request.input, &request.instructions);
+    let input_tokens =
+        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
+    let text_for_usage = text.clone().unwrap_or_default();
+    let output_text_tokens = crate::count_tokens_default(&text_for_usage)
+        .unwrap_or(text_for_usage.split_whitespace().count());
+    let tool_call_tokens: usize = tool_calls
+        .iter()
+        .map(|c| {
+            let args = serde_json::to_string(&c.arguments).unwrap_or_default();
+            crate::count_tokens_default(&args).unwrap_or(args.split_whitespace().count())
+                + c.name.split_whitespace().count()
+        })
+        .sum();
+    let output_tokens = output_text_tokens + tool_call_tokens;
+
+    let usage = ResponsesUsage {
+        input_tokens: input_tokens as u32,
+        output_tokens: output_tokens as u32,
+        total_tokens: (input_tokens + output_tokens) as u32,
+        output_tokens_details: Some(OutputTokensDetails {
+            reasoning_tokens: 0,
+        }),
+    };
+
+    let mut output: Vec<OutputItem> = Vec::new();
+    let output_text_value: Option<String> = text.clone();
+    if let Some(t) = text {
+        output.push(OutputItem::Message {
+            id: prefixed_id("msg_"),
+            role: OutputRole::Assistant,
+            status: crate::openai::ItemStatus::Completed,
+            content: vec![OutputContentPart::OutputText {
+                text: t,
+                annotations: vec![],
+            }],
+        });
+    }
+    for (i, call) in tool_calls.iter().enumerate() {
+        let call_id = call
+            .id
+            .clone()
+            .unwrap_or_else(|| crate::script::auto_tool_call_id(turn_index, i));
+        let args = serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string());
+        output.push(OutputItem::FunctionCall {
+            id: prefixed_id("fc_"),
+            call_id,
+            name: call.name.clone(),
+            arguments: args,
+            status: crate::openai::ItemStatus::Completed,
+        });
+    }
+
+    state.stats.record_request_end(
+        request_start.elapsed(),
+        usage.input_tokens,
+        usage.output_tokens,
+    );
+
+    let resp = ResponsesResponse {
+        id: prefixed_id("resp_"),
+        object: "response".to_string(),
+        created_at: unix_timestamp(),
+        model: request.model,
+        status: ResponseStatus::Completed,
+        output,
+        output_text: output_text_value,
+        usage: Some(usage),
+        error: None,
+        metadata: None,
+    };
+
+    Json(resp).into_response()
+}
+
+/// Build an OpenAI Responses-API-shaped error response for a SimError.
+fn sim_error_to_responses_api_response(err: &SimError) -> Response {
+    let status = match err.status_code() {
+        429 => StatusCode::TOO_MANY_REQUESTS,
+        500 => StatusCode::INTERNAL_SERVER_ERROR,
+        503 => StatusCode::SERVICE_UNAVAILABLE,
+        504 => StatusCode::GATEWAY_TIMEOUT,
+        400 => StatusCode::BAD_REQUEST,
+        401 => StatusCode::UNAUTHORIZED,
+        502 => StatusCode::BAD_GATEWAY,
+        other => StatusCode::from_u16(other).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+    let body = ResponsesErrorResponse {
+        error: crate::openai::ResponsesError::new(err.error_type(), err.message()),
+    };
+    let mut response = Json(body).into_response();
+    *response.status_mut() = status;
+    response
+}
+
+/// OpenResponses-shaped error response for a scripted SimError.
+fn sim_error_to_openresponses_response(err: &SimError) -> Response {
+    let status = match err.status_code() {
+        429 => StatusCode::TOO_MANY_REQUESTS,
+        500 => StatusCode::INTERNAL_SERVER_ERROR,
+        503 => StatusCode::SERVICE_UNAVAILABLE,
+        504 => StatusCode::GATEWAY_TIMEOUT,
+        400 => StatusCode::BAD_REQUEST,
+        401 => StatusCode::UNAUTHORIZED,
+        502 => StatusCode::BAD_GATEWAY,
+        other => StatusCode::from_u16(other).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+    let body = openresponses::ErrorResponse::new(err.message(), err.error_type());
+    let mut response = Json(body).into_response();
+    *response.status_mut() = status;
+    response
+}
+
+/// Render a `SimError` from the script as an HTTP response (matches
+/// the existing error-injection wire format).
+fn sim_error_to_response(err: &SimError) -> Response {
+    let status = match err.status_code() {
+        429 => StatusCode::TOO_MANY_REQUESTS,
+        500 => StatusCode::INTERNAL_SERVER_ERROR,
+        503 => StatusCode::SERVICE_UNAVAILABLE,
+        504 => StatusCode::GATEWAY_TIMEOUT,
+        400 => StatusCode::BAD_REQUEST,
+        401 => StatusCode::UNAUTHORIZED,
+        502 => StatusCode::BAD_GATEWAY,
+        other => StatusCode::from_u16(other).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR),
+    };
+
+    let body = ErrorResponse::new(err.message(), err.error_type());
+    let mut response = Json(body).into_response();
+    *response.status_mut() = status;
+    response
 }
 
 /// GET /llmsim/stats - Get server statistics
@@ -322,32 +600,54 @@ pub async fn create_openresponses_response(
 
     // Generate response using the input text
     let input_text = request.input.extract_text();
-    let generator = create_generator(
-        &state.config.response.generator,
-        state.config.response.target_tokens,
-    );
 
-    // Create a minimal ChatCompletionRequest for the generator
-    let chat_request = ChatCompletionRequest {
-        model: request.model.clone(),
-        messages: vec![crate::openai::Message::user(&input_text)],
-        temperature: request.temperature,
-        top_p: request.top_p,
-        n: None,
-        stream: request.stream,
-        stop: None,
-        max_tokens: request.max_output_tokens,
-        max_completion_tokens: request.max_output_tokens,
-        presence_penalty: None,
-        frequency_penalty: None,
-        logit_bias: None,
-        user: request.user.clone(),
-        tools: None,
-        tool_choice: None,
-        response_format: None,
-        seed: None,
+    // Scripted mode short-circuits to use the next scripted turn's text.
+    // Error turns are surfaced as HTTP errors here (works for both
+    // streaming and non-streaming); tool-call turns are not yet
+    // represented in OpenResponses output items (see specs/scripted-mode.md).
+    let content = if let Some(script) = state.script.as_ref() {
+        match script.next_turn() {
+            ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,
+            ScriptedResponse::Turn(SimTurn::Mixed { text, .. }) => text,
+            ScriptedResponse::Turn(SimTurn::ToolCalls { .. }) => String::new(),
+            ScriptedResponse::Turn(SimTurn::Error(err)) => {
+                state.stats.record_error(err.status_code());
+                return Ok(sim_error_to_openresponses_response(&err));
+            }
+            ScriptedResponse::Exhausted => {
+                state.stats.record_error(500);
+                return Ok(sim_error_to_openresponses_response(&SimError::Other {
+                    message: "llmsim script exhausted (on_exhausted=error)".to_string(),
+                    status_code: Some(500),
+                }));
+            }
+        }
+    } else {
+        let generator = create_generator(
+            &state.config.response.generator,
+            state.config.response.target_tokens,
+        );
+        let chat_request = ChatCompletionRequest {
+            model: request.model.clone(),
+            messages: vec![crate::openai::Message::user(&input_text)],
+            temperature: request.temperature,
+            top_p: request.top_p,
+            n: None,
+            stream: request.stream,
+            stop: None,
+            max_tokens: request.max_output_tokens,
+            max_completion_tokens: request.max_output_tokens,
+            presence_penalty: None,
+            frequency_penalty: None,
+            logit_bias: None,
+            user: request.user.clone(),
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+        };
+        generator.generate(&chat_request)
     };
-    let content = generator.generate(&chat_request);
 
     // Count tokens
     let input_tokens = count_openresponses_input_tokens(&request);
@@ -514,6 +814,15 @@ pub async fn create_response(
         }
 
         return Ok(response);
+    }
+
+    // Scripted mode: handle non-streaming with full tool-call support;
+    // streaming falls through to the text-based scripted result built
+    // by generate_responses_result (text + error turns only).
+    if let Some(script) = state.script.clone() {
+        if !request.stream {
+            return Ok(handle_scripted_responses_api(state, request, request_start, script).await);
+        }
     }
 
     // Generate response using shared logic

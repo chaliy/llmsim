@@ -48,6 +48,8 @@ pub mod latency;
 pub mod openai;
 pub mod openresponses;
 pub mod responses_stream;
+pub mod script;
+pub mod script_stream;
 pub mod stats;
 pub mod stream;
 pub mod tokens;
@@ -67,6 +69,9 @@ pub use generator::{
 };
 pub use latency::LatencyProfile;
 pub use responses_stream::{ResponsesTokenStream, ResponsesTokenStreamBuilder};
+pub use script::{
+    OnExhausted, Script, ScriptError, ScriptSpec, ScriptedResponse, SimError, SimToolCall, SimTurn,
+};
 pub use stats::{new_shared_stats, EndpointType, SharedStats, Stats, StatsSnapshot};
 pub use stream::{TokenStream, TokenStreamBuilder};
 pub use tokens::{count_tokens, count_tokens_default, TokenCounter, TokenError};

@@ -79,6 +79,22 @@ Using LangChain's OpenAI-compatible client:
 uv run examples/langchain_client.py
 ```
 
+### Scripted mode
+
+Drive a deterministic multi-turn script (tool calls, errors, mixed
+text+calls) for agent scenario tests:
+
+```bash
+# Boot the server with a script file
+cargo run -- serve --config examples/scripted_demo.toml
+
+# In another shell
+uv run examples/scripted_demo.py
+```
+
+See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the full
+script JSON format.
+
 ## TypeScript Example
 
 Direct usage of the official OpenAI Node.js library:

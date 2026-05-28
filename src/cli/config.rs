@@ -143,6 +143,11 @@ pub struct ResponseConfig {
     /// Target number of tokens in response
     #[serde(default = "default_target_tokens")]
     pub target_tokens: usize,
+    /// Optional path to a scripted response JSON file. When set, the
+    /// server replays the script across requests and ignores
+    /// `generator`. See `specs/scripted-mode.md`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub script_path: Option<String>,
 }
 
 fn default_generator() -> String {
@@ -158,6 +163,7 @@ impl Default for ResponseConfig {
         Self {
             generator: default_generator(),
             target_tokens: default_target_tokens(),
+            script_path: None,
         }
     }
 }

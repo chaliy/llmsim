@@ -11,6 +11,7 @@ pub use config::{Config, ConfigError};
 pub use state::AppState;
 pub use ws_handler::ws_responses;
 
+use crate::script::Script;
 use crate::stats::{new_shared_stats, SharedStats};
 use axum::{
     routing::{get, post},
@@ -79,8 +80,24 @@ pub async fn run_server_with_stats(
     );
     tracing::info!("Stats endpoint: /llmsim/stats");
 
-    let state = Arc::new(AppState::new(config, stats));
-    let app = build_router(state);
+    let mut state = AppState::new(config, stats);
+    if let Some(script_path) = state.config.response.script_path.clone() {
+        let script =
+            Script::from_file(&script_path).map_err(|e| -> Box<dyn std::error::Error> {
+                Box::new(std::io::Error::other(format!(
+                    "Failed to load script from {}: {}",
+                    script_path, e
+                )))
+            })?;
+        tracing::info!(
+            "Scripted mode enabled: {} turns from {} (on_exhausted={:?})",
+            script.len(),
+            script_path,
+            script.on_exhausted()
+        );
+        state = state.with_script(Arc::new(script));
+    }
+    let app = build_router(Arc::new(state));
 
     let listener = tokio::net::TcpListener::bind(addr).await?;
 

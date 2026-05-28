@@ -382,6 +382,37 @@ curl http://localhost:8080/llmsim/stats
 | Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite |
 | DeepSeek | deepseek-chat, deepseek-reasoner |
 
+## Scripted Mode
+
+For agent scenario tests, llmsim can replay a deterministic
+multi-turn script (text, tool calls, mixed turns, errors) instead of
+running a generator. Enable it in your config:
+
+```toml
+[response]
+script_path = "/path/to/script.json"
+```
+
+The script JSON has an `on_exhausted` policy (`repeat_last` /
+`error` / `loop`) and a `turns` array. Example:
+
+```json
+{
+  "on_exhausted": "error",
+  "turns": [
+    {"type": "tool_calls", "calls": [
+      {"name": "bash", "arguments": {"command": "ls"}}
+    ]},
+    {"type": "assistant", "text": "done"}
+  ]
+}
+```
+
+See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the
+full format, turn variants (`assistant` / `tool_calls` / `mixed` /
+`error`), and per-endpoint coverage. Example script and clients live
+in [`examples/scripted_demo.*`](../examples/).
+
 ## Error Responses
 
 Errors follow OpenAI/OpenResponses format:

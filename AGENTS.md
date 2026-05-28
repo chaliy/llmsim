@@ -28,6 +28,7 @@ Available specs:
 - `specs/architecture.md` - System architecture and module organization
 - `specs/api-endpoints.md` - API endpoint structure and routing conventions
 - `specs/responses-api.md` - OpenAI Responses API simulation
+- `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
 - `specs/load-testing.md` - Load testing framework and benchmarks
 - `specs/release-process.md` - Release workflow and versioning
 - `specs/maintenance.md` - Routine maintenance process

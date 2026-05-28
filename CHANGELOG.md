@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Scripted response mode** for agent scenario tests. Point
+  `response.script_path` at a JSON file describing an ordered list of
+  assistant turns (plain text, tool calls, mixed, errors). llmsim
+  replays the script across requests with a configurable
+  `on_exhausted` policy (`repeat_last`, `error`, `loop`). Full
+  support for OpenAI Chat Completions (streaming + non-streaming,
+  including tool-call deltas); non-streaming support for the OpenAI
+  Responses API (function_call output items). See
+  `specs/scripted-mode.md` and `examples/scripted_demo.*`.
+
 ## [0.3.0] - 2026-05-19
 
 ### Highlights

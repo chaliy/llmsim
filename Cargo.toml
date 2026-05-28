@@ -61,3 +61,4 @@ crossterm = { version = "0.29", optional = true }
 [dev-dependencies]
 tokio-test = "0.4"
 tokio-tungstenite = "0.29"
+tower = { version = "0.5", features = ["util"] }
