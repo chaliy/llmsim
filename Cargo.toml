@@ -17,36 +17,57 @@ path = "src/lib.rs"
 [[bin]]
 name = "llmsim"
 path = "src/main.rs"
+# The binary needs clap argument parsing, the HTTP server, and a tracing
+# subscriber, all pulled in by the `cli` feature.
+required-features = ["cli"]
 
 [features]
-default = []
-tui = ["dep:crossterm", "dep:ratatui", "tokio/io-util"]
+# The default build is the full CLI binary. Library consumers (e.g. core
+# crates that only embed the simulator's library modules) can opt out with
+# `default-features = false` to shed axum, tower-http, tiktoken-rs, clap,
+# websockets, and tracing-subscriber.
+default = ["cli"]
+
+# Accurate token counting via tiktoken-rs (the `tokens` module).
+tokens = ["dep:tiktoken-rs"]
+
+# HTTP server: the `cli` module (axum router, handlers, websockets, CORS).
+# Handlers account for usage via token counting, so this implies `tokens`.
+server = ["tokens", "dep:axum", "dep:tower-http"]
+
+# The `llmsim` binary: clap argument parsing plus a tracing subscriber.
+# Implies `server` since the binary's job is to run the server.
+cli = ["server", "dep:clap", "dep:tracing-subscriber"]
+
+# Real-time stats dashboard (`llmsim serve --tui`); only reachable via the
+# binary, so it implies `cli`.
+tui = ["cli", "dep:crossterm", "dep:ratatui", "tokio/io-util"]
 
 [dependencies]
 # Async runtime
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
 
-# HTTP framework
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"] }
-tower-http = { version = "0.6", default-features = false, features = ["cors", "trace"] }
+# HTTP framework (enabled by the `server` feature)
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"], optional = true }
+tower-http = { version = "0.6", default-features = false, features = ["cors", "trace"], optional = true }
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 toml = "1.1"
 
-# Token counting
-tiktoken-rs = "0.11"
+# Token counting (enabled by the `tokens` feature)
+tiktoken-rs = { version = "0.11", optional = true }
 
 # Random numbers
 rand = "0.10"
 
-# Logging
+# Logging (tracing-subscriber enabled by the `cli` feature)
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"], optional = true }
 
-# CLI
-clap = { version = "4.6", features = ["derive", "env"] }
+# CLI (enabled by the `cli` feature)
+clap = { version = "4.6", features = ["derive", "env"], optional = true }
 
 # Utilities
 futures-core = "0.3"

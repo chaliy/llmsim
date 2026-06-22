@@ -96,6 +96,31 @@ let generator = LoremGenerator::new(100);
 let response = generator.generate(&request);
 ```
 
+#### Cargo features
+
+The crate is split into optional features so library consumers only pull in
+what they use. The defaults (`["cli"]`) give the full binary, so `cargo build`,
+`cargo run -- serve`, and `cargo test` work out of the box.
+
+| Feature  | Adds                                            | Extra dependencies                   |
+|----------|-------------------------------------------------|--------------------------------------|
+| `tokens` | `tokens` module (token counting)                | `tiktoken-rs`                        |
+| `server` | `cli` module (axum router, handlers, websockets); implies `tokens` | `axum`, `tower-http` |
+| `cli`    | the `llmsim` binary; implies `server`           | `clap`, `tracing-subscriber`         |
+| `tui`    | `serve --tui` dashboard; implies `cli`          | `ratatui`, `crossterm`               |
+
+To embed only the core library modules (types, generators, latency,
+streaming, stats, scripts) and shed `axum`, `tower-http`, `tiktoken-rs`,
+`clap`, websockets, and `tracing-subscriber`:
+
+```toml
+[dependencies]
+llmsim = { version = "0.4", default-features = false }
+```
+
+Note that `count_tokens` and the `tokens` module are only available with the
+`tokens` feature enabled.
+
 ## API Endpoints
 
 ### OpenAI API (`/openai/v1/...`)

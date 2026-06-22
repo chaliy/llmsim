@@ -52,9 +52,13 @@ pub mod script;
 pub mod script_stream;
 pub mod stats;
 pub mod stream;
+
+// Token counting via tiktoken-rs (enabled by the `tokens` feature)
+#[cfg(feature = "tokens")]
 pub mod tokens;
 
-// CLI module (for `llmsim serve` command)
+// CLI module: HTTP server, router, and handlers (enabled by the `server` feature)
+#[cfg(feature = "server")]
 pub mod cli;
 
 // TUI module (for `llmsim serve --tui`)
@@ -74,4 +78,5 @@ pub use script::{
 };
 pub use stats::{new_shared_stats, EndpointType, SharedStats, Stats, StatsSnapshot};
 pub use stream::{TokenStream, TokenStreamBuilder};
+#[cfg(feature = "tokens")]
 pub use tokens::{count_tokens, count_tokens_default, TokenCounter, TokenError};

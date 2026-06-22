@@ -107,8 +107,30 @@ The project uses a single crate with both `[lib]` and `[[bin]]` targets rather t
 - Binary available as `llmsim` command
 
 **Cons:**
-- CLI dependencies included in library (minimal overhead)
-- Less separation of concerns
+- Less separation of concerns than a workspace
+
+### Cargo Feature Layering
+
+Server- and CLI-only dependencies are gated behind Cargo features so that
+library consumers who only embed the core simulator modules do not pay for
+them. The features form a chain, each enabling the previous one:
+
+| Feature  | Enables module(s)              | Pulls in dependencies                |
+|----------|--------------------------------|--------------------------------------|
+| `tokens` | `tokens`                       | `tiktoken-rs`                        |
+| `server` | `cli` (router/handlers) + `tokens` | `axum`, `tower-http` (+ axum `ws`) |
+| `cli`    | binary + `server`              | `clap`, `tracing-subscriber`         |
+| `tui`    | `tui` dashboard + `cli`        | `ratatui`, `crossterm`               |
+
+`server` implies `tokens` because the handlers count tokens for usage
+accounting. `cli` implies `server` because the binary's job is to run the
+server. The `[[bin]]` target sets `required-features = ["cli"]`.
+
+The default feature set is `["cli"]`, so `cargo build`, `cargo run -- serve`,
+and `cargo test` behave exactly as before. Library consumers opt out with
+`llmsim = { default-features = false }`, which sheds `axum`, `tower-http`,
+`tiktoken-rs`, `clap`, websockets, and `tracing-subscriber`, leaving just the
+core library modules (types, generators, latency, streaming, stats, scripts).
 
 ### CLI Subcommand Pattern
 
@@ -156,8 +178,9 @@ See `specs/responses-api.md` for detailed Responses API specification.
 
 ### Module Organization
 
-- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `responses_stream`, `tokens`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`
-- **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration
+- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `responses_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
+- **Token module** (`tokens`): Token counting behind the `tokens` feature (tiktoken-rs)
+- **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration, behind the `server` feature
 - **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with Ratatui
 
 ### API Support
