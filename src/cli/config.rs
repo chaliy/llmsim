@@ -248,6 +248,7 @@ fn default_models() -> Vec<String> {
         "claude-opus-4.5".to_string(),
         "claude-opus-4.6".to_string(),
         "claude-opus-4.7".to_string(),
+        "claude-opus-4.8".to_string(),
         "claude-haiku-4.5".to_string(),
         // Gemini family
         "gemini-2.0-flash".to_string(),

@@ -486,6 +486,19 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1776297600) // 2026-04-16
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2026-01-31"),
+        // Claude Opus 4.8 (current flagship Opus, sourced from the claude-api
+        // reference). knowledge_cutoff is intentionally omitted: models.dev had
+        // not yet published an authoritative cutoff for 4.8 at maintenance time,
+        // and we prefer omission over a guessed value.
+        ModelProfile::new(
+            "claude-opus-4.8",
+            "Claude Opus 4.8",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1779235200) // 2026-05-20 (approximate)
+        .with_capabilities(claude_reasoning_capabilities()),
         // Claude Haiku 4.5
         ModelProfile::new(
             "claude-haiku-4.5",
@@ -724,6 +737,17 @@ mod tests {
         assert_eq!(profile.max_output_tokens, 128_000);
         assert!(profile.capabilities.reasoning);
         assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2026-01-31"));
+    }
+
+    #[test]
+    fn test_claude_opus_4_8_profile() {
+        let profile = get_model_profile("claude-opus-4.8").expect("claude-opus-4.8 should exist");
+        assert_eq!(profile.owned_by, "anthropic");
+        assert_eq!(profile.context_window, 1_000_000);
+        assert_eq!(profile.max_output_tokens, 128_000);
+        assert!(profile.capabilities.reasoning);
+        // knowledge_cutoff is intentionally omitted for 4.8 (see profile comment).
+        assert_eq!(profile.knowledge_cutoff, None);
     }
 
     #[test]
