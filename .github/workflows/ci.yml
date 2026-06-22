@@ -32,6 +32,11 @@ jobs:
       - name: Run cargo check
         run: cargo check --all-targets
 
+      # Guard the library-only path: consumers using `default-features = false`
+      # must still build without axum, tower-http, tiktoken-rs, clap, etc.
+      - name: Check library without default features
+        run: cargo check --lib --no-default-features
+
   fmt:
     name: Format
     runs-on: ubuntu-latest

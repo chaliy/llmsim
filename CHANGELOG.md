@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Cargo features to gate server/CLI dependencies so library consumers can
+  shed them. New features `tokens` (tiktoken-rs), `server` (axum/tower-http,
+  implies `tokens`), `cli` (clap/tracing-subscriber + binary, implies
+  `server`), with `tui` now implying `cli`. The default feature set is
+  `["cli"]`, so the binary and `cargo test` are unchanged. Library consumers
+  can use `llmsim = { default-features = false }` to drop `axum`,
+  `tower-http`, `tiktoken-rs`, `clap`, websockets, and `tracing-subscriber`.
+
 ## [0.4.0] - 2026-05-28
 
 ### Highlights
