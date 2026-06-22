@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.5.0] - 2026-06-22
 
-- Cargo features to gate server/CLI dependencies so library consumers can
-  shed them. New features `tokens` (tiktoken-rs), `server` (axum/tower-http,
-  implies `tokens`), `cli` (clap/tracing-subscriber + binary, implies
-  `server`), with `tui` now implying `cli`. The default feature set is
-  `["cli"]`, so the binary and `cargo test` are unchanged. Library consumers
-  can use `llmsim = { default-features = false }` to drop `axum`,
-  `tower-http`, `tiktoken-rs`, `clap`, websockets, and `tracing-subscriber`.
+### Highlights
+
+- **Optional Cargo features** let library consumers slim their builds. New
+  features `tokens` (tiktoken-rs), `server` (axum/tower-http, implies
+  `tokens`), and `cli` (clap/tracing-subscriber + binary, implies `server`),
+  with `tui` now implying `cli`. The default feature set is `["cli"]`, so the
+  binary and `cargo test` are unchanged; consumers can use
+  `llmsim = { default-features = false }` to drop `axum`, `tower-http`,
+  `tiktoken-rs`, `clap`, websockets, and `tracing-subscriber`.
+- **Claude Opus 4.8** added to the model registry, default model list, and
+  API docs as the current flagship Anthropic model.
+- Major dependency upgrades: `tiktoken-rs` 0.11 → 0.12 and `tower-http`
+  0.6 → 0.7 (plus transitive bumps).
+
+### What's Changed
+
+* feat(build): gate server, tokens, and CLI deps behind Cargo features ([#63](https://github.com/chaliy/llmsim/pull/63)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.4.0...v0.5.0
 
 ## [0.4.0] - 2026-05-28
 
@@ -179,7 +191,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/chaliy/llmsim/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/chaliy/llmsim/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/chaliy/llmsim/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/chaliy/llmsim/compare/v0.2.2...v0.2.3
