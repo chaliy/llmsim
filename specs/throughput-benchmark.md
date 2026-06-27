@@ -7,10 +7,11 @@ peak sustained request rate llmsim can serve, and how that rate scales with
 parallelism (CPU cores / async worker threads).
 
 It is distinct from the general load-testing framework (`specs/load-testing.md`),
-which validates behavior under realistic, latency-shaped traffic. The throughput
-benchmark deliberately strips away simulated latency and large payloads so the
-number it reports reflects llmsim's own request-handling ceiling — the figure
-suitable for headline claims (e.g. "sustains ~X req/s on N cores").
+which validates behavior under realistic, latency-shaped traffic using k6. The
+throughput benchmark deliberately strips away simulated latency and large
+payloads so the number it reports reflects llmsim's own request-handling
+ceiling — the figure suitable for headline claims (e.g. "sustains ~X req/s on
+N cores").
 
 The benchmark MUST produce two things:
 
@@ -28,6 +29,28 @@ that llmsim actually uses available cores rather than being single-threaded —
 the core justification for it being written in Rust on a multi-threaded async
 runtime.
 
+## Tool Selection: oha (not k6)
+
+The general load-testing framework uses **k6** (`specs/load-testing.md`) and that
+remains the reference tool for scenario-based, latency-shaped tests. The
+throughput benchmark instead uses **[`oha`](https://github.com/hatoo/oha)**, and
+the distinction is deliberate:
+
+- **The throughput benchmark saturates the server with `instant` latency.** There
+  the load generator and the server compete for the same CPU cores. k6 runs each
+  iteration through an embedded JS interpreter (goja), which has comparatively
+  high per-request overhead — at saturation you risk measuring *k6's* ceiling,
+  not llmsim's. (Note: k6 is a Go binary running JS scripts, **not** Node.js.)
+- **`oha` is a Rust, MIT-licensed HTTP load generator** purpose-built for maximum
+  request rate, with latency histograms (p50/p95/p99) and JSON output. Its
+  per-request overhead is near zero, so the measured rate reflects the server.
+- For latency-shaped load tests the generator is mostly idle (waiting on
+  simulated TTFT), so k6's overhead is irrelevant there — hence k6 stays for
+  `specs/load-testing.md` and oha is scoped to throughput only.
+
+`oha` is MIT-licensed (permissive, compatible with this repo's dependency
+policy).
+
 ## Requirements
 
 ### R1: Isolate the server's request-handling ceiling
@@ -37,8 +60,9 @@ The benchmark MUST minimize every cost that is not llmsim's own request handling
 - Latency profile MUST be `instant` (0ms TTFT, 0ms inter-token) so the measured
   rate is the server's ceiling, not the latency it was configured to simulate.
 - Requests MUST be **non-streaming** `POST /openai/v1/chat/completions`.
-- Response size MUST be small and fixed (`target_tokens` ≤ 32, `max_tokens` ≤ 32)
-  to minimize serialization and token-counting cost.
+- Response size MUST be small and fixed (`target_tokens` ≤ 32, and the request
+  body MUST cap output similarly, e.g. `max_tokens` ≤ 32) to minimize
+  serialization and token-counting cost.
 - Error injection MUST be disabled (all rates `0.0`).
 
 A dedicated config file `benchmarks/config/throughput.toml` MUST encode these
@@ -57,8 +81,8 @@ counts and report each result.
   logical core count, plus the core count itself if it is not a power of two
   (e.g. on a 4-core host: `1, 2, 4`; on a 6-core host: `1, 2, 4, 6`).
 - For each worker-thread count, the runner MUST start a fresh server pinned to
-  that count, run the load stage (R3), record peak sustained RPS, then shut the
-  server down before the next step.
+  that count, run the load stage (R3/R4), record peak sustained RPS, then shut
+  the server down before the next step.
 - Results MUST be emitted as a markdown table with columns:
   `workers | RPS | p50 (ms) | p95 (ms) | p99 (ms) | error %`, plus a derived
   `scaling vs 1 worker` column (RPS at N / RPS at 1) so near-linear scaling is
@@ -69,44 +93,49 @@ counts and report each result.
 The reported RPS must reflect the server, not the load generator. The benchmark
 MUST:
 
-- Drive load with an **open model** (k6 `ramping-arrival-rate` or
-  `constant-arrival-rate`), so offered load is independent of response time and
-  the true saturation point is found rather than masked by a closed VU loop.
-- Provision enough `preAllocatedVUs` / `maxVUs` that the generator never starves
-  (k6 MUST NOT emit "insufficient VUs" / dropped-iteration warnings; if it does,
-  the run is invalid and MUST be retried with a higher cap).
-- Reuse connections (HTTP keep-alive; k6 default) so the measurement is not
-  dominated by TCP/TLS setup.
+- Drive load with `oha` using enough concurrent connections (`-c`) to saturate
+  the server under test. `oha` is a closed-loop generator (fixed in-flight
+  concurrency), so saturation is reached by raising `-c` until RPS plateaus
+  (see R4), not by setting a target arrival rate.
+- Reuse connections (HTTP keep-alive, oha default) so the measurement is not
+  dominated by TCP setup.
 - Run the load generator on the same host as the server (loopback) for the
   headline number, to remove network variance. Remote runs are permitted but
   MUST be labeled as such.
+- Ensure the generator itself is not CPU-starved by the server. When sweeping
+  low worker-thread counts the host has spare cores for oha; at full-core counts,
+  oha and the server share cores — this is acceptable and MUST be noted as a
+  caveat (the full-core number is a realistic floor, not an upper bound). Where
+  feasible, the operator MAY pin oha and the server to disjoint core sets
+  (e.g. `taskset`) for the full-core measurement; if done, it MUST be recorded.
 
-If a non-k6 generator with lower per-request overhead is used as a cross-check
-(e.g. `oha`, `wrk`), it MUST be additive — k6 remains the reference tool per
-`specs/load-testing.md`. Any such cross-check MUST be clearly labeled.
+A k6-based cross-check is permitted but MUST be additive and clearly labeled;
+oha is the reference tool for this benchmark.
 
 ### R4: Finding peak sustained RPS
 
 For each worker-thread count the runner MUST locate the sustainable rate, not a
 momentary burst:
 
-- Ramp offered request rate upward in stages and identify the highest stage at
-  which the run still meets the success criteria in R5 (the "knee").
-- Report the RPS **actually achieved** (completed requests / wall-clock of the
-  held stage), not merely the offered target rate.
-- The held measurement window MUST be ≥ 30s to average out scheduler jitter and
-  GC/allocator noise. A short warm-up stage (≥ 5s) before measurement MUST be
-  discarded from the reported figure.
+- Sweep oha concurrency `-c` upward in steps (e.g. 16, 32, 64, 128, 256) and pick
+  the highest achieved RPS that still meets the success criteria in R5. RPS will
+  rise then plateau (and eventually latency degrades) — report the plateau.
+- Report the RPS **actually achieved** by oha (its `Requests/sec` summary over
+  the measured run), not a target.
+- Each measured run MUST last ≥ 30s (oha `-z 30s`) to average out scheduler
+  jitter and allocator noise. A short warm-up run (≥ 5s) before measurement MUST
+  be discarded from the reported figure.
 
 ### R5: Success criteria (what counts as "sustained")
 
-A rate qualifies as sustained only if, during the held window:
+A rate qualifies as sustained only if, during the measured run:
 
-- `http_req_failed` rate < 0.1%
-- p99 response latency < 50ms (with the `instant` profile there is no simulated
-  latency, so anything above this indicates the server is saturating/queuing)
+- Error/non-2xx rate < 0.1% (oha reports status-code distribution).
+- p99 response latency < 50ms. With the `instant` profile there is no simulated
+  latency, so anything above this indicates the server is saturating/queuing.
 
-The highest qualifying stage is the reported peak for that worker count.
+The highest qualifying concurrency step is the reported peak for that worker
+count.
 
 ### R6: Environment capture (methodology honesty)
 
@@ -117,8 +146,9 @@ quoted without context:
 - Total RAM
 - OS / kernel and architecture
 - Rust toolchain version and llmsim version/commit
-- k6 version
-- Whether load generator and server shared a host (loopback) or were remote
+- oha version (and k6 version if a cross-check was run)
+- Whether load generator and server shared a host (loopback) or were remote, and
+  any core pinning applied
 
 This block MUST appear in stdout and in the JSON output (R7).
 
@@ -130,8 +160,11 @@ The benchmark MUST emit:
   (R2), and a final single headline line, e.g.:
   `PEAK: 18,400 req/s sustained at 4 workers (4 vCPU, p99 2ms, 0.0% errors)`
 - A machine-readable JSON file (path via `--output`) containing the environment
-  block, an array of per-worker results, and the selected peak. This enables
-  pasting numbers into docs/posts and future run-over-run comparison.
+  block, an array of per-worker results (each with the winning concurrency,
+  achieved RPS, latency percentiles, error rate), and the selected peak. oha's
+  own `--json` output for each step SHOULD be captured/aggregated rather than
+  re-parsing text. This enables pasting numbers into docs/posts and future
+  run-over-run comparison.
 
 ### R8: Invocation
 
@@ -141,13 +174,15 @@ conventions, e.g.:
 ```bash
 ./benchmarks/run-benchmark.sh throughput
 ./benchmarks/run-benchmark.sh throughput --output throughput.json
-./benchmarks/run-benchmark.sh throughput --workers 1,2,4,8   # override sweep
+./benchmarks/run-benchmark.sh throughput --workers 1,2,4,8     # override sweep
+./benchmarks/run-benchmark.sh throughput --concurrency 16,64,256  # override -c steps
 ```
 
 It MUST follow the existing runner contract from `specs/load-testing.md`:
 auto-build (`cargo build --release`), start/stop the server, `--no-server` to
 target an existing server, `--output` for JSON, graceful cleanup on exit, and a
-clear failure if `k6` is not installed.
+clear failure with install guidance if `oha` is not installed
+(`cargo install oha`, or the project's package manager).
 
 ### R9: Reproducibility and caveats
 
@@ -167,40 +202,40 @@ These are guidance for the implementing agent, not binding requirements.
 benchmarks/
 ├── config/
 │   └── throughput.toml          # instant profile, non-streaming, target_tokens<=32, no errors
-├── k6/
-│   └── throughput.js            # open-model arrival-rate script, non-streaming only
-└── run-benchmark.sh             # extend: add `throughput` profile + worker sweep + env capture
+├── throughput.sh                # or extend run-benchmark.sh: worker sweep + concurrency sweep + env capture
+└── run-benchmark.sh             # extend: add `throughput` profile dispatch
 ```
+
+`oha` drives requests directly from the CLI, so no JS script is needed (unlike
+the k6 scripts in `benchmarks/k6/`). The request body is passed via
+`oha --method POST -H 'Content-Type: application/json' -d '<json>'`.
 
 ### Worker-thread sweep mechanics
 
 - Determine the sweep set from `nproc` unless `--workers a,b,c` is given.
 - For each `W` in the set:
   - `TOKIO_WORKER_THREADS=$W target/release/llmsim serve --host 127.0.0.1 \
-     --port $PORT --config benchmarks/config/throughput.toml`
+     --port $PORT --config benchmarks/config/throughput.toml &`
   - Wait for `/health` to return `{"status":"ok"}`.
-  - Run `k6 run --env K6_TARGET_URL=... --env PROFILE=throughput benchmarks/k6/throughput.js`.
-  - Parse achieved RPS + latency percentiles (prefer k6 `--summary-export` /
-    `handleSummary`, or read `/llmsim/stats`, consistent with the existing
-    high-concurrency teardown).
+  - Warm-up: `oha -z 5s -c 32 ...` (discarded).
+  - For each concurrency `C` in the `-c` sweep: run
+    `oha -z 30s -c $C --json --method POST -H ... -d '<body>' \
+      http://127.0.0.1:$PORT/openai/v1/chat/completions`
+    and capture RPS + latency percentiles + status distribution from oha's JSON.
+  - Select the best qualifying `C` per R4/R5; record it for this `W`.
   - Kill the server, free the port, proceed to next `W`.
 
-### k6 script shape (`throughput.js`)
+### Request body
 
-- Single scenario, `executor: 'ramping-arrival-rate'`.
-- Stages step the target rate upward (e.g. 2k → 5k → 10k → 20k → 40k rps, scaled
-  by host capability), each held ≥ 30s after a short warm-up.
-- `preAllocatedVUs` / `maxVUs` generous (e.g. 200–1000) so offered rate is met.
-- Thresholds encode R5 (`http_req_failed: ['rate<0.001']`,
-  `http_req_duration: ['p(99)<50']`).
-- `handleSummary` writes the JSON described in R7.
-- Payload built via `buildChatRequest({ stream:false, maxTokens:16, prompt:'Hi' })`.
+```json
+{"model":"gpt-5","messages":[{"role":"user","content":"Hi"}],"stream":false,"max_tokens":16}
+```
 
 ### Headline parsing
 
-The selected peak for the post is `max(RPS)` across the sweep that still meets
-R5 — typically (but not necessarily) at `workers == nproc`. The scaling column
-makes it clear whether llmsim is bottlenecked before saturating all cores.
+The selected peak for the post is `max(RPS)` across the worker sweep that still
+meets R5 — typically (but not necessarily) at `workers == nproc`. The scaling
+column makes it clear whether llmsim is bottlenecked before saturating all cores.
 
 ## Future Enhancements
 
@@ -208,6 +243,6 @@ makes it clear whether llmsim is bottlenecked before saturating all cores.
    baseline for the runner's core count.
 2. Streaming-throughput variant: tokens/sec ceiling under the `instant` profile
    with streaming enabled.
-3. `oha`/`wrk` cross-check harness to bound k6's own client-side overhead.
+3. k6 cross-check harness to quantify client-side overhead differences.
 4. Per-endpoint throughput (responses API, openresponses) alongside chat
    completions.
