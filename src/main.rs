@@ -39,12 +39,18 @@ enum Commands {
         host: Option<String>,
 
         /// Response generator (lorem, echo, random, fixed:text)
-        #[arg(long, default_value = "lorem")]
-        generator: String,
+        ///
+        /// Overrides the config file when set; otherwise the config value
+        /// (or the "lorem" default) is used.
+        #[arg(long)]
+        generator: Option<String>,
 
         /// Target number of tokens in responses
-        #[arg(long, default_value = "100")]
-        target_tokens: usize,
+        ///
+        /// Overrides the config file when set; otherwise the config value
+        /// (or the default of 100) is used.
+        #[arg(long)]
+        target_tokens: Option<usize>,
 
         /// Show real-time stats dashboard (TUI)
         ///
@@ -58,8 +64,8 @@ fn build_config(
     config_file: Option<String>,
     port: u16,
     host: Option<String>,
-    generator: String,
-    target_tokens: usize,
+    generator: Option<String>,
+    target_tokens: Option<usize>,
 ) -> Result<Config, ConfigError> {
     let mut config = if let Some(path) = config_file {
         Config::from_file(&path)?
@@ -67,13 +73,19 @@ fn build_config(
         Config::default()
     };
 
-    // Override with CLI arguments
+    // Override with CLI arguments only when explicitly provided, so values from
+    // the config file are respected (previously the CLI defaults silently
+    // clobbered generator/target_tokens from --config).
     config.server.port = port;
     if let Some(host) = host {
         config.server.host = host;
     }
-    config.response.generator = generator;
-    config.response.target_tokens = target_tokens;
+    if let Some(generator) = generator {
+        config.response.generator = generator;
+    }
+    if let Some(target_tokens) = target_tokens {
+        config.response.target_tokens = target_tokens;
+    }
 
     Ok(config)
 }

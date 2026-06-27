@@ -167,13 +167,9 @@ cleanup() {
 start_server() {
     local workers="$1"
     log_info "Starting llmsim with TOKIO_WORKER_THREADS=$workers ..."
-    # NOTE: --target-tokens is passed explicitly because the CLI default
-    # currently overrides the value from --config (build_config in main.rs).
-    # Keep it in sync with target_tokens in throughput.toml.
     TOKIO_WORKER_THREADS="$workers" \
         "$PROJECT_ROOT/target/release/llmsim" serve \
         --host 127.0.0.1 --port "$PORT" --config "$CONFIG_FILE" \
-        --target-tokens 16 \
         >/dev/null 2>&1 &
     LLMSIM_PID=$!
     for _ in $(seq 1 20); do
