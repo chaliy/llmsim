@@ -30,6 +30,7 @@ Available specs:
 - `specs/responses-api.md` - OpenAI Responses API simulation
 - `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
 - `specs/load-testing.md` - Load testing framework and benchmarks
+- `specs/throughput-benchmark.md` - Peak throughput (req/s) benchmark with parallelisation scaling
 - `specs/release-process.md` - Release workflow and versioning
 - `specs/maintenance.md` - Routine maintenance process
 
