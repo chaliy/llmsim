@@ -1,0 +1,27 @@
+# llmsim throughput benchmark configuration
+#
+# Purpose: measure llmsim's own request-handling ceiling (peak req/s), NOT the
+# latency it can simulate. See specs/throughput-benchmark.md.
+#
+# Decisions encoded here (R1 of the spec):
+# - latency profile `instant` (0ms TTFT / 0ms inter-token) so the measured rate
+#   is the server ceiling, not the configured latency.
+# - small fixed response (target_tokens = 16) to minimize serialization and
+#   token-counting cost.
+# - all error injection disabled for clean, reproducible numbers.
+
+[server]
+port = 8888
+host = "0.0.0.0"
+
+[latency]
+profile = "instant"
+
+[response]
+generator = "lorem"
+target_tokens = 16
+
+[errors]
+rate_limit_rate = 0.0
+server_error_rate = 0.0
+timeout_rate = 0.0

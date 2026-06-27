@@ -14,6 +14,7 @@
 #   spike       - Spike test (~2 minutes)
 #   soak        - Long-running soak test (~32 minutes)
 #   high-concurrency - High VU count test
+#   throughput  - Peak req/s ceiling + parallelisation sweep (uses oha; see throughput.sh)
 #
 # Options:
 #   --no-server     Don't start llmsim (use existing server)
@@ -95,6 +96,13 @@ while [[ $# -gt 0 ]]; do
             ;;
         --help|-h)
             show_help
+            ;;
+        throughput)
+            # Throughput ceiling benchmark with parallelisation sweep.
+            # Delegated to a dedicated runner (uses oha, not k6). All remaining
+            # args are forwarded. See specs/throughput-benchmark.md.
+            shift
+            exec "$SCRIPT_DIR/throughput.sh" "$@"
             ;;
         smoke|quick-smoke|load|stress|spike|soak|high-concurrency)
             PROFILE="$1"
