@@ -11,6 +11,16 @@ use std::time::{Duration, Instant};
 /// Relaxed ordering for stats - we don't need strict ordering guarantees
 const ORDERING: Ordering = Ordering::Relaxed;
 
+/// Width of the rolling RPS window, in 1-second buckets.
+///
+/// RPS is tracked as a ring of per-second atomic buckets instead of a
+/// `Vec<Instant>` behind a write lock. The previous design took a global write
+/// lock and did an O(n) `retain` on *every* request, which serialized all
+/// worker threads and was the dominant throughput bottleneck under load. Each
+/// bucket packs `(second_tag << 32) | count` into one AtomicU64, so recording a
+/// request is a single lock-free compare-exchange.
+const RPS_WINDOW_SECS: u64 = 60;
+
 /// Maximum bytes kept for a model name in stats.
 const MAX_MODEL_NAME_BYTES: usize = 128;
 /// Maximum number of distinct model keys tracked before aggregating.
@@ -69,8 +79,11 @@ pub struct Stats {
     /// Timeout errors (504)
     pub timeout_errors: AtomicU64,
 
-    // Per-model request counts
-    model_requests: RwLock<HashMap<String, u64>>,
+    // Per-model request counts. The value is an AtomicU64 so the common case
+    // (a model that's already been seen) increments under a shared read lock
+    // with no serialization; the write lock is only taken to insert a new model
+    // key, which is bounded by MAX_TRACKED_MODELS.
+    model_requests: RwLock<HashMap<String, AtomicU64>>,
 
     // Latency tracking (in microseconds)
     /// Total latency for calculating average
@@ -82,8 +95,9 @@ pub struct Stats {
     /// Maximum latency seen
     max_latency_us: AtomicU64,
 
-    // Rolling window for RPS calculation
-    request_times: RwLock<Vec<Instant>>,
+    // Rolling window for RPS calculation: one AtomicU64 per second bucket,
+    // each packing (second_tag << 32) | count. See RPS_WINDOW_SECS.
+    rps_buckets: Vec<AtomicU64>,
 }
 
 impl Default for Stats {
@@ -116,7 +130,7 @@ impl Stats {
             completed_requests: AtomicU64::new(0),
             min_latency_us: AtomicU64::new(u64::MAX),
             max_latency_us: AtomicU64::new(0),
-            request_times: RwLock::new(Vec::new()),
+            rps_buckets: (0..RPS_WINDOW_SECS).map(|_| AtomicU64::new(0)).collect(),
         }
     }
 
@@ -144,26 +158,54 @@ impl Stats {
             }
         }
 
-        // Track per-model requests with bounded key size/cardinality
-        if let Ok(mut map) = self.model_requests.write() {
-            let model_key = normalize_model_name(model);
-            let bucket = if map.contains_key(&model_key)
-                || map.len() < MAX_TRACKED_MODELS
-                || model_key == OTHER_MODELS_BUCKET
-            {
-                model_key
-            } else {
-                OTHER_MODELS_BUCKET.to_string()
-            };
-            *map.entry(bucket).or_insert(0) += 1;
+        // Track per-model requests with bounded key size/cardinality.
+        // Fast path: a model we've already seen increments under a shared read
+        // lock (read locks don't block each other), so concurrent requests for
+        // known models don't serialize.
+        let model_key = normalize_model_name(model);
+        let counted = match self.model_requests.read() {
+            Ok(map) => match map.get(&model_key) {
+                Some(counter) => {
+                    counter.fetch_add(1, ORDERING);
+                    true
+                }
+                None => false,
+            },
+            Err(_) => false,
+        };
+        if !counted {
+            // Slow path: insert a new key (write lock, bounded by cardinality cap).
+            if let Ok(mut map) = self.model_requests.write() {
+                let bucket = if map.contains_key(&model_key)
+                    || map.len() < MAX_TRACKED_MODELS
+                    || model_key == OTHER_MODELS_BUCKET
+                {
+                    model_key
+                } else {
+                    OTHER_MODELS_BUCKET.to_string()
+                };
+                map.entry(bucket)
+                    .or_insert_with(|| AtomicU64::new(0))
+                    .fetch_add(1, ORDERING);
+            }
         }
 
-        // Add to rolling window
-        if let Ok(mut times) = self.request_times.write() {
-            times.push(Instant::now());
-            // Keep only last 60 seconds of requests
-            let cutoff = Instant::now() - Duration::from_secs(60);
-            times.retain(|t| *t > cutoff);
+        // Record into the rolling RPS window: lock-free update of this second's
+        // bucket. Packs (second_tag << 32) | count into one AtomicU64.
+        let sec = self.start_time.elapsed().as_secs();
+        let tag = (sec as u32) as u64;
+        let bucket = &self.rps_buckets[(sec % RPS_WINDOW_SECS) as usize];
+        let mut cur = bucket.load(ORDERING);
+        loop {
+            let new = if (cur >> 32) == tag {
+                (tag << 32) | ((cur & 0xFFFF_FFFF) + 1)
+            } else {
+                (tag << 32) | 1
+            };
+            match bucket.compare_exchange_weak(cur, new, ORDERING, ORDERING) {
+                Ok(_) => break,
+                Err(x) => cur = x,
+            }
         }
     }
 
@@ -254,27 +296,29 @@ impl Stats {
         self.start_time.elapsed()
     }
 
-    /// Get requests per second (over the last 60 seconds)
+    /// Get requests per second (over the last RPS_WINDOW_SECS seconds)
     pub fn requests_per_second(&self) -> f64 {
-        if let Ok(times) = self.request_times.read() {
-            let now = Instant::now();
-            let cutoff = now - Duration::from_secs(60);
-            let recent_count = times.iter().filter(|t| **t > cutoff).count();
-
-            if recent_count == 0 {
-                return 0.0;
+        let now_tag = self.start_time.elapsed().as_secs() as u32;
+        let mut total = 0u64;
+        let mut oldest_age = 0u32;
+        for bucket in &self.rps_buckets {
+            let packed = bucket.load(ORDERING);
+            let count = packed & 0xFFFF_FFFF;
+            if count == 0 {
+                continue;
             }
-
-            // Calculate actual time window
-            let oldest = times.iter().filter(|t| **t > cutoff).min();
-            if let Some(oldest) = oldest {
-                let window = now.duration_since(*oldest).as_secs_f64();
-                if window > 0.0 {
-                    return recent_count as f64 / window;
-                }
+            // Wrapping subtraction so the comparison is correct as the tag wraps.
+            let age = now_tag.wrapping_sub((packed >> 32) as u32);
+            if (age as u64) < RPS_WINDOW_SECS {
+                total += count;
+                oldest_age = oldest_age.max(age);
             }
         }
-        0.0
+        if total == 0 {
+            return 0.0;
+        }
+        // Span covered, inclusive of the current (possibly partial) second.
+        total as f64 / (oldest_age as f64 + 1.0)
     }
 
     /// Get average latency in milliseconds
@@ -316,7 +360,11 @@ impl Stats {
     pub fn model_requests(&self) -> HashMap<String, u64> {
         self.model_requests
             .read()
-            .map(|m| m.clone())
+            .map(|m| {
+                m.iter()
+                    .map(|(k, v)| (k.clone(), v.load(ORDERING)))
+                    .collect()
+            })
             .unwrap_or_default()
     }
 
