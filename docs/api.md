@@ -47,6 +47,26 @@ curl http://localhost:8080/openai/v1/chat/completions \
 | `max_tokens` | integer | No | Maximum tokens to generate |
 | `top_p` | number | No | Nucleus sampling parameter |
 
+#### Multimodal (image) input
+
+A message's `content` may be a plain string or an array of content parts, matching the OpenAI Chat Completions format:
+
+```bash
+curl http://localhost:8080/openai/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-4o",
+    "messages": [
+      {"role": "user", "content": [
+        {"type": "text", "text": "What is in this image?"},
+        {"type": "image_url", "image_url": {"url": "https://example.com/cat.png", "detail": "auto"}}
+      ]}
+    ]
+  }'
+```
+
+Image parts require a vision-capable model. Sending an `image_url` part to a model whose profile reports no vision support (e.g. `gpt-4`) returns `400 invalid_request_error`. Custom model ids with no profile are accepted. Image content does not yet affect generated output.
+
 #### Response
 
 ```json
