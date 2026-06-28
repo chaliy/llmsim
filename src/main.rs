@@ -175,15 +175,17 @@ mod tests {
 
     #[test]
     fn cli_args_none_preserve_config_file_values() {
-        // Regression: the CLI defaults for --generator/--target-tokens used to
-        // clobber values from --config. With Option args left as None, the
-        // config file must win.
+        // Regression: the CLI defaults for --port/--generator/--target-tokens
+        // used to clobber values from --config. With Option args left as None,
+        // the config file must win.
         let path = write_temp_config(
-            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "[server]\nport = 9123\nhost = \"127.0.0.1\"\n[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
             "preserve",
         );
 
-        let config = build_config(Some(path.clone()), 8080, None, None, None).unwrap();
+        let config = build_config(Some(path.clone()), None, None, None, None).unwrap();
+        assert_eq!(config.server.port, 9123);
+        assert_eq!(config.server.host, "127.0.0.1");
         assert_eq!(config.response.generator, "echo");
         assert_eq!(config.response.target_tokens, 7);
 
@@ -193,18 +195,19 @@ mod tests {
     #[test]
     fn cli_args_some_override_config_file_values() {
         let path = write_temp_config(
-            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "[server]\nport = 9123\n[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
             "override",
         );
 
         let config = build_config(
             Some(path.clone()),
-            8080,
+            Some(9555),
             None,
             Some("lorem".to_string()),
             Some(50),
         )
         .unwrap();
+        assert_eq!(config.server.port, 9555);
         assert_eq!(config.response.generator, "lorem");
         assert_eq!(config.response.target_tokens, 50);
 
@@ -213,7 +216,8 @@ mod tests {
 
     #[test]
     fn no_config_file_uses_defaults() {
-        let config = build_config(None, 8080, None, None, None).unwrap();
+        let config = build_config(None, None, None, None, None).unwrap();
+        assert_eq!(config.server.port, 8080);
         assert_eq!(config.response.generator, "lorem");
         assert_eq!(config.response.target_tokens, 100);
     }
