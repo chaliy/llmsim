@@ -1,3 +1,10 @@
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.10"
+# dependencies = [
+#     "requests>=2.34.2",
+# ]
+# ///
 """Drive llmsim's scripted mode from Python.
 
 Prerequisites
@@ -29,11 +36,15 @@ dependency-free and easy to read.
 """
 
 import json
+import os
 import sys
 
 import requests
 
-BASE = "http://localhost:8080/openai/v1/chat/completions"
+# LLMSIM_URL points at the OpenAI-compatible base (default matches the
+# README); CI overrides it to target a dedicated scripted server.
+LLMSIM_URL = os.environ.get("LLMSIM_URL", "http://localhost:8080/openai/v1")
+BASE = f"{LLMSIM_URL.rstrip('/')}/chat/completions"
 HEADERS = {"Content-Type": "application/json", "Authorization": "Bearer not-needed"}
 
 

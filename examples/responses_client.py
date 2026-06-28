@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "httpx>=0.27.0",
+#     "httpx>=0.28.1",
 # ]
 # ///
 """

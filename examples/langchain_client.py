@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "langchain-openai>=0.3.0",
+#     "langchain-openai>=1.3.3",
 # ]
 # ///
 """
