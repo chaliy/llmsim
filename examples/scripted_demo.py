@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "requests>=2.32.0",
+#     "requests>=2.34.2",
 # ]
 # ///
 """Drive llmsim's scripted mode from Python.

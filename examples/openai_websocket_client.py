@@ -2,7 +2,7 @@
 # /// script
 # requires-python = ">=3.10"
 # dependencies = [
-#     "openai[realtime]>=2.40.0",
+#     "openai[realtime]>=2.44.0",
 # ]
 # ///
 """

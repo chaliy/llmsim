@@ -3,6 +3,6 @@
     "openai": "^6.45.0"
   },
   "devDependencies": {
-    "tsx": "^4.22.0"
+    "tsx": "^4.22.4"
   }
 }
