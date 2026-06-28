@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-06-28
+
+### Highlights
+
+- **~1100x throughput improvement**: tokenizers are now cached and stats are
+  tracked lock-free, dramatically increasing peak requests/sec. Includes a new
+  throughput benchmark to measure parallelisation scaling.
+- The CLI now preserves the port configured in the config file when the
+  `--port` flag is absent, matching the existing host-handling behavior.
+
+### What's Changed
+
+* fix(cli): preserve config port when --port flag is absent ([#68](https://github.com/chaliy/llmsim/pull/68)) by @chaliy
+* perf: cache tokenizers + lock-free stats (~1100x throughput), add throughput benchmark ([#66](https://github.com/chaliy/llmsim/pull/66)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.5.0...v0.5.1
+
 ## [0.5.0] - 2026-06-22
 
 ### Highlights
@@ -191,7 +208,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/chaliy/llmsim/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/chaliy/llmsim/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/chaliy/llmsim/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/chaliy/llmsim/compare/v0.2.3...v0.3.0
