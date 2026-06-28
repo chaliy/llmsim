@@ -79,4 +79,6 @@ pub use script::{
 pub use stats::{new_shared_stats, EndpointType, SharedStats, Stats, StatsSnapshot};
 pub use stream::{TokenStream, TokenStreamBuilder};
 #[cfg(feature = "tokens")]
-pub use tokens::{count_tokens, count_tokens_default, TokenCounter, TokenError};
+pub use tokens::{
+    count_tokens, count_tokens_default, estimate_image_tokens, TokenCounter, TokenError,
+};

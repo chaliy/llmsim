@@ -152,6 +152,27 @@ impl TokenCounter {
     }
 }
 
+/// Token cost of a `detail: "low"` image, matching OpenAI's fixed low-res pass.
+pub const IMAGE_TOKENS_LOW: usize = 85;
+/// Representative token cost of a high/auto-detail image. OpenAI's tile-based
+/// formula is `85 + 170 * tiles`; 765 corresponds to a ~1024x1024 image
+/// (85 base + 4 tiles). Used as the default when detail is high/auto/unset.
+pub const IMAGE_TOKENS_HIGH: usize = 765;
+
+/// Approximate the token cost of a single image input part.
+///
+/// Decision: the simulator never fetches or decodes image bytes, so the real
+/// tile-based count (which needs pixel dimensions) cannot be computed. We
+/// approximate from the `detail` hint using OpenAI's documented gpt-4o image
+/// costs: `"low"` is a fixed low-res pass; everything else (`"high"`, `"auto"`,
+/// or unspecified) is treated as a representative high-detail image.
+pub fn estimate_image_tokens(detail: Option<&str>) -> usize {
+    match detail.map(|d| d.to_ascii_lowercase()).as_deref() {
+        Some("low") => IMAGE_TOKENS_LOW,
+        _ => IMAGE_TOKENS_HIGH,
+    }
+}
+
 /// Estimate tokens for a chat message (includes overhead for message formatting)
 /// OpenAI uses ~4 tokens overhead per message for role and formatting
 pub fn estimate_message_tokens(
@@ -237,6 +258,15 @@ mod tests {
         assert_eq!(count_gpt5, count_mini);
         assert_eq!(count_gpt5, count_codex);
         assert_eq!(count_gpt5, count_51);
+    }
+
+    #[test]
+    fn test_estimate_image_tokens() {
+        assert_eq!(estimate_image_tokens(Some("low")), IMAGE_TOKENS_LOW);
+        assert_eq!(estimate_image_tokens(Some("LOW")), IMAGE_TOKENS_LOW);
+        assert_eq!(estimate_image_tokens(Some("high")), IMAGE_TOKENS_HIGH);
+        assert_eq!(estimate_image_tokens(Some("auto")), IMAGE_TOKENS_HIGH);
+        assert_eq!(estimate_image_tokens(None), IMAGE_TOKENS_HIGH);
     }
 
     #[test]

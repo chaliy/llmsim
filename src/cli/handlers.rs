@@ -117,8 +117,9 @@ pub(crate) fn generate_responses_result(
     };
 
     // Count tokens
-    let input_tokens =
-        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
+    let input_tokens = crate::count_tokens_default(&input_text)
+        .unwrap_or(input_text.split_whitespace().count())
+        + count_responses_input_image_tokens(params.input);
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
@@ -405,8 +406,9 @@ async fn handle_scripted_responses_api(
     };
 
     let input_text = extract_input_text(&request.input, &request.instructions);
-    let input_tokens =
-        crate::count_tokens_default(&input_text).unwrap_or(input_text.split_whitespace().count());
+    let input_tokens = crate::count_tokens_default(&input_text)
+        .unwrap_or(input_text.split_whitespace().count())
+        + count_responses_input_image_tokens(&request.input);
     let text_for_usage = text.clone().unwrap_or_default();
     let output_text_tokens = crate::count_tokens_default(&text_for_usage)
         .unwrap_or(text_for_usage.split_whitespace().count());
@@ -713,9 +715,37 @@ pub async fn create_openresponses_response(
 fn count_openresponses_input_tokens(request: &ResponseRequest) -> usize {
     let text = request.input.extract_text();
     let mut total = crate::count_tokens_default(&text).unwrap_or(text.split_whitespace().count());
+    // Account for image inputs (simulator approximation; see estimate_image_tokens).
+    total += count_openresponses_input_image_tokens(&request.input);
     // Add overhead for request formatting
     total += 3;
     total
+}
+
+/// Approximate the image-input token cost for an OpenResponses request.
+/// OpenResponses `input_image` parts carry an optional `detail`, which is
+/// passed through to `estimate_image_tokens`.
+fn count_openresponses_input_image_tokens(input: &openresponses::Input) -> usize {
+    use openresponses::{ContentItem, Input, MessageContent};
+
+    let Input::Messages(messages) = input else {
+        return 0;
+    };
+    messages
+        .iter()
+        .map(|m| match &m.content {
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter_map(|p| match p {
+                    ContentItem::InputImage { detail, .. } => {
+                        Some(crate::estimate_image_tokens(detail.as_deref()))
+                    }
+                    _ => None,
+                })
+                .sum(),
+            MessageContent::Text(_) => 0,
+        })
+        .sum()
 }
 
 /// GET /openai/v1/models
@@ -949,6 +979,30 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
     parts.join("\n")
 }
 
+/// Approximate the image-input token cost for a Responses API request.
+/// The Responses `input_image` part carries no `detail`, so each image is
+/// charged at the high-detail default (see `estimate_image_tokens`).
+fn count_responses_input_image_tokens(input: &ResponsesInput) -> usize {
+    let ResponsesInput::Items(items) = input else {
+        return 0;
+    };
+    items
+        .iter()
+        .filter_map(|item| match item {
+            InputItem::Message { content, .. } => Some(content),
+            _ => None,
+        })
+        .map(|content| match content {
+            MessageContent::Parts(parts) => parts
+                .iter()
+                .filter(|p| matches!(p, crate::openai::ContentPart::InputImage { .. }))
+                .map(|_| crate::estimate_image_tokens(None))
+                .sum(),
+            MessageContent::Text(_) => 0,
+        })
+        .sum()
+}
+
 /// Generate simulated reasoning summary text.
 /// Returns `Some(text)` when the model is a reasoning model and summary is requested.
 fn generate_reasoning_summary(
@@ -1136,6 +1190,10 @@ fn count_request_tokens(request: &ChatCompletionRequest) -> usize {
         if let Some(content) = &message.content {
             let text = content.text();
             total += crate::count_tokens_default(&text).unwrap_or(text.split_whitespace().count());
+            // Account for image inputs (simulator approximation; see estimate_image_tokens).
+            for image in content.images() {
+                total += crate::estimate_image_tokens(image.detail.as_deref());
+            }
         }
         // Add overhead for message formatting
         total += 4;
@@ -1223,6 +1281,66 @@ mod tests {
             }}"#
         );
         serde_json::from_str(&json).unwrap()
+    }
+
+    #[test]
+    fn test_count_request_tokens_includes_image_tokens() {
+        // A high-detail image adds IMAGE_TOKENS_HIGH over the text-only count.
+        let with_image = request_with_image("gpt-4o");
+
+        let text_only: ChatCompletionRequest = serde_json::from_str(
+            r#"{"model":"gpt-4o","messages":[{"role":"user","content":[{"type":"text","text":"Describe this"}]}]}"#,
+        )
+        .unwrap();
+
+        let delta = count_request_tokens(&with_image) - count_request_tokens(&text_only);
+        assert_eq!(delta, crate::tokens::IMAGE_TOKENS_HIGH);
+    }
+
+    #[test]
+    fn test_count_request_tokens_low_detail_image() {
+        let low: ChatCompletionRequest = serde_json::from_str(
+            r#"{"model":"gpt-4o","messages":[{"role":"user","content":[{"type":"image_url","image_url":{"url":"u","detail":"low"}}]}]}"#,
+        )
+        .unwrap();
+        let none: ChatCompletionRequest =
+            serde_json::from_str(r#"{"model":"gpt-4o","messages":[{"role":"user","content":[]}]}"#)
+                .unwrap();
+        let delta = count_request_tokens(&low) - count_request_tokens(&none);
+        assert_eq!(delta, crate::tokens::IMAGE_TOKENS_LOW);
+    }
+
+    #[test]
+    fn test_responses_input_image_tokens() {
+        let input: ResponsesInput = serde_json::from_str(
+            r#"[{"type":"message","role":"user","content":[
+                {"type":"input_text","text":"hi"},
+                {"type":"input_image","image_url":"https://example.com/a.png"}
+            ]}]"#,
+        )
+        .unwrap();
+        assert_eq!(
+            count_responses_input_image_tokens(&input),
+            crate::tokens::IMAGE_TOKENS_HIGH
+        );
+
+        let text_only: ResponsesInput = serde_json::from_str(r#""just text""#).unwrap();
+        assert_eq!(count_responses_input_image_tokens(&text_only), 0);
+    }
+
+    #[test]
+    fn test_openresponses_input_image_tokens() {
+        let request: ResponseRequest = serde_json::from_str(
+            r#"{"model":"gpt-4o","input":[{"role":"user","content":[
+                {"type":"input_text","text":"hi"},
+                {"type":"input_image","image_url":"u","detail":"low"}
+            ]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(
+            count_openresponses_input_image_tokens(&request.input),
+            crate::tokens::IMAGE_TOKENS_LOW
+        );
     }
 
     #[test]

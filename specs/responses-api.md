@@ -39,6 +39,8 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 - `input_text`: `{"type": "input_text", "text": "..."}`
 - `input_image`: `{"type": "input_image", "image_url": "..."}`
 
+**R2.3**: Each `input_image` part contributes an approximate token cost to `usage.input_tokens`. The simulator does not fetch or decode image bytes, so the cost is approximated rather than computed from pixel dimensions: 765 tokens per image (a representative high-detail image under OpenAI's tile formula). Image inputs do not influence the generated output text.
+
 ### R3: Output Item Types
 
 **R3.1**: Generate message output items:
