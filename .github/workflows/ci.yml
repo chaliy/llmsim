@@ -228,17 +228,28 @@ jobs:
 
       # Server-backed Python examples run against the server on :8080 started
       # above. uv resolves each script's PEP 723 inline dependencies and an
-      # appropriate Python automatically.
+      # appropriate Python automatically. The examples are independent and the
+      # server is concurrent, so run them in parallel (uv's cache is lock-safe
+      # across simultaneous runs) and fail the step if any one fails.
       - name: Run Python examples
         run: |
-          set -euo pipefail
-          for ex in list_models openai_client responses_client \
+          set -uo pipefail
+          examples=(list_models openai_client responses_client \
                     openresponses_client langchain_client \
-                    langchain_responses_client openai_websocket_client; do
-            echo "::group::$ex.py"
-            uv run "examples/$ex.py"
+                    langchain_responses_client openai_websocket_client)
+          declare -A pid
+          for ex in "${examples[@]}"; do
+            uv run "examples/$ex.py" > "$RUNNER_TEMP/$ex.log" 2>&1 &
+            pid[$ex]=$!
+          done
+          rc=0
+          for ex in "${examples[@]}"; do
+            if wait "${pid[$ex]}"; then status=ok; else status=FAILED; rc=1; fi
+            echo "::group::$ex.py ($status)"
+            cat "$RUNNER_TEMP/$ex.log"
             echo "::endgroup::"
           done
+          exit "$rc"
 
       # scripted_demo.py needs a scripted server; the turn counter is global,
       # so use a fresh instance independent of the smoke test below.
