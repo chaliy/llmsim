@@ -14,13 +14,12 @@
 //	Start the llmsim server first:
 //	    llmsim serve --port 8080
 //
-//	Initialise the module and fetch the SDK:
-//	    cd examples/go
-//	    go mod init llmsim-anthropic-example
-//	    go get github.com/anthropics/anthropic-sdk-go
+// The module (go.mod / go.sum) is committed alongside this file, so no manual
+// setup is needed — just run it.
 //
 // Usage:
 //
+//	cd examples/go
 //	LLMSIM_URL=http://localhost:8080/anthropic/ go run anthropic_client.go
 //
 // Note: the base URL must end with a trailing slash and include the

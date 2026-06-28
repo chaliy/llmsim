@@ -195,6 +195,11 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+
       - name: Install Node dependencies
         run: npm install
         working-directory: examples/node
@@ -226,6 +231,19 @@ jobs:
         run: npx tsx openai_client.ts
         working-directory: examples/node
 
+      - name: Run TypeScript Anthropic example
+        run: npx tsx anthropic_client.ts
+        working-directory: examples/node
+
+      - name: Run Go Anthropic example
+        run: go run anthropic_client.go
+        working-directory: examples/go
+        env:
+          LLMSIM_URL: http://localhost:8080/anthropic/
+
+      - name: Run Anthropic curl example
+        run: bash examples/anthropic_curl.sh
+
       # Server-backed Python examples run against the server on :8080 started
       # above. uv resolves each script's PEP 723 inline dependencies and an
       # appropriate Python automatically. The examples are independent and the
@@ -236,7 +254,8 @@ jobs:
           set -uo pipefail
           examples=(list_models openai_client responses_client \
                     openresponses_client langchain_client \
-                    langchain_responses_client openai_websocket_client)
+                    langchain_responses_client openai_websocket_client \
+                    anthropic_client anthropic_langchain)
           declare -A pid
           for ex in "${examples[@]}"; do
             uv run "examples/$ex.py" > "$RUNNER_TEMP/$ex.log" 2>&1 &

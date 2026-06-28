@@ -139,12 +139,11 @@ npx tsx examples/node/anthropic_client.ts
 
 ## Go Example
 
-Direct usage of the official Anthropic Go SDK:
+Direct usage of the official Anthropic Go SDK (the module is committed under
+`examples/go`, so no setup is needed):
 
 ```bash
 cd examples/go
-go mod init llmsim-anthropic-example
-go get github.com/anthropics/anthropic-sdk-go
 LLMSIM_URL=http://localhost:8080/anthropic/ go run anthropic_client.go
 ```
 
