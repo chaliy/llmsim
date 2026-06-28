@@ -35,6 +35,7 @@ sudo apt-get update && sudo apt-get install k6
 | `spike` | ~2 min | 10→500→10 | Burst traffic handling |
 | `soak` | ~32 min | 50 | Long-running stability |
 | `high-concurrency` | ~4 min | 100→500 | Maximum throughput |
+| `throughput` | varies | n/a | Peak req/s ceiling + parallelisation scaling (uses oha) |
 
 ## Usage
 
@@ -76,6 +77,31 @@ sudo apt-get update && sudo apt-get install k6
 export K6_TARGET_URL="https://llmsim.example.com"
 ./benchmarks/run-benchmark.sh load --no-server
 ```
+
+### Throughput Benchmark (peak req/s + parallelisation)
+
+The `throughput` profile measures llmsim's own request-handling ceiling and how
+it scales with async worker threads. It uses [`oha`](https://github.com/hatoo/oha)
+(Rust) instead of k6, because it saturates the server and needs a load generator
+with near-zero per-request overhead. See `specs/throughput-benchmark.md`.
+
+```bash
+# Install oha (the throughput generator)
+cargo install oha   # or: brew install oha
+
+# Sweep worker-thread counts (default: powers of two up to nproc) x concurrency
+./benchmarks/run-benchmark.sh throughput
+
+# Write the scaling table + headline to JSON
+./benchmarks/run-benchmark.sh throughput --output throughput.json
+
+# Override the sweeps
+./benchmarks/run-benchmark.sh throughput --workers 1,2,4,8 --concurrency 16,64,256
+```
+
+It prints a per-worker scaling table (RPS, p50/p95/p99, error %, scaling vs 1
+worker) and a single headline line. Absolute numbers are hardware-dependent; the
+scaling curve is the portable result.
 
 ## Test Scripts
 

@@ -550,6 +550,25 @@ mod tests {
     }
 
     #[test]
+    fn test_requests_per_second_empty_is_zero() {
+        let stats = Stats::new();
+        assert_eq!(stats.requests_per_second(), 0.0);
+    }
+
+    #[test]
+    fn test_requests_per_second_counts_recent() {
+        let stats = Stats::new();
+        for _ in 0..5 {
+            stats.record_request_start("gpt-4", false, EndpointType::ChatCompletions);
+        }
+        let rps = stats.requests_per_second();
+        // All requests land within the first second(s) of uptime, so the
+        // rolling window must report a positive rate reflecting them.
+        assert!(rps > 0.0, "expected positive rps, got {rps}");
+        assert!(rps.is_finite());
+    }
+
+    #[test]
     fn test_endpoint_types() {
         let stats = Stats::new();
 

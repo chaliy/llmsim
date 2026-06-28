@@ -151,3 +151,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_temp_config(contents: &str, tag: &str) -> String {
+        let path = std::env::temp_dir().join(format!(
+            "llmsim_build_config_{}_{}.toml",
+            std::process::id(),
+            tag
+        ));
+        let mut f = std::fs::File::create(&path).expect("create temp config");
+        f.write_all(contents.as_bytes()).expect("write temp config");
+        path.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn cli_args_none_preserve_config_file_values() {
+        // Regression: the CLI defaults for --generator/--target-tokens used to
+        // clobber values from --config. With Option args left as None, the
+        // config file must win.
+        let path = write_temp_config(
+            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "preserve",
+        );
+
+        let config = build_config(Some(path.clone()), 8080, None, None, None).unwrap();
+        assert_eq!(config.response.generator, "echo");
+        assert_eq!(config.response.target_tokens, 7);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn cli_args_some_override_config_file_values() {
+        let path = write_temp_config(
+            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "override",
+        );
+
+        let config = build_config(
+            Some(path.clone()),
+            8080,
+            None,
+            Some("lorem".to_string()),
+            Some(50),
+        )
+        .unwrap();
+        assert_eq!(config.response.generator, "lorem");
+        assert_eq!(config.response.target_tokens, 50);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn no_config_file_uses_defaults() {
+        let config = build_config(None, 8080, None, None, None).unwrap();
+        assert_eq!(config.response.generator, "lorem");
+        assert_eq!(config.response.target_tokens, 100);
+    }
+}
