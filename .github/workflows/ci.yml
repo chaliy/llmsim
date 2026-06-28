@@ -199,6 +199,11 @@ jobs:
         run: npm install
         working-directory: examples/node
 
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
       - name: Run Rust example (basic)
         run: cargo run --example basic_usage
 
@@ -220,6 +225,34 @@ jobs:
       - name: Run TypeScript example
         run: npx tsx openai_client.ts
         working-directory: examples/node
+
+      # Server-backed Python examples run against the server on :8080 started
+      # above. uv resolves each script's PEP 723 inline dependencies and an
+      # appropriate Python automatically.
+      - name: Run Python examples
+        run: |
+          set -euo pipefail
+          for ex in list_models openai_client responses_client \
+                    openresponses_client langchain_client \
+                    langchain_responses_client openai_websocket_client; do
+            echo "::group::$ex.py"
+            uv run "examples/$ex.py"
+            echo "::endgroup::"
+          done
+
+      # scripted_demo.py needs a scripted server; the turn counter is global,
+      # so use a fresh instance independent of the smoke test below.
+      - name: Run Python scripted example
+        run: |
+          set -euo pipefail
+          ./target/release/llmsim serve \
+            --config examples/scripted_demo.toml \
+            --port 8091 &
+          SCRIPTED_PID=$!
+          trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT
+          sleep 2
+          curl -sf http://localhost:8091/health > /dev/null
+          LLMSIM_URL=http://localhost:8091/openai/v1 uv run examples/scripted_demo.py
 
       - name: Smoke-test scripted server (examples/scripted_demo.json)
         run: |
