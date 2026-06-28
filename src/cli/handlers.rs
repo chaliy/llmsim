@@ -208,6 +208,12 @@ pub async fn chat_completions(
         return Ok(response);
     }
 
+    // Reject image inputs to non-vision models before doing any work.
+    if let Err(err) = validate_input_modalities(&request) {
+        state.stats.record_error(400);
+        return Ok(err.into_response());
+    }
+
     // Get latency profile (use model-specific if not configured)
     let latency =
         if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
@@ -1096,13 +1102,40 @@ fn calculate_reasoning_tokens(
     (output_tokens as f64 * multiplier) as usize
 }
 
+/// Reject image inputs sent to a model that does not advertise vision support,
+/// mirroring the real provider behavior. Decision: only enforce when the model
+/// resolves to a known profile — unknown/custom model ids are let through since
+/// the simulator cannot assert their capabilities. The content-array syntax
+/// itself is always accepted (valid for every chat model); only image parts gate.
+fn validate_input_modalities(request: &ChatCompletionRequest) -> Result<(), AppError> {
+    let has_images = request
+        .messages
+        .iter()
+        .filter_map(|m| m.content.as_ref())
+        .any(|c| c.has_images());
+
+    if has_images {
+        if let Some(profile) = crate::openai::get_model_profile(&request.model) {
+            if !profile.capabilities.vision {
+                return Err(AppError::BadRequest(format!(
+                    "The model `{}` does not support image inputs. \
+                     Use a vision-capable model.",
+                    request.model
+                )));
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Count tokens in a chat request
 fn count_request_tokens(request: &ChatCompletionRequest) -> usize {
     let mut total = 0;
     for message in &request.messages {
         if let Some(content) = &message.content {
-            total +=
-                crate::count_tokens_default(content).unwrap_or(content.split_whitespace().count());
+            let text = content.text();
+            total += crate::count_tokens_default(&text).unwrap_or(text.split_whitespace().count());
         }
         // Add overhead for message formatting
         total += 4;
@@ -1175,6 +1208,67 @@ mod tests {
 
         let tokens = count_request_tokens(&request);
         assert!(tokens > 0);
+    }
+
+    fn request_with_image(model: &str) -> ChatCompletionRequest {
+        let json = format!(
+            r#"{{
+                "model": "{model}",
+                "messages": [
+                    {{"role": "user", "content": [
+                        {{"type": "text", "text": "Describe this"}},
+                        {{"type": "image_url", "image_url": {{"url": "https://example.com/x.png"}}}}
+                    ]}}
+                ]
+            }}"#
+        );
+        serde_json::from_str(&json).unwrap()
+    }
+
+    #[test]
+    fn test_vision_model_accepts_image_input() {
+        // gpt-4o advertises vision.
+        let request = request_with_image("gpt-4o");
+        assert!(validate_input_modalities(&request).is_ok());
+    }
+
+    #[test]
+    fn test_non_vision_model_rejects_image_input() {
+        // gpt-4 has vision: false in its profile.
+        let request = request_with_image("gpt-4");
+        let err = validate_input_modalities(&request).unwrap_err();
+        assert!(matches!(err, AppError::BadRequest(_)));
+    }
+
+    #[test]
+    fn test_unknown_model_allows_image_input() {
+        // Custom/unknown ids have no profile, so we cannot assert non-vision.
+        let request = request_with_image("my-custom-model");
+        assert!(validate_input_modalities(&request).is_ok());
+    }
+
+    #[test]
+    fn test_text_only_request_passes_modality_check() {
+        let request = ChatCompletionRequest {
+            model: "gpt-4".to_string(),
+            messages: vec![Message::user("Hello!")],
+            temperature: None,
+            top_p: None,
+            n: None,
+            stream: false,
+            stop: None,
+            max_tokens: None,
+            max_completion_tokens: None,
+            presence_penalty: None,
+            frequency_penalty: None,
+            logit_bias: None,
+            user: None,
+            tools: None,
+            tool_choice: None,
+            response_format: None,
+            seed: None,
+        };
+        assert!(validate_input_modalities(&request).is_ok());
     }
 
     #[tokio::test]

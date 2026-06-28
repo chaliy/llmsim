@@ -231,7 +231,7 @@ pub fn build_chat_completion_response(
 
     let message = Message {
         role: Role::Assistant,
-        content: text,
+        content: text.map(crate::openai::ChatMessageContent::Text),
         name: None,
         tool_calls: if tool_calls.is_empty() {
             None
