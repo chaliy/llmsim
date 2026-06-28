@@ -10,6 +10,9 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "lowercase")]
 pub enum Role {
     System,
+    // `developer` is the newer OpenAI role that supersedes `system`; SDKs such as
+    // the Vercel AI SDK emit it for system prompts, so accept it for compatibility.
+    Developer,
     User,
     Assistant,
     Tool,
@@ -482,6 +485,22 @@ mod tests {
         assert_eq!(request.messages.len(), 2);
         assert_eq!(request.temperature, Some(0.7));
         assert!(request.stream);
+    }
+
+    #[test]
+    fn test_chat_request_developer_role() {
+        // The Vercel AI SDK (and newer OpenAI models) send system prompts with
+        // the `developer` role; make sure it deserializes.
+        let json = r#"{
+            "model": "gpt-5",
+            "messages": [
+                {"role": "developer", "content": "You are a helpful assistant."},
+                {"role": "user", "content": "Hello!"}
+            ]
+        }"#;
+
+        let request: ChatCompletionRequest = serde_json::from_str(json).unwrap();
+        assert_eq!(request.messages[0].role, Role::Developer);
     }
 
     #[test]

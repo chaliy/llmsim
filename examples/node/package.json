@@ -1,5 +1,7 @@
 {
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.0",
+    "ai": "^5.0.0",
     "openai": "^6.45.0"
   },
   "devDependencies": {
