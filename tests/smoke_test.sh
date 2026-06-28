@@ -192,5 +192,50 @@ else
     exit 1
 fi
 
+# Test 11: Anthropic Messages API (non-streaming)
+echo_info "Testing /anthropic/v1/messages (non-streaming)..."
+ANTHROPIC=$(curl -s -X POST "$BASE_URL/anthropic/v1/messages" \
+    -H "Content-Type: application/json" \
+    -H "x-api-key: not-needed" \
+    -H "anthropic-version: 2023-06-01" \
+    -d '{
+        "model": "claude-opus-4-8",
+        "max_tokens": 64,
+        "messages": [{"role": "user", "content": "Hello!"}]
+    }')
+if echo "$ANTHROPIC" | grep -q '"type":"message"' && echo "$ANTHROPIC" | grep -q '"stop_reason":"end_turn"'; then
+    echo_pass "Anthropic Messages API passed"
+else
+    echo_fail "Anthropic Messages API failed: $ANTHROPIC"
+    exit 1
+fi
+
+# Test 12: Anthropic Messages API (streaming)
+echo_info "Testing /anthropic/v1/messages (streaming)..."
+ANTHROPIC_STREAM=$(curl -s -X POST "$BASE_URL/anthropic/v1/messages" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "claude-haiku-4-5",
+        "max_tokens": 32,
+        "stream": true,
+        "messages": [{"role": "user", "content": "Hello!"}]
+    }')
+if echo "$ANTHROPIC_STREAM" | grep -q 'event: message_start' && echo "$ANTHROPIC_STREAM" | grep -q 'event: message_stop'; then
+    echo_pass "Anthropic streaming passed"
+else
+    echo_fail "Anthropic streaming failed: $ANTHROPIC_STREAM"
+    exit 1
+fi
+
+# Test 13: Anthropic models endpoint
+echo_info "Testing /anthropic/v1/models endpoint..."
+ANTHROPIC_MODELS=$(curl -s "$BASE_URL/anthropic/v1/models")
+if echo "$ANTHROPIC_MODELS" | grep -q 'claude-opus-4-8'; then
+    echo_pass "Anthropic models endpoint passed"
+else
+    echo_fail "Anthropic models endpoint failed: $ANTHROPIC_MODELS"
+    exit 1
+fi
+
 echo ""
 echo -e "${GREEN}All smoke tests passed!${NC}"

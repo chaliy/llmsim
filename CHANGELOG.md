@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Anthropic Messages API support**: new `/anthropic/v1/messages` endpoint
+  (streaming and non-streaming) plus `/anthropic/v1/models` and
+  `/anthropic/v1/models/:id`, wire-compatible with the official Anthropic SDKs
+  when pointed at `{base_url}/anthropic`. Includes realistic Claude model
+  profiles (sourced from models.dev) using the real Anthropic API model IDs
+  (`claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-fable-5`,
+  …) with dated-snapshot and `-latest` aliases, the Anthropic SSE event
+  sequence, the Anthropic error envelope, scripted `tool_use` support, and a
+  `messages_requests` stat counter. New examples for Python, TypeScript, Go,
+  curl, and LangChain. See `specs/anthropic-api.md`.
+
 ## [0.5.1] - 2026-06-28
 
 ### Highlights

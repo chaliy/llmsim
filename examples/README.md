@@ -8,6 +8,7 @@ LLMSim provides two API providers:
 |----------|-----------|-------------|
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
+| **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
 
 ### OpenAI API Endpoints
 
@@ -24,6 +25,14 @@ LLMSim provides two API providers:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/openresponses/v1/responses` | POST | Create response (streaming supported) |
+
+### Anthropic API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/anthropic/v1/messages` | POST | Messages API (streaming supported) |
+| `/anthropic/v1/models` | GET | List available Claude models |
+| `/anthropic/v1/models/:id` | GET | Get model details |
 
 ## Running the Examples
 
@@ -79,6 +88,23 @@ Using LangChain's OpenAI-compatible client:
 uv run examples/langchain_client.py
 ```
 
+### Anthropic SDK
+
+Direct usage of the official Anthropic Python SDK (messages, streaming, tools,
+models):
+
+```bash
+uv run examples/anthropic_client.py
+```
+
+### Anthropic via LangChain
+
+Using LangChain's `ChatAnthropic` client:
+
+```bash
+uv run examples/anthropic_langchain.py
+```
+
 ### Scripted mode
 
 Drive a deterministic multi-turn script (tool calls, errors, mixed
@@ -95,13 +121,39 @@ uv run examples/scripted_demo.py
 See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the full
 script JSON format.
 
-## TypeScript Example
+## TypeScript Examples
 
 Direct usage of the official OpenAI Node.js library:
 
 ```bash
 npm install openai
 npx tsx examples/openai_client.ts
+```
+
+Direct usage of the official Anthropic Node.js SDK:
+
+```bash
+npm install @anthropic-ai/sdk
+npx tsx examples/node/anthropic_client.ts
+```
+
+## Go Example
+
+Direct usage of the official Anthropic Go SDK:
+
+```bash
+cd examples/go
+go mod init llmsim-anthropic-example
+go get github.com/anthropics/anthropic-sdk-go
+LLMSIM_URL=http://localhost:8080/anthropic/ go run anthropic_client.go
+```
+
+## Shell / curl Example
+
+Raw HTTP against the Anthropic Messages API:
+
+```bash
+./examples/anthropic_curl.sh
 ```
 
 ## Custom Server URL
@@ -112,6 +164,9 @@ LLMSIM_URL=http://localhost:9000/openai/v1 uv run examples/openai_client.py
 
 # OpenResponses example
 LLMSIM_URL=http://localhost:9000 uv run examples/openresponses_client.py
+
+# Anthropic example
+LLMSIM_URL=http://localhost:9000/anthropic uv run examples/anthropic_client.py
 ```
 
 ## Stats API
@@ -174,5 +229,32 @@ curl http://localhost:8080/openresponses/v1/responses \
     "model": "gpt-5",
     "input": "Tell me a story",
     "stream": true
+  }'
+```
+
+### Anthropic Messages API
+
+```bash
+curl http://localhost:8080/anthropic/v1/messages \
+  -H "content-type: application/json" \
+  -H "x-api-key: not-needed" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-opus-4-8",
+    "max_tokens": 64,
+    "messages": [{"role": "user", "content": "Hello, Claude!"}]
+  }'
+```
+
+### Streaming (Anthropic)
+
+```bash
+curl -N http://localhost:8080/anthropic/v1/messages \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-haiku-4-5",
+    "max_tokens": 64,
+    "stream": true,
+    "messages": [{"role": "user", "content": "Tell me a story"}]
   }'
 ```

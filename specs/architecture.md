@@ -13,7 +13,8 @@ llmsim/
 │   ├── cli/            # CLI-specific modules
 │   │   ├── mod.rs      # Server runner
 │   │   ├── config.rs   # Configuration loading
-│   │   ├── handlers.rs # HTTP request handlers
+│   │   ├── handlers.rs # HTTP request handlers (OpenAI + OpenResponses)
+│   │   ├── anthropic_handlers.rs # Anthropic Messages + Models handlers
 │   │   ├── ws_handler.rs # WebSocket request handler
 │   │   └── state.rs    # Application state (config + stats)
 │   ├── tui/            # Terminal UI dashboard
@@ -30,6 +31,11 @@ llmsim/
 │   │   ├── mod.rs
 │   │   ├── types.rs    # Request/response types
 │   │   └── stream.rs   # OpenResponses-specific streaming
+│   ├── anthropic/      # Anthropic Messages API
+│   │   ├── mod.rs
+│   │   ├── types.rs    # Messages request/response types
+│   │   ├── models.rs   # Claude model profiles (real API IDs)
+│   │   └── stream.rs   # Anthropic SSE streaming
 │   ├── stats.rs        # Real-time statistics tracking
 │   ├── tokens.rs       # Token counting with tiktoken
 │   ├── latency.rs      # Latency profile simulation
@@ -176,16 +182,23 @@ See `specs/api-endpoints.md` for the full specification.
 
 See `specs/responses-api.md` for detailed Responses API specification.
 
+### Anthropic Messages API
+- `POST /anthropic/v1/messages` - Create a message (streaming and non-streaming)
+- `GET /anthropic/v1/models` - List available Claude models
+- `GET /anthropic/v1/models/:model_id` - Get model details
+
+See `specs/anthropic-api.md` for detailed Anthropic API specification.
+
 ### Module Organization
 
-- **Public modules** (`openai`, `openresponses`, `generator`, `latency`, `stream`, `responses_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
+- **Public modules** (`openai`, `openresponses`, `anthropic`, `generator`, `latency`, `stream`, `responses_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
 - **Token module** (`tokens`): Token counting behind the `tokens` feature (tiktoken-rs)
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration, behind the `server` feature
 - **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with Ratatui
 
 ### API Support
 
-The server implements two LLM API specifications with provider-namespaced routes:
+The server implements three LLM API specifications with provider-namespaced routes:
 
 1. **OpenAI API** (`/openai/v1/...`)
    - `/openai/v1/chat/completions` - Chat completions (streaming & non-streaming)
@@ -199,6 +212,14 @@ The server implements two LLM API specifications with provider-namespaced routes
    - Supports text and message-based input
    - Full streaming with lifecycle events (response.created, response.output_text.delta, etc.)
    - Tool support, reasoning configuration, and metadata
+
+3. **Anthropic API** (`/anthropic/v1/...`) - [docs.anthropic.com](https://docs.anthropic.com/en/api/messages)
+   - `/anthropic/v1/messages` - Messages API (streaming & non-streaming)
+   - `/anthropic/v1/models` - List available Claude models
+   - `/anthropic/v1/models/:model_id` - Get specific model
+   - Real Claude model IDs (`claude-opus-4-8`, ...) with dated/`-latest` aliases
+   - Anthropic SSE event sequence (message_start, content_block_delta, message_stop)
+   - Anthropic error envelope and scripted tool_use support
 
 ### Stats Module
 

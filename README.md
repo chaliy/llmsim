@@ -17,7 +17,7 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Features
 
-- **Multi-Provider API Support** - OpenAI Chat Completions and [OpenResponses](https://www.openresponses.org) APIs
+- **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), and Anthropic Messages APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
 - **Streaming Support** - Server-Sent Events (SSE) for both OpenAI and OpenResponses streaming formats
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
@@ -141,6 +141,18 @@ When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
+
+### Anthropic API (`/anthropic/v1/...`)
+
+Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) with realistic Claude model profiles.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming) |
+| `/anthropic/v1/models` | GET | List available Claude models |
+| `/anthropic/v1/models/{model_id}` | GET | Get specific model details |
+
+When using Anthropic SDKs, set the base URL to `http://localhost:8080/anthropic`.
 
 ### LLMSim endpoints
 

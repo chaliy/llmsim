@@ -28,6 +28,7 @@ Available specs:
 - `specs/architecture.md` - System architecture and module organization
 - `specs/api-endpoints.md` - API endpoint structure and routing conventions
 - `specs/responses-api.md` - OpenAI Responses API simulation
+- `specs/anthropic-api.md` - Anthropic Messages API simulation
 - `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
 - `specs/load-testing.md` - Load testing framework and benchmarks
 - `specs/throughput-benchmark.md` - Peak throughput (req/s) benchmark with parallelisation scaling
@@ -93,7 +94,7 @@ Provider-specific endpoints mirror their original API paths, prefixed with the p
 Examples:
 - OpenAI `/v1/chat/completions` → `/openai/v1/chat/completions`
 - OpenAI `/v1/responses` → `/openai/v1/responses`
-- Anthropic `/v1/messages` → `/anthropic/v1/messages` (future)
+- Anthropic `/v1/messages` → `/anthropic/v1/messages`
 
 **Current OpenAI endpoints:**
 - `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
@@ -103,6 +104,11 @@ Examples:
 
 **OpenResponses endpoints:**
 - `POST /openresponses/v1/responses` - OpenResponses API (streaming supported)
+
+**Anthropic endpoints:**
+- `POST /anthropic/v1/messages` - Messages API (streaming supported)
+- `GET /anthropic/v1/models` - List available Claude models
+- `GET /anthropic/v1/models/:id` - Get model details
 
 **System endpoints:**
 - `GET /health` - Health check
@@ -115,10 +121,11 @@ See `specs/api-endpoints.md` for the full specification.
 - `src/` - Main source code (library and binary)
 - `src/openai/` - OpenAI API types and model profiles
 - `src/openresponses/` - OpenResponses API types and streaming
+- `src/anthropic/` - Anthropic Messages API types, model profiles, and streaming
 - `src/cli/` - CLI server, configuration, and HTTP handlers
 - `src/tui/` - Terminal UI components
 - `tests/` - Integration tests
-- `examples/` - Usage examples (Rust, Python, TypeScript)
+- `examples/` - Usage examples (Rust, Python, TypeScript, Go)
 - `specs/` - Feature specifications
 - `benchmarks/` - Load testing scripts (k6)
 - `docs/` - Public-facing user documentation
