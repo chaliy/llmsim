@@ -24,6 +24,15 @@ brew install k6
 k6 version
 ```
 
+**oha** is required only for the `throughput` profile (peak req/s ceiling +
+parallelisation sweep). It is a Rust load generator with near-zero per-request
+overhead, used instead of k6 when saturating the server:
+
+```bash
+cargo install oha   # or: brew install oha
+oha --version
+```
+
 ### Build llmsim
 
 ```bash
@@ -55,6 +64,7 @@ Ultra-fast variant (3 iterations):
 | Spike | `./benchmarks/run-benchmark.sh spike` | ~2 min | 10-500 | Burst traffic |
 | Soak | `./benchmarks/run-benchmark.sh soak` | ~32 min | 50 | Memory leaks |
 | High Concurrency | `./benchmarks/run-benchmark.sh high-concurrency` | ~4 min | 500 | Max throughput |
+| Throughput | `./benchmarks/run-benchmark.sh throughput` | varies | n/a | Peak req/s ceiling + parallelisation scaling (uses oha) |
 
 ### Common Options
 

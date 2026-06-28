@@ -39,12 +39,18 @@ enum Commands {
         host: Option<String>,
 
         /// Response generator (lorem, echo, random, fixed:text)
-        #[arg(long, default_value = "lorem")]
-        generator: String,
+        ///
+        /// Overrides the config file when set; otherwise the config value
+        /// (or the "lorem" default) is used.
+        #[arg(long)]
+        generator: Option<String>,
 
         /// Target number of tokens in responses
-        #[arg(long, default_value = "100")]
-        target_tokens: usize,
+        ///
+        /// Overrides the config file when set; otherwise the config value
+        /// (or the default of 100) is used.
+        #[arg(long)]
+        target_tokens: Option<usize>,
 
         /// Show real-time stats dashboard (TUI)
         ///
@@ -58,8 +64,8 @@ fn build_config(
     config_file: Option<String>,
     port: u16,
     host: Option<String>,
-    generator: String,
-    target_tokens: usize,
+    generator: Option<String>,
+    target_tokens: Option<usize>,
 ) -> Result<Config, ConfigError> {
     let mut config = if let Some(path) = config_file {
         Config::from_file(&path)?
@@ -67,13 +73,19 @@ fn build_config(
         Config::default()
     };
 
-    // Override with CLI arguments
+    // Override with CLI arguments only when explicitly provided, so values from
+    // the config file are respected (previously the CLI defaults silently
+    // clobbered generator/target_tokens from --config).
     config.server.port = port;
     if let Some(host) = host {
         config.server.host = host;
     }
-    config.response.generator = generator;
-    config.response.target_tokens = target_tokens;
+    if let Some(generator) = generator {
+        config.response.generator = generator;
+    }
+    if let Some(target_tokens) = target_tokens {
+        config.response.target_tokens = target_tokens;
+    }
 
     Ok(config)
 }
@@ -138,4 +150,66 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_temp_config(contents: &str, tag: &str) -> String {
+        let path = std::env::temp_dir().join(format!(
+            "llmsim_build_config_{}_{}.toml",
+            std::process::id(),
+            tag
+        ));
+        let mut f = std::fs::File::create(&path).expect("create temp config");
+        f.write_all(contents.as_bytes()).expect("write temp config");
+        path.to_string_lossy().into_owned()
+    }
+
+    #[test]
+    fn cli_args_none_preserve_config_file_values() {
+        // Regression: the CLI defaults for --generator/--target-tokens used to
+        // clobber values from --config. With Option args left as None, the
+        // config file must win.
+        let path = write_temp_config(
+            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "preserve",
+        );
+
+        let config = build_config(Some(path.clone()), 8080, None, None, None).unwrap();
+        assert_eq!(config.response.generator, "echo");
+        assert_eq!(config.response.target_tokens, 7);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn cli_args_some_override_config_file_values() {
+        let path = write_temp_config(
+            "[response]\ngenerator = \"echo\"\ntarget_tokens = 7\n",
+            "override",
+        );
+
+        let config = build_config(
+            Some(path.clone()),
+            8080,
+            None,
+            Some("lorem".to_string()),
+            Some(50),
+        )
+        .unwrap();
+        assert_eq!(config.response.generator, "lorem");
+        assert_eq!(config.response.target_tokens, 50);
+
+        let _ = std::fs::remove_file(path);
+    }
+
+    #[test]
+    fn no_config_file_uses_defaults() {
+        let config = build_config(None, 8080, None, None, None).unwrap();
+        assert_eq!(config.response.generator, "lorem");
+        assert_eq!(config.response.target_tokens, 100);
+    }
 }

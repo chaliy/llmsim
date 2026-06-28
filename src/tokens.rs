@@ -1,6 +1,16 @@
 // Token Counter Module
 // Uses tiktoken-rs for accurate token counting compatible with OpenAI's tokenizer.
+//
+// Decision: each tiktoken encoding (cl100k/o200k/p50k/r50k) is built once and
+// cached in a process-wide OnceLock. Building a CoreBPE parses the embedded BPE
+// vocabulary and costs ~140ms, while encoding a string costs ~0.05ms. The hot
+// request path calls count_tokens several times per request, so rebuilding the
+// tokenizer on every call made token counting (not the HTTP/async machinery) the
+// dominant throughput bottleneck. Caching keeps the encodings resident, so the
+// build cost is paid once per process. CoreBPE is Send + Sync, so sharing a
+// &'static across worker threads is safe.
 
+use std::sync::OnceLock;
 use tiktoken_rs::{cl100k_base, o200k_base, p50k_base, r50k_base, CoreBPE};
 
 /// Error type for token counting operations
@@ -10,8 +20,40 @@ pub enum TokenError {
     InitError(String),
 }
 
-/// Get the appropriate tokenizer for a model
-fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
+/// Build (once) and return a shared reference to a cached encoding.
+fn cached<E: std::fmt::Display>(
+    cache: &'static OnceLock<CoreBPE>,
+    build: fn() -> Result<CoreBPE, E>,
+) -> Result<&'static CoreBPE, TokenError> {
+    if let Some(bpe) = cache.get() {
+        return Ok(bpe);
+    }
+    let built = build().map_err(|e| TokenError::InitError(e.to_string()))?;
+    Ok(cache.get_or_init(|| built))
+}
+
+fn cl100k() -> Result<&'static CoreBPE, TokenError> {
+    static CACHE: OnceLock<CoreBPE> = OnceLock::new();
+    cached(&CACHE, cl100k_base)
+}
+
+fn o200k() -> Result<&'static CoreBPE, TokenError> {
+    static CACHE: OnceLock<CoreBPE> = OnceLock::new();
+    cached(&CACHE, o200k_base)
+}
+
+fn p50k() -> Result<&'static CoreBPE, TokenError> {
+    static CACHE: OnceLock<CoreBPE> = OnceLock::new();
+    cached(&CACHE, p50k_base)
+}
+
+fn r50k() -> Result<&'static CoreBPE, TokenError> {
+    static CACHE: OnceLock<CoreBPE> = OnceLock::new();
+    cached(&CACHE, r50k_base)
+}
+
+/// Get the appropriate tokenizer for a model (cached, see module note)
+fn get_tokenizer_for_model(model: &str) -> Result<&'static CoreBPE, TokenError> {
     // Model to encoding mapping based on OpenAI's documentation
     let model_lower = model.to_lowercase();
 
@@ -23,7 +65,7 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
         || model_lower.starts_with("o4")
         || model_lower.contains("chatgpt-4o")
     {
-        return o200k_base().map_err(|e| TokenError::InitError(e.to_string()));
+        return o200k();
     }
 
     // cl100k_base: GPT-4, text-embedding, Claude, Gemini, DeepSeek
@@ -33,12 +75,12 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
         || model_lower.contains("gemini")
         || model_lower.contains("deepseek")
     {
-        return cl100k_base().map_err(|e| TokenError::InitError(e.to_string()));
+        return cl100k();
     }
 
     // p50k_base: text-davinci-002, text-davinci-003, code-* models
     if model_lower.contains("davinci") || model_lower.contains("code-") {
-        return p50k_base().map_err(|e| TokenError::InitError(e.to_string()));
+        return p50k();
     }
 
     // r50k_base: GPT-3 models (ada, babbage, curie, davinci without version)
@@ -46,11 +88,11 @@ fn get_tokenizer_for_model(model: &str) -> Result<CoreBPE, TokenError> {
         || model_lower.contains("babbage")
         || model_lower.contains("curie")
     {
-        return r50k_base().map_err(|e| TokenError::InitError(e.to_string()));
+        return r50k();
     }
 
     // Default to cl100k_base as it's the most common for modern models
-    cl100k_base().map_err(|e| TokenError::InitError(e.to_string()))
+    cl100k()
 }
 
 /// Count tokens in a text string for a specific model
@@ -73,7 +115,7 @@ pub fn count_tokens_default(text: &str) -> Result<usize, TokenError> {
 
 /// Token counter that caches the tokenizer for repeated use
 pub struct TokenCounter {
-    bpe: CoreBPE,
+    bpe: &'static CoreBPE,
     model: String,
 }
 
