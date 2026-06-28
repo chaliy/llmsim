@@ -19,6 +19,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/responses` | WS | WebSocket mode for Responses API |
+| `/openai/v1/images/generations` | POST | Image generation (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
 
@@ -213,6 +214,81 @@ curl http://localhost:8080/openai/v1/models
 ```bash
 curl http://localhost:8080/openai/v1/models/gpt-5
 ```
+
+### Image Generation
+
+Simulates the gpt-image family ("ChatGPT Images"). Returns a synthetic PNG of
+the requested size that renders the prompt text and a "LLMSIM SIMULATED IMAGE"
+watermark — no real model runs. Works with the official SDKs
+(`client.images.generate(...)`).
+
+```bash
+curl http://localhost:8080/openai/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-1",
+    "prompt": "a cat riding a bicycle",
+    "size": "1024x1024",
+    "quality": "low"
+  }'
+```
+
+#### Request Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `prompt` | string | (required) | Text description of the image |
+| `model` | string | `gpt-image-1` | `gpt-image-1`, `gpt-image-1-mini`, `gpt-image-1.5` |
+| `n` | integer | `1` | Number of images (1–10) |
+| `size` | string | `1024x1024` | `1024x1024`, `1536x1024`, `1024x1536`, or `auto` |
+| `quality` | string | `high` | `low`, `medium`, `high`, `auto` |
+| `output_format` | string | `png` | `png`, `jpeg`, `webp` (echoed back) |
+| `background` | string | `opaque` | `transparent`, `opaque`, `auto` |
+| `stream` | boolean | `false` | Stream partial images via SSE |
+| `partial_images` | integer | `0` | Progressive preview frames (0–3) |
+
+#### Response
+
+```json
+{
+  "created": 1750000000,
+  "data": [{ "b64_json": "<base64 PNG>" }],
+  "usage": {
+    "input_tokens": 8,
+    "output_tokens": 272,
+    "total_tokens": 280,
+    "input_tokens_details": { "text_tokens": 8, "image_tokens": 0 }
+  },
+  "size": "1024x1024",
+  "quality": "low",
+  "output_format": "png",
+  "background": "opaque"
+}
+```
+
+#### Streaming
+
+With `"stream": true` and `"partial_images": N`, the server emits SSE events:
+`image_generation.partial_image` frames (progressively sharper previews) followed
+by a final `image_generation.completed` event carrying the full image and usage.
+
+```bash
+curl http://localhost:8080/openai/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-1",
+    "prompt": "sunset over mountains",
+    "stream": true,
+    "partial_images": 3
+  }'
+```
+
+Generation latency scales with quality and image size and is anchored to the
+configured latency profile; the `instant`/`fast` profiles make it effectively
+immediate for tests and load runs.
+
+See [`specs/image-generation.md`](../specs/image-generation.md) for the full
+specification.
 
 ## OpenResponses API (`/openresponses/v1/...`)
 

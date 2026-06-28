@@ -39,6 +39,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/openai/v1/responses",
             post(handlers::create_response).get(ws_handler::ws_responses),
         )
+        .route(
+            "/openai/v1/images/generations",
+            post(handlers::create_image),
+        )
         // OpenResponses API routes (https://www.openresponses.org)
         .route(
             "/openresponses/v1/responses",

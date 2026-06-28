@@ -160,6 +160,44 @@ else
     exit 1
 fi
 
+# Test 8b: OpenAI Image Generation (non-streaming)
+echo_info "Testing /openai/v1/images/generations (non-streaming)..."
+IMAGE_API=$(curl -s -X POST "$BASE_URL/openai/v1/images/generations" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "gpt-image-1",
+        "prompt": "a cat riding a bicycle",
+        "size": "256x256",
+        "quality": "low"
+    }')
+# A valid PNG begins with the base64 prefix "iVBORw0KGgo" in b64_json.
+if echo "$IMAGE_API" | grep -q '"b64_json":"iVBORw0KGgo'; then
+    echo_pass "OpenAI Image Generation passed"
+else
+    echo_fail "OpenAI Image Generation failed: ${IMAGE_API:0:200}"
+    exit 1
+fi
+
+# Test 8c: OpenAI Image Generation (streaming partial images)
+echo_info "Testing /openai/v1/images/generations (streaming)..."
+IMAGE_STREAM=$(curl -s -X POST "$BASE_URL/openai/v1/images/generations" \
+    -H "Content-Type: application/json" \
+    -d '{
+        "model": "gpt-image-1",
+        "prompt": "sunset over mountains",
+        "size": "256x256",
+        "quality": "low",
+        "stream": true,
+        "partial_images": 2
+    }')
+if echo "$IMAGE_STREAM" | grep -q 'image_generation.partial_image' \
+    && echo "$IMAGE_STREAM" | grep -q 'image_generation.completed'; then
+    echo_pass "OpenAI Image Generation streaming passed"
+else
+    echo_fail "OpenAI Image Generation streaming failed: ${IMAGE_STREAM:0:200}"
+    exit 1
+fi
+
 # Test 9: OpenResponses API
 echo_info "Testing /openresponses/v1/responses endpoint..."
 OPENRESPONSES=$(curl -s -X POST "$BASE_URL/openresponses/v1/responses" \

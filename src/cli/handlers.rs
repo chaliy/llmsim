@@ -5,7 +5,13 @@ use super::state::AppState;
 use crate::ids::{prefixed_id, unix_timestamp};
 use crate::{
     create_generator,
+    image_stream::ImageStream,
+    imagegen::{base64_encode, render_png, PlaceholderSpec},
     openai::{
+        images::{
+            estimate_image_tokens, image_total_duration, ImageData, ImageGenerationRequest,
+            ImageGenerationResponse, ImageInputTokensDetails, ImagesUsage,
+        },
         ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
         MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem, OutputRole,
         OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
@@ -927,6 +933,159 @@ pub async fn create_response(
             )
         } else {
             ResponsesResponse::new(request.model.clone(), result.content, result.usage)
+        };
+        Ok(Json(response).into_response())
+    }
+}
+
+/// POST /openai/v1/images/generations
+///
+/// Simulates the OpenAI image generation API (the gpt-image / "ChatGPT Images"
+/// capability). Returns a synthetic PNG of the requested size that renders the
+/// prompt text and a clear "LLMSIM SIMULATED IMAGE" watermark. Supports both
+/// the non-streaming JSON response and SSE streaming with partial images.
+pub async fn create_image(
+    State(state): State<Arc<AppState>>,
+    Json(request): Json<ImageGenerationRequest>,
+) -> Result<Response, AppError> {
+    let request_start = Instant::now();
+
+    tracing::info!(
+        model = %request.model,
+        stream = request.stream,
+        "Image generation request"
+    );
+
+    state
+        .stats
+        .record_request_start(&request.model, request.stream, EndpointType::Images);
+
+    // Check for error injection (shares the configured error model).
+    let error_injector = ErrorInjector::new(state.config.error_config());
+    if let Some(error) = error_injector.maybe_inject() {
+        tracing::warn!("Injecting error: {:?}", error);
+
+        let status_code = error.status_code();
+        let status = match status_code {
+            429 => StatusCode::TOO_MANY_REQUESTS,
+            500 => StatusCode::INTERNAL_SERVER_ERROR,
+            503 => StatusCode::SERVICE_UNAVAILABLE,
+            504 => StatusCode::GATEWAY_TIMEOUT,
+            400 => StatusCode::BAD_REQUEST,
+            401 => StatusCode::UNAUTHORIZED,
+            _ => StatusCode::INTERNAL_SERVER_ERROR,
+        };
+
+        state.stats.record_error(status_code);
+
+        let mut response = Json(error.to_error_response()).into_response();
+        *response.status_mut() = status;
+        if let Some(retry_after) = error.retry_after() {
+            response.headers_mut().insert(
+                header::RETRY_AFTER,
+                retry_after.to_string().parse().unwrap(),
+            );
+        }
+        return Ok(response);
+    }
+
+    // Image-generation timing is anchored to the configured latency profile;
+    // model-derived latency (the default) yields realistic multi-second waits,
+    // while `instant`/`fast` profiles collapse it for tests and load runs.
+    let latency =
+        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
+            state.config.latency_profile()
+        } else {
+            LatencyProfile::from_model(&request.model)
+        };
+
+    let params = request.resolve();
+
+    // Usage: text tokens from the prompt + estimated image (output) tokens.
+    let text_tokens = crate::count_tokens_default(&request.prompt)
+        .unwrap_or(request.prompt.split_whitespace().count()) as u32;
+    let image_tokens =
+        estimate_image_tokens(params.width, params.height, &params.quality) * params.n;
+    let usage = ImagesUsage {
+        input_tokens: text_tokens,
+        output_tokens: image_tokens,
+        total_tokens: text_tokens + image_tokens,
+        input_tokens_details: ImageInputTokensDetails {
+            text_tokens,
+            image_tokens: 0,
+        },
+    };
+
+    if request.stream {
+        let stats = state.stats.clone();
+        let input_tok = usage.input_tokens;
+        let output_tok = usage.output_tokens;
+
+        let stream = ImageStream::new(
+            &request.model,
+            &request.prompt,
+            params,
+            latency,
+            usage.clone(),
+        )
+        .with_on_complete(move || {
+            stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
+        });
+
+        let body = Body::from_stream(stream.into_stream().map(Ok::<_, std::io::Error>));
+
+        Ok(Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header(header::CONNECTION, "keep-alive")
+            .body(body)
+            .unwrap())
+    } else {
+        // Non-streaming: simulate the full generation time, then return all
+        // images at once.
+        let total = crate::image_stream::capped(image_total_duration(
+            &latency,
+            &params.quality,
+            params.width,
+            params.height,
+            params.n,
+        ));
+        if !total.is_zero() {
+            tokio::time::sleep(total).await;
+        }
+
+        let mut data = Vec::with_capacity(params.n as usize);
+        for _ in 0..params.n {
+            let png = render_png(&PlaceholderSpec {
+                width: params.width,
+                height: params.height,
+                prompt: &request.prompt,
+                model: &request.model,
+                quality: &params.quality,
+                blockiness: 1,
+            });
+            data.push(ImageData {
+                b64_json: Some(base64_encode(&png)),
+                url: None,
+                revised_prompt: None,
+            });
+        }
+
+        state.stats.record_request_end(
+            request_start.elapsed(),
+            usage.input_tokens,
+            usage.output_tokens,
+        );
+
+        let response = ImageGenerationResponse {
+            created: unix_timestamp(),
+            data,
+            usage,
+            size: params.size,
+            quality: params.quality,
+            output_format: params.output_format,
+            background: params.background,
         };
         Ok(Json(response).into_response())
     }

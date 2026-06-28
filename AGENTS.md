@@ -29,6 +29,7 @@ Available specs:
 - `specs/api-endpoints.md` - API endpoint structure and routing conventions
 - `specs/responses-api.md` - OpenAI Responses API simulation
 - `specs/anthropic-api.md` - Anthropic Messages API simulation
+- `specs/image-generation.md` - OpenAI image generation (gpt-image / "ChatGPT Images") simulation
 - `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
 - `specs/load-testing.md` - Load testing framework and benchmarks
 - `specs/throughput-benchmark.md` - Peak throughput (req/s) benchmark with parallelisation scaling
@@ -99,6 +100,7 @@ Examples:
 **Current OpenAI endpoints:**
 - `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
 - `POST /openai/v1/responses` - Responses API (streaming supported)
+- `POST /openai/v1/images/generations` - Image generation (gpt-image, streaming supported)
 - `GET /openai/v1/models` - List available models
 - `GET /openai/v1/models/:id` - Get model details
 
@@ -119,7 +121,9 @@ See `specs/api-endpoints.md` for the full specification.
 #### Code organization
 
 - `src/` - Main source code (library and binary)
-- `src/openai/` - OpenAI API types and model profiles
+- `src/openai/` - OpenAI API types and model profiles (includes `images.rs` for image generation)
+- `src/imagegen.rs` - Self-contained placeholder PNG synthesis (encoder + bitmap font)
+- `src/image_stream.rs` - Image generation streaming engine (partial images)
 - `src/openresponses/` - OpenResponses API types and streaming
 - `src/anthropic/` - Anthropic Messages API types, model profiles, and streaming
 - `src/cli/` - CLI server, configuration, and HTTP handlers

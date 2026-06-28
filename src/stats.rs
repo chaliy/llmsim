@@ -39,6 +39,8 @@ pub enum EndpointType {
     WebSocketResponses,
     /// Anthropic Messages API (/anthropic/v1/messages)
     Messages,
+    /// Image generation API (/openai/v1/images/generations)
+    Images,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -64,6 +66,8 @@ pub struct Stats {
     pub websocket_requests: AtomicU64,
     /// Anthropic Messages API requests
     pub messages_requests: AtomicU64,
+    /// Image generation API requests
+    pub image_requests: AtomicU64,
     /// Currently active WebSocket connections
     pub active_websocket_connections: AtomicU64,
 
@@ -123,6 +127,7 @@ impl Stats {
             responses_requests: AtomicU64::new(0),
             websocket_requests: AtomicU64::new(0),
             messages_requests: AtomicU64::new(0),
+            image_requests: AtomicU64::new(0),
             active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
@@ -163,6 +168,9 @@ impl Stats {
             }
             EndpointType::Messages => {
                 self.messages_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Images => {
+                self.image_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -388,6 +396,7 @@ impl Stats {
             responses_requests: self.responses_requests.load(ORDERING),
             websocket_requests: self.websocket_requests.load(ORDERING),
             messages_requests: self.messages_requests.load(ORDERING),
+            image_requests: self.image_requests.load(ORDERING),
             active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
@@ -418,6 +427,8 @@ pub struct StatsSnapshot {
     pub websocket_requests: u64,
     #[serde(default)]
     pub messages_requests: u64,
+    #[serde(default)]
+    pub image_requests: u64,
     pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,

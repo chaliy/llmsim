@@ -20,6 +20,7 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 - **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), and Anthropic Messages APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
 - **Streaming Support** - Server-Sent Events (SSE) for OpenAI, OpenResponses, and Anthropic streaming formats
+- **Image Generation** - Simulated gpt-image ("ChatGPT Images") endpoint returning watermarked PNGs, with streaming partial images
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
@@ -131,6 +132,7 @@ Note that `count_tokens` and the `tokens` module are only available with the
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
+| `/openai/v1/images/generations` | POST | Image generation (gpt-image, streaming & non-streaming) |
 
 When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 

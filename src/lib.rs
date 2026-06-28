@@ -45,6 +45,8 @@ pub mod anthropic;
 pub mod errors;
 pub mod generator;
 mod ids;
+pub mod image_stream;
+pub mod imagegen;
 pub mod latency;
 pub mod openai;
 pub mod openresponses;

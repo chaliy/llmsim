@@ -20,6 +20,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | OpenAI | `/openai` | `/v1/chat/completions` | `/openai/v1/chat/completions` |
 | OpenAI | `/openai` | `/v1/responses` | `/openai/v1/responses` |
 | OpenAI | `/openai` | `/v1/models` | `/openai/v1/models` |
+| OpenAI | `/openai` | `/v1/images/generations` | `/openai/v1/images/generations` |
 | OpenResponses | `/openresponses` | `/v1/responses` | `/openresponses/v1/responses` |
 | Anthropic | `/anthropic` | `/v1/messages` | `/anthropic/v1/messages` |
 
@@ -32,6 +33,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `POST` | `/openai/v1/chat/completions` | Chat Completions API |
 | `POST` | `/openai/v1/responses` | Responses API |
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
+| `POST` | `/openai/v1/images/generations` | Image generation API (streaming supported) |
 | `GET` | `/openai/v1/models` | List available models |
 | `GET` | `/openai/v1/models/:model_id` | Get model details |
 
@@ -45,6 +47,12 @@ This specification defines the URL structure and routing conventions for LLMSim 
 The content-array form is accepted for every model. Image parts are gated on the model's `vision` capability: a request carrying an `image_url` part to a model whose profile advertises `vision: false` (e.g. `gpt-4`) is rejected with `400 invalid_request_error`. Unknown/custom model ids (no profile) are allowed through, since their capabilities cannot be asserted.
 
 Image parts contribute an approximate token cost to `usage` (`prompt_tokens` / Responses `input_tokens`) but do not influence the generated output text. Because the simulator never fetches or decodes image bytes, the per-image cost is approximated from the `detail` hint: `"low"` → 85 tokens, otherwise (`"high"`/`"auto"`/unset) → 765 tokens (a representative ~1024×1024 image under OpenAI's tile formula). The Responses `input_image` part carries no `detail` and is charged the high-detail default. This applies to `/openai/v1/chat/completions`, `/openai/v1/responses`, and `/openresponses/v1/responses`.
+
+**R2.6**: The `/openai/v1/images/generations` endpoint simulates the gpt-image
+family ("ChatGPT Images"), returning a synthetic watermarked PNG of the
+requested size. It supports both non-streaming JSON and SSE streaming with
+progressive partial images. See `specs/image-generation.md` for the full
+specification.
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 

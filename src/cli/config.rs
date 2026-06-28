@@ -237,6 +237,10 @@ fn default_models() -> Vec<String> {
         "gpt-4.1".to_string(),
         "gpt-4.1-mini".to_string(),
         "gpt-4.1-nano".to_string(),
+        // OpenAI image generation models (gpt-image / "ChatGPT Images")
+        "gpt-image-1".to_string(),
+        "gpt-image-1-mini".to_string(),
+        "gpt-image-1.5".to_string(),
         // Claude family
         "claude-3.5-sonnet".to_string(),
         "claude-3.7-sonnet".to_string(),

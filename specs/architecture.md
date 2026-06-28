@@ -26,6 +26,7 @@ llmsim/
 │   │   ├── types.rs
 │   │   ├── models.rs   # Model profiles from models.dev
 │   │   ├── responses.rs # Responses API types
+│   │   ├── images.rs   # Image generation (gpt-image) types + streaming events
 │   │   └── websocket.rs # WebSocket (Realtime) types
 │   ├── openresponses/  # OpenResponses API types (https://www.openresponses.org)
 │   │   ├── mod.rs
@@ -42,6 +43,8 @@ llmsim/
 │   ├── generator.rs    # Response generators
 │   ├── stream.rs       # SSE streaming engine
 │   ├── responses_stream.rs # Responses API streaming
+│   ├── imagegen.rs     # Self-contained placeholder PNG synthesis (encoder + font)
+│   ├── image_stream.rs # Image generation streaming engine (partial images)
 │   └── errors.rs       # Error injection
 ├── benchmarks/         # Load testing benchmarks (k6)
 │   ├── run-benchmark.sh    # Main benchmark runner
@@ -182,6 +185,13 @@ See `specs/api-endpoints.md` for the full specification.
 
 See `specs/responses-api.md` for detailed Responses API specification.
 
+### OpenAI Image Generation API
+- `POST /openai/v1/images/generations` - Generate images (streaming and non-streaming)
+
+Simulates the gpt-image family ("ChatGPT Images"), returning a synthetic
+watermarked PNG of the requested size. See `specs/image-generation.md` for the
+detailed specification.
+
 ### Anthropic Messages API
 - `POST /anthropic/v1/messages` - Create a message (streaming and non-streaming)
 - `GET /anthropic/v1/models` - List available Claude models
@@ -191,7 +201,7 @@ See `specs/anthropic-api.md` for detailed Anthropic API specification.
 
 ### Module Organization
 
-- **Public modules** (`openai`, `openresponses`, `anthropic`, `generator`, `latency`, `stream`, `responses_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
+- **Public modules** (`openai`, `openresponses`, `anthropic`, `generator`, `latency`, `stream`, `responses_stream`, `imagegen`, `image_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
 - **Token module** (`tokens`): Token counting behind the `tokens` feature (tiktoken-rs)
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration, behind the `server` feature
 - **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with Ratatui
@@ -314,6 +324,13 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-4.1 | 1M | 32K | Vision, Tools, JSON |
 | gpt-4.1-mini | 1M | 32K | Vision, Tools, JSON |
 | gpt-4.1-nano | 1M | 32K | Vision, Tools, JSON |
+
+### Image Generation Models (gpt-image / "ChatGPT Images")
+| Model | Context | Max Output | Capabilities |
+|-------|---------|------------|--------------|
+| gpt-image-1 | 32K | 4160 img tokens | Vision (image in/out) |
+| gpt-image-1-mini | 32K | 4160 img tokens | Vision (image in/out) |
+| gpt-image-1.5 | 32K | 4160 img tokens | Vision (image in/out) |
 
 ### Claude Family
 | Model | Context | Max Output | Capabilities |
