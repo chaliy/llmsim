@@ -319,7 +319,7 @@ pub fn default_anthropic_model_ids() -> Vec<&'static str> {
 }
 
 /// Anthropic model object as returned by `GET /anthropic/v1/models`.
-/// Reference: https://docs.anthropic.com/en/api/models-list
+/// Reference: <https://docs.anthropic.com/en/api/models-list>
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnthropicModel {
     #[serde(rename = "type")]

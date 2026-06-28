@@ -335,7 +335,7 @@ impl AnthropicErrorResponse {
     }
 
     /// Map an HTTP status code to the canonical Anthropic error `type`.
-    /// Reference: https://docs.anthropic.com/en/api/errors
+    /// Reference: <https://docs.anthropic.com/en/api/errors>
     pub fn type_for_status(status: u16) -> &'static str {
         match status {
             400 => "invalid_request_error",
