@@ -22,3 +22,6 @@ Thumbs.db
 
 # Node.js
 node_modules/
+
+# Go example build artifact
+/examples/go/llmsim-anthropic-example

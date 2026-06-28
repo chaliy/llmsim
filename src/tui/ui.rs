@@ -16,7 +16,7 @@ pub fn draw(f: &mut Frame, app: &App) {
         .margin(1)
         .constraints([
             Constraint::Length(3), // Header
-            Constraint::Length(8), // Request stats + Token stats
+            Constraint::Length(9), // Request stats + Token stats
             Constraint::Length(8), // Latency + Errors
             Constraint::Min(8),    // Charts
             Constraint::Length(1), // Footer
@@ -79,6 +79,7 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
     let active = stats.map(|s| s.active_requests).unwrap_or(0);
     let completions = stats.map(|s| s.completions_requests).unwrap_or(0);
     let responses = stats.map(|s| s.responses_requests).unwrap_or(0);
+    let messages = stats.map(|s| s.messages_requests).unwrap_or(0);
     let streaming = stats.map(|s| s.streaming_requests).unwrap_or(0);
     let rps = stats.map(|s| s.requests_per_second).unwrap_or(0.0);
 
@@ -110,6 +111,13 @@ fn draw_request_stats(f: &mut Frame, app: &App, area: Rect) {
             Span::styled(
                 format_number(responses),
                 Style::default().fg(Color::Magenta),
+            ),
+        ]),
+        Row::new(vec![
+            Span::raw("Messages API"),
+            Span::styled(
+                format_number(messages),
+                Style::default().fg(Color::LightRed),
             ),
         ]),
         Row::new(vec![

@@ -17,9 +17,9 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Features
 
-- **Multi-Provider API Support** - OpenAI Chat Completions and [OpenResponses](https://www.openresponses.org) APIs
+- **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), and Anthropic Messages APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
-- **Streaming Support** - Server-Sent Events (SSE) for both OpenAI and OpenResponses streaming formats
+- **Streaming Support** - Server-Sent Events (SSE) for OpenAI, OpenResponses, and Anthropic streaming formats
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
@@ -142,6 +142,33 @@ When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
 |----------|--------|-------------|
 | `/openresponses/v1/responses` | POST | Create response (streaming & non-streaming) |
 
+### Anthropic API (`/anthropic/v1/...`)
+
+Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) with realistic Claude model profiles.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming) |
+| `/anthropic/v1/models` | GET | List available Claude models |
+| `/anthropic/v1/models/{model_id}` | GET | Get specific model details |
+
+When using Anthropic SDKs, set the base URL to `http://localhost:8080/anthropic`:
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic(base_url="http://localhost:8080/anthropic", api_key="not-needed")
+msg = client.messages.create(
+    model="claude-opus-4-8",
+    max_tokens=64,
+    messages=[{"role": "user", "content": "Hello, Claude"}],
+)
+print(msg.content[0].text)
+```
+
+Runnable examples for Python, TypeScript, Go, curl, and LangChain live in
+[`examples/`](examples/) (see [`examples/README.md`](examples/README.md)).
+
 ### LLMSim endpoints
 
 | Endpoint | Method | Description |
@@ -194,8 +221,13 @@ available = [
 | GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.4, gpt-5.5 |
 | O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1 |
-| Claude | claude-opus, claude-sonnet, claude-haiku (with 4.x versions through Opus 4.7 and Sonnet 4.6) |
+| Claude | claude-opus, claude-sonnet, claude-haiku (with 4.x versions through Opus 4.8 and Sonnet 4.6) |
 | Gemini | gemini-2.0-flash, gemini-2.5-pro, gemini-3 and gemini-3.1 previews |
+
+> The Anthropic endpoints (`/anthropic/v1/...`) use the **real Anthropic API
+> model IDs** (dash-separated, e.g. `claude-opus-4-8`, `claude-sonnet-4-6`,
+> `claude-haiku-4-5`, `claude-fable-5`), including dated-snapshot and `-latest`
+> aliases. List them via `GET /anthropic/v1/models`.
 
 ## Latency Profiles
 

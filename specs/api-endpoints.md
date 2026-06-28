@@ -69,13 +69,32 @@ Image parts contribute an approximate token cost to `usage` (`prompt_tokens` / R
 
 **R3.2**: The endpoint accepts both text input and structured message input, and emits the OpenResponses lifecycle events (`response.created`, `response.output_text.delta`, `response.completed`, etc.) when streaming.
 
-### R4: Anthropic Endpoints (Future)
+### R4: Anthropic Endpoints
 
-**R4.1**: When implemented, Anthropic endpoints MUST follow the same pattern:
+**R4.1**: Anthropic endpoints follow the provider-prefixed pattern and accept
+the same request/response formats as the official Anthropic Messages API, so
+the official Anthropic SDKs work when configured with `{base_url}/anthropic`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `POST` | `/anthropic/v1/messages` | Messages API |
+| `POST` | `/anthropic/v1/messages` | Messages API (streaming and non-streaming) |
+| `GET` | `/anthropic/v1/models` | List available Claude models |
+| `GET` | `/anthropic/v1/models/:model_id` | Get model details |
+
+**R4.2**: The `/anthropic/v1/messages` endpoint emits the Anthropic streaming
+event sequence when `stream: true` (`message_start`, `content_block_start`,
+`content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`).
+Unlike the OpenAI SSE format, Anthropic events carry an explicit `event:` line
+and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
+
+**R4.3**: Errors use the Anthropic error envelope:
+`{"type": "error", "error": {"type": "...", "message": "..."}}`, with the inner
+`type` derived from the HTTP status (`invalid_request_error`, `rate_limit_error`,
+`api_error`, `overloaded_error`, ...).
+
+**R4.4**: The models endpoints use real Anthropic model IDs (dash-separated,
+e.g. `claude-opus-4-8`) plus dated snapshot and `-latest` aliases. See
+`specs/anthropic-api.md` for the full specification.
 
 ### R5: System Endpoints
 
@@ -109,7 +128,7 @@ const client = new OpenAI({
 ```
 
 ```python
-# Anthropic Python SDK (future)
+# Anthropic Python SDK
 from anthropic import Anthropic
 client = Anthropic(
     base_url="http://localhost:8080/anthropic",

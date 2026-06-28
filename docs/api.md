@@ -1,6 +1,6 @@
 # LLMSim API Reference
 
-LLMSim provides two API providers with provider-namespaced routes.
+LLMSim provides multiple API providers with provider-namespaced routes.
 
 ## Providers
 
@@ -8,6 +8,7 @@ LLMSim provides two API providers with provider-namespaced routes.
 |----------|-----------|-------------|
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
+| **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
 
 ## OpenAI API (`/openai/v1/...`)
 
@@ -345,6 +346,115 @@ curl http://localhost:8080/openresponses/v1/responses \
       "summary": "detailed"
     }
   }'
+```
+
+## Anthropic API (`/anthropic/v1/...`)
+
+Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages).
+When using an Anthropic SDK, set the base URL to `http://localhost:8080/anthropic`.
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming) |
+| `/anthropic/v1/models` | GET | List available Claude models |
+| `/anthropic/v1/models/:id` | GET | Get model details |
+
+### Messages
+
+```bash
+curl http://localhost:8080/anthropic/v1/messages \
+  -H "content-type: application/json" \
+  -H "x-api-key: not-needed" \
+  -H "anthropic-version: 2023-06-01" \
+  -d '{
+    "model": "claude-opus-4-8",
+    "max_tokens": 64,
+    "system": "You are a helpful assistant.",
+    "messages": [{"role": "user", "content": "What is the capital of France?"}]
+  }'
+```
+
+#### Request Fields
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `model` | string | yes | Anthropic model ID (e.g. `claude-opus-4-8`) |
+| `max_tokens` | integer | yes | Maximum tokens to generate |
+| `messages` | array | yes | Conversation turns (`user`/`assistant`); content is a string or content blocks |
+| `system` | string \| array | no | System prompt |
+| `temperature` | number | no | |
+| `top_p` | number | no | |
+| `top_k` | integer | no | |
+| `stop_sequences` | array | no | |
+| `stream` | boolean | no | Stream Server-Sent Events |
+| `tools` | array | no | Tool definitions |
+| `tool_choice` | object | no | |
+| `metadata` | object | no | E.g. `{"user_id": "..."}` |
+
+#### Response
+
+```json
+{
+  "id": "msg_abc123",
+  "type": "message",
+  "role": "assistant",
+  "model": "claude-opus-4-8",
+  "content": [{"type": "text", "text": "The capital of France is Paris."}],
+  "stop_reason": "end_turn",
+  "stop_sequence": null,
+  "usage": {"input_tokens": 10, "output_tokens": 8}
+}
+```
+
+### Streaming
+
+When `stream: true`, the response is the Anthropic Server-Sent Event sequence.
+Each event carries an explicit `event:` line, and the stream ends after
+`message_stop` with **no** `[DONE]` sentinel.
+
+```bash
+curl -N http://localhost:8080/anthropic/v1/messages \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-haiku-4-5",
+    "max_tokens": 64,
+    "stream": true,
+    "messages": [{"role": "user", "content": "Tell me a story"}]
+  }'
+```
+
+#### Stream Events
+
+| Event Type | Description |
+|------------|-------------|
+| `message_start` | Message object created (seeds `usage.input_tokens`) |
+| `content_block_start` | Text content block opened at `index` 0 |
+| `ping` | Keep-alive |
+| `content_block_delta` | Text chunk (`delta.type == "text_delta"`) |
+| `content_block_stop` | Content block complete |
+| `message_delta` | Final `stop_reason` + cumulative `usage.output_tokens` |
+| `message_stop` | Stream complete |
+
+### List Models
+
+```bash
+curl http://localhost:8080/anthropic/v1/models
+```
+
+### Get Model
+
+```bash
+curl http://localhost:8080/anthropic/v1/models/claude-opus-4-8
+```
+
+### Errors
+
+Errors use the Anthropic error envelope:
+
+```json
+{"type": "error", "error": {"type": "rate_limit_error", "message": "..."}}
 ```
 
 ## LLMSim Endpoints

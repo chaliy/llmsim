@@ -37,6 +37,8 @@ pub enum EndpointType {
     Responses,
     /// WebSocket Responses API (/openai/v1/responses via WS)
     WebSocketResponses,
+    /// Anthropic Messages API (/anthropic/v1/messages)
+    Messages,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -60,6 +62,8 @@ pub struct Stats {
     pub responses_requests: AtomicU64,
     /// WebSocket Responses API requests (individual response.create messages)
     pub websocket_requests: AtomicU64,
+    /// Anthropic Messages API requests
+    pub messages_requests: AtomicU64,
     /// Currently active WebSocket connections
     pub active_websocket_connections: AtomicU64,
 
@@ -118,6 +122,7 @@ impl Stats {
             completions_requests: AtomicU64::new(0),
             responses_requests: AtomicU64::new(0),
             websocket_requests: AtomicU64::new(0),
+            messages_requests: AtomicU64::new(0),
             active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
@@ -155,6 +160,9 @@ impl Stats {
             }
             EndpointType::WebSocketResponses => {
                 self.websocket_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Messages => {
+                self.messages_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -379,6 +387,7 @@ impl Stats {
             completions_requests: self.completions_requests.load(ORDERING),
             responses_requests: self.responses_requests.load(ORDERING),
             websocket_requests: self.websocket_requests.load(ORDERING),
+            messages_requests: self.messages_requests.load(ORDERING),
             active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
@@ -407,6 +416,8 @@ pub struct StatsSnapshot {
     pub completions_requests: u64,
     pub responses_requests: u64,
     pub websocket_requests: u64,
+    #[serde(default)]
+    pub messages_requests: u64,
     pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,

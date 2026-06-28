@@ -41,6 +41,7 @@
 //! ```
 
 // Core library modules
+pub mod anthropic;
 pub mod errors;
 pub mod generator;
 mod ids;
