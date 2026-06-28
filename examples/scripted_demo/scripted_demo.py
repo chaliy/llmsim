@@ -11,19 +11,19 @@ Prerequisites
 -------------
 1. Start llmsim with a script file::
 
-    cargo run -- serve --config examples/scripted_demo.toml
+    cargo run -- serve --config examples/scripted_demo/scripted_demo.toml
 
    where scripted_demo.toml is::
 
     [response]
-    script_path = "examples/scripted_demo.json"
+    script_path = "examples/scripted_demo/scripted_demo.json"
 
    Or set it inline by editing the default config and pointing it at
-   examples/scripted_demo.json.
+   examples/scripted_demo/scripted_demo.json.
 
 2. Run this script::
 
-    python examples/scripted_demo.py
+    python examples/scripted_demo/scripted_demo.py
 
 Expected output
 ---------------

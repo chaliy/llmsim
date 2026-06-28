@@ -60,9 +60,9 @@ fn main() -> Result<(), ScriptError> {
     walk(&script);
 
     // 2. Round-trip via the JSON file shipped in examples/.
-    println!("\n2. Load from disk (examples/scripted_demo.json)");
+    println!("\n2. Load from disk (examples/scripted_demo/scripted_demo.json)");
     println!("-----------------------------------------------");
-    let from_disk = Script::from_file("examples/scripted_demo.json")?;
+    let from_disk = Script::from_file("examples/scripted_demo/scripted_demo.json")?;
     println!(
         "loaded {} turns, on_exhausted={:?}",
         from_disk.len(),
@@ -85,7 +85,9 @@ fn main() -> Result<(), ScriptError> {
     }
 
     println!("\nNext steps:");
-    println!("  - Boot the server: cargo run -- serve --config examples/scripted_demo.toml");
+    println!(
+        "  - Boot the server: cargo run -- serve --config examples/scripted_demo/scripted_demo.toml"
+    );
     println!("  - Drive it via any OpenAI-compatible client (see specs/scripted-mode.md).");
 
     Ok(())

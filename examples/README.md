@@ -86,10 +86,10 @@ text+calls) for agent scenario tests:
 
 ```bash
 # Boot the server with a script file
-cargo run -- serve --config examples/scripted_demo.toml
+cargo run -- serve --config examples/scripted_demo/scripted_demo.toml
 
 # In another shell
-uv run examples/scripted_demo.py
+uv run examples/scripted_demo/scripted_demo.py
 ```
 
 See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the full
@@ -97,11 +97,13 @@ script JSON format.
 
 ## TypeScript Example
 
-Direct usage of the official OpenAI Node.js library:
+Direct usage of the official OpenAI Node.js library. The TypeScript example
+lives in its own folder with a pinned `package.json`/`package-lock.json`:
 
 ```bash
-npm install openai
-npx tsx examples/openai_client.ts
+cd examples/node
+npm install
+npx tsx openai_client.ts
 ```
 
 ## Custom Server URL

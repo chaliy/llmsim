@@ -257,19 +257,19 @@ jobs:
         run: |
           set -euo pipefail
           ./target/release/llmsim serve \
-            --config examples/scripted_demo.toml \
+            --config examples/scripted_demo/scripted_demo.toml \
             --port 8091 &
           SCRIPTED_PID=$!
           trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT
           sleep 2
           curl -sf http://localhost:8091/health > /dev/null
-          LLMSIM_URL=http://localhost:8091/openai/v1 uv run examples/scripted_demo.py
+          LLMSIM_URL=http://localhost:8091/openai/v1 uv run examples/scripted_demo/scripted_demo.py
 
-      - name: Smoke-test scripted server (examples/scripted_demo.json)
+      - name: Smoke-test scripted server (examples/scripted_demo/scripted_demo.json)
         run: |
           set -euo pipefail
           ./target/release/llmsim serve \
-            --config examples/scripted_demo.toml \
+            --config examples/scripted_demo/scripted_demo.toml \
             --port 8090 &
           SCRIPTED_PID=$!
           trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT

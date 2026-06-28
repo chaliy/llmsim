@@ -411,7 +411,7 @@ The script JSON has an `on_exhausted` policy (`repeat_last` /
 See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the
 full format, turn variants (`assistant` / `tool_calls` / `mixed` /
 `error`), and per-endpoint coverage. Example script and clients live
-in [`examples/scripted_demo.*`](../examples/).
+in [`examples/scripted_demo/`](../examples/scripted_demo/).
 
 ## Error Responses
 
