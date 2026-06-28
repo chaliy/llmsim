@@ -1,13 +1,13 @@
 # Example llmsim configuration that enables scripted mode.
 #
 # Run with:
-#   cargo run -- serve --config examples/scripted_demo.toml
+#   cargo run -- serve --config examples/scripted_demo/scripted_demo.toml
 #
 # Then in another shell:
-#   python examples/scripted_demo.py
+#   python examples/scripted_demo/scripted_demo.py
 
 [response]
-script_path = "examples/scripted_demo.json"
+script_path = "examples/scripted_demo/scripted_demo.json"
 
 [latency]
 # Keep tests fast; remove to use the per-model default profile.
