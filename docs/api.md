@@ -65,7 +65,9 @@ curl http://localhost:8080/openai/v1/chat/completions \
   }'
 ```
 
-Image parts require a vision-capable model. Sending an `image_url` part to a model whose profile reports no vision support (e.g. `gpt-4`) returns `400 invalid_request_error`. Custom model ids with no profile are accepted. Image content does not yet affect generated output.
+Image parts require a vision-capable model. Sending an `image_url` part to a model whose profile reports no vision support (e.g. `gpt-4`) returns `400 invalid_request_error`. Custom model ids with no profile are accepted.
+
+Images add an approximate cost to `usage` (`prompt_tokens`): `detail: "low"` adds 85 tokens, otherwise (`"high"`/`"auto"`/unset) 765 tokens. The simulator does not fetch or decode image bytes, so the cost is estimated from `detail` rather than pixel dimensions, and image content does not affect the generated output text. The same accounting applies to image inputs on `/openai/v1/responses` and `/openresponses/v1/responses`.
 
 #### Response
 

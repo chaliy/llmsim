@@ -42,7 +42,9 @@ This specification defines the URL structure and routing conventions for LLMSim 
 - `{"type": "text", "text": "..."}`
 - `{"type": "image_url", "image_url": {"url": "...", "detail": "..."}}`
 
-The content-array form is accepted for every model. Image parts are gated on the model's `vision` capability: a request carrying an `image_url` part to a model whose profile advertises `vision: false` (e.g. `gpt-4`) is rejected with `400 invalid_request_error`. Unknown/custom model ids (no profile) are allowed through, since their capabilities cannot be asserted. Non-text parts do not currently contribute to generated output (text is echoed/generated as before); see the responses-api spec for image token accounting status.
+The content-array form is accepted for every model. Image parts are gated on the model's `vision` capability: a request carrying an `image_url` part to a model whose profile advertises `vision: false` (e.g. `gpt-4`) is rejected with `400 invalid_request_error`. Unknown/custom model ids (no profile) are allowed through, since their capabilities cannot be asserted.
+
+Image parts contribute an approximate token cost to `usage` (`prompt_tokens` / Responses `input_tokens`) but do not influence the generated output text. Because the simulator never fetches or decodes image bytes, the per-image cost is approximated from the `detail` hint: `"low"` → 85 tokens, otherwise (`"high"`/`"auto"`/unset) → 765 tokens (a representative ~1024×1024 image under OpenAI's tile formula). The Responses `input_image` part carries no `detail` and is charged the high-detail default. This applies to `/openai/v1/chat/completions`, `/openai/v1/responses`, and `/openresponses/v1/responses`.
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 
