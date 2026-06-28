@@ -37,6 +37,13 @@ This specification defines the URL structure and routing conventions for LLMSim 
 
 **R2.2**: These endpoints accept the same request/response formats as the official OpenAI API.
 
+**R2.5**: The `/openai/v1/chat/completions` endpoint accepts multimodal message content. A message's `content` may be either a plain string or an array of content parts:
+
+- `{"type": "text", "text": "..."}`
+- `{"type": "image_url", "image_url": {"url": "...", "detail": "..."}}`
+
+The content-array form is accepted for every model. Image parts are gated on the model's `vision` capability: a request carrying an `image_url` part to a model whose profile advertises `vision: false` (e.g. `gpt-4`) is rejected with `400 invalid_request_error`. Unknown/custom model ids (no profile) are allowed through, since their capabilities cannot be asserted. Non-text parts do not currently contribute to generated output (text is echoed/generated as before); see the responses-api spec for image token accounting status.
+
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 
 **R2.3**: The models endpoint (`/openai/v1/models`) returns extended model information sourced from [models.dev](https://models.dev):

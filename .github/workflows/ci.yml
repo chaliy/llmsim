@@ -227,11 +227,15 @@ jobs:
           sleep 2
           curl -sf http://localhost:8080/health
 
-      - name: Run TypeScript example
+      - name: Run TypeScript example (OpenAI SDK)
         run: npx tsx openai_client.ts
         working-directory: examples/node
 
-      - name: Run TypeScript Anthropic example
+      - name: Run TypeScript example (Vercel AI SDK)
+        run: npx tsx vercel_ai_client.ts
+        working-directory: examples/node
+
+      - name: Run TypeScript example (Anthropic SDK)
         run: npx tsx anthropic_client.ts
         working-directory: examples/node
 
@@ -255,6 +259,7 @@ jobs:
           examples=(list_models openai_client responses_client \
                     openresponses_client langchain_client \
                     langchain_responses_client openai_websocket_client \
+                    pydantic_ai_client \
                     anthropic_client anthropic_langchain)
           declare -A pid
           for ex in "${examples[@]}"; do
@@ -276,19 +281,19 @@ jobs:
         run: |
           set -euo pipefail
           ./target/release/llmsim serve \
-            --config examples/scripted_demo.toml \
+            --config examples/scripted_demo/scripted_demo.toml \
             --port 8091 &
           SCRIPTED_PID=$!
           trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT
           sleep 2
           curl -sf http://localhost:8091/health > /dev/null
-          LLMSIM_URL=http://localhost:8091/openai/v1 uv run examples/scripted_demo.py
+          LLMSIM_URL=http://localhost:8091/openai/v1 uv run examples/scripted_demo/scripted_demo.py
 
-      - name: Smoke-test scripted server (examples/scripted_demo.json)
+      - name: Smoke-test scripted server (examples/scripted_demo/scripted_demo.json)
         run: |
           set -euo pipefail
           ./target/release/llmsim serve \
-            --config examples/scripted_demo.toml \
+            --config examples/scripted_demo/scripted_demo.toml \
             --port 8090 &
           SCRIPTED_PID=$!
           trap "kill $SCRIPTED_PID 2>/dev/null || true" EXIT

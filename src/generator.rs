@@ -158,7 +158,7 @@ impl ResponseGenerator for EchoGenerator {
         for message in request.messages.iter().rev() {
             if matches!(message.role, crate::openai::Role::User) {
                 if let Some(content) = &message.content {
-                    return format!("Echo: {}", content);
+                    return format!("Echo: {}", content.text());
                 }
             }
         }

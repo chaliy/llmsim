@@ -88,6 +88,18 @@ Using LangChain's OpenAI-compatible client:
 uv run examples/langchain_client.py
 ```
 
+### Pydantic AI
+
+Using [Pydantic AI](https://ai.pydantic.dev) via its OpenAI-compatible provider:
+
+```bash
+uv run examples/pydantic_ai_client.py
+```
+
+> Structured `output_type` results and tool calling require the server to be
+> running in [scripted mode](../specs/scripted-mode.md); a default server
+> returns simulated text.
+
 ### Anthropic SDK
 
 Direct usage of the official Anthropic Python SDK (messages, streaming, tools,
@@ -112,10 +124,10 @@ text+calls) for agent scenario tests:
 
 ```bash
 # Boot the server with a script file
-cargo run -- serve --config examples/scripted_demo.toml
+cargo run -- serve --config examples/scripted_demo/scripted_demo.toml
 
 # In another shell
-uv run examples/scripted_demo.py
+uv run examples/scripted_demo/scripted_demo.py
 ```
 
 See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the full
@@ -123,18 +135,40 @@ script JSON format.
 
 ## TypeScript Examples
 
+The TypeScript examples live in their own folder with a pinned
+`package.json`/`package-lock.json`:
+
+```bash
+cd examples/node
+npm install
+```
+
+### OpenAI SDK
+
 Direct usage of the official OpenAI Node.js library:
 
 ```bash
-npm install openai
-npx tsx examples/openai_client.ts
+npx tsx openai_client.ts
 ```
+
+### Vercel AI SDK
+
+Using the [Vercel AI SDK](https://sdk.vercel.ai) via its OpenAI-compatible provider:
+
+```bash
+npx tsx vercel_ai_client.ts
+```
+
+> `generateObject` and tool calling require the server to be running in
+> [scripted mode](../specs/scripted-mode.md); a default server returns
+> simulated text.
+
+### Anthropic SDK
 
 Direct usage of the official Anthropic Node.js SDK:
 
 ```bash
-npm install @anthropic-ai/sdk
-npx tsx examples/node/anthropic_client.ts
+npx tsx anthropic_client.ts
 ```
 
 ## Go Example
