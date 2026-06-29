@@ -1,3 +1,4 @@
+pub mod images;
 mod models;
 mod responses;
 mod types;

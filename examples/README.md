@@ -72,6 +72,16 @@ Using the OpenResponses specification with httpx:
 uv run examples/openresponses_client.py
 ```
 
+### Image Generation
+
+Generate simulated images (gpt-image / "ChatGPT Images"), including streaming
+with progressive partial images. Each image is a synthetic PNG of the requested
+size rendering the prompt text and a "LLMSIM SIMULATED IMAGE" watermark:
+
+```bash
+uv run examples/images_client.py
+```
+
 ### WebSocket Mode
 
 Using the WebSocket transport for the Responses API:
@@ -149,6 +159,15 @@ Direct usage of the official OpenAI Node.js library:
 
 ```bash
 npx tsx openai_client.ts
+```
+
+### OpenAI Image Generation
+
+Generate simulated images (gpt-image / "ChatGPT Images"), including streaming
+with progressive partial images:
+
+```bash
+npx tsx images_client.ts
 ```
 
 ### Vercel AI SDK
@@ -239,6 +258,19 @@ curl http://localhost:8080/openai/v1/responses \
   -d '{
     "model": "gpt-5",
     "input": "What is 2+2?"
+  }'
+```
+
+### OpenAI Image Generation
+
+```bash
+curl http://localhost:8080/openai/v1/images/generations \
+  -H "Content-Type: application/json" \
+  -d '{
+    "model": "gpt-image-1",
+    "prompt": "a cat riding a bicycle",
+    "size": "1024x1024",
+    "quality": "low"
   }'
 ```
 

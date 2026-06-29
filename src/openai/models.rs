@@ -167,6 +167,17 @@ fn gemini_reasoning_capabilities() -> ModelCapabilities {
     }
 }
 
+/// Capabilities for OpenAI image generation models (gpt-image family).
+/// They accept image inputs (vision) but do not do text tool-calling/JSON.
+fn image_capabilities() -> ModelCapabilities {
+    ModelCapabilities {
+        function_calling: false,
+        vision: true,
+        json_mode: false,
+        reasoning: false,
+    }
+}
+
 /// Standard capabilities for DeepSeek models
 fn deepseek_capabilities() -> ModelCapabilities {
     ModelCapabilities {
@@ -605,6 +616,30 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_capabilities(deepseek_reasoning_capabilities()),
     ];
 
+    // OpenAI image generation models (gpt-image / "ChatGPT Images" family).
+    // context_window is the prompt token limit; max_output_tokens reflects the
+    // image token output ceiling rather than text tokens.
+    let image_models = vec![
+        ModelProfile::new("gpt-image-1", "GPT Image 1", "openai", 32_000, 4_160)
+            .with_created(1744761600) // 2025-04-16
+            .with_capabilities(image_capabilities())
+            .with_knowledge_cutoff("2024-06-30"),
+        ModelProfile::new(
+            "gpt-image-1-mini",
+            "GPT Image 1 Mini",
+            "openai",
+            32_000,
+            4_160,
+        )
+        .with_created(1744761600) // 2025-04-16
+        .with_capabilities(image_capabilities())
+        .with_knowledge_cutoff("2024-06-30"),
+        ModelProfile::new("gpt-image-1.5", "GPT Image 1.5", "openai", 32_000, 4_160)
+            .with_created(1761955200) // 2025-11
+            .with_capabilities(image_capabilities())
+            .with_knowledge_cutoff("2024-06-30"),
+    ];
+
     // Add all models to registry
     for model in gpt5_models
         .into_iter()
@@ -613,6 +648,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .chain(claude_models)
         .chain(gemini_models)
         .chain(deepseek_models)
+        .chain(image_models)
     {
         registry.insert(model.id.clone(), model);
     }
