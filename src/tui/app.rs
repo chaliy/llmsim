@@ -1,25 +1,23 @@
 //! TUI application logic: state, stats fetching, and the tuika host loop.
 //!
-//! Design note: the dashboard is driven by `tuika`'s synchronous [`Runner`],
-//! which owns the alternate screen, translates crossterm input, and schedules
-//! redraws. Because the runner blocks its thread on terminal I/O, it runs on a
-//! `spawn_blocking` thread while the stats poller stays on the async runtime;
-//! the two communicate through a [`Live`] value (redraw-on-write) and a `Notify`
-//! for the manual `r` refresh. This keeps `run_dashboard` an `async fn` so the
-//! caller can still race it against the server with `tokio::select!`.
+//! Design note: the dashboard is driven by `tuika`'s [`AsyncRunner`], which ties
+//! the alternate-screen lifecycle, crossterm's async event stream, and a tick
+//! timer into one `tokio::select!` loop on the caller's runtime. The dashboard
+//! state is a plain local [`DashboardData`] the loop owns: `view` reads it to
+//! build each frame and `update` mutates it (and may `.await` a stats fetch) in
+//! response to a [`Signal`] — a tick or a key. No `spawn_blocking`, shared
+//! `RwLock`, `Notify`, or stop flag; `run_dashboard` stays an `async fn` the
+//! caller races against the server with `tokio::select!`.
 
 use super::ui;
 use crate::stats::StatsSnapshot;
 use ratatui::style::Color;
 use std::io;
 use std::ops::ControlFlow;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tokio::sync::Notify;
-use tuika::{element, Event, KeyCode, Live, LiveView, Runner, RunnerConfig, Theme};
+use tuika::{AsyncRunner, Event, KeyCode, RunnerConfig, Signal, Theme};
 
 /// Configuration for the dashboard
 #[derive(Debug, Clone)]
@@ -205,89 +203,57 @@ fn contains_invalid_request_chars(value: &str) -> bool {
         .any(|c| c.is_ascii_control() || c == ' ' || !c.is_ascii())
 }
 
+/// Fetch a fresh snapshot and fold it into `data`, recording any failure as the
+/// disconnected state. Shared by the periodic tick and the manual `r` refresh.
+async fn poll(url: &str, data: &mut DashboardData) {
+    match fetch_stats(url).await {
+        Ok(snapshot) => data.ingest(snapshot),
+        Err(error) => data.set_error(error),
+    }
+}
+
 /// Run the TUI dashboard until the user quits with `q`/`Esc`.
 pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
     let refresh = Duration::from_millis(config.refresh_ms.max(1));
+    let runner = AsyncRunner::new(RunnerConfig { tick_rate: refresh });
 
-    // The runner owns redraw scheduling; hand its redraw handle to the Live
-    // value so poller writes wake the render loop.
-    let runner = Runner::new(RunnerConfig { tick_rate: refresh });
-    let data = Live::with_redraw(DashboardData::new(), runner.redraw_handle());
-
-    // `notify` lets the `r` key trigger an out-of-band refresh; `stop` unwinds
-    // the poller once the runner exits.
-    let notify = Arc::new(Notify::new());
-    let stop = Arc::new(AtomicBool::new(false));
-
-    // Producer: poll the stats endpoint on the async runtime.
-    let poller = {
-        let data = data.clone();
-        let notify = Arc::clone(&notify);
-        let stop = Arc::clone(&stop);
-        let url = config.server_url.clone();
-        tokio::spawn(async move {
-            loop {
-                match fetch_stats(&url).await {
-                    Ok(snapshot) => data.update(|d| d.ingest(snapshot)),
-                    Err(error) => data.update(|d| d.set_error(error)),
-                }
-                if stop.load(Ordering::Acquire) {
-                    break;
-                }
-                // Wake on the next tick or on a manual refresh, whichever first.
-                tokio::select! {
-                    _ = tokio::time::sleep(refresh) => {}
-                    _ = notify.notified() => {}
-                }
-                if stop.load(Ordering::Acquire) {
-                    break;
-                }
-            }
-        })
+    // Match the previous look: keep the terminal's own background instead of
+    // tuika's themed fill, so only the widgets paint color.
+    let theme = Theme {
+        background: Color::Reset,
+        ..Theme::default()
     };
 
-    // Consumer: the synchronous tuika runner drives the terminal. It blocks its
-    // thread on input, so it belongs on a blocking worker rather than the async
-    // reactor.
-    let render_data = data.clone();
-    let render_notify = Arc::clone(&notify);
-    let run_result = tokio::task::spawn_blocking(move || {
-        // Match the previous look: keep the terminal's own background instead of
-        // tuika's themed fill, so only the widgets paint color.
-        let theme = Theme {
-            background: Color::Reset,
-            ..Theme::default()
-        };
-        runner.run(
+    // The runner owns this state for the duration of the run. `view` reads it
+    // each frame; `update` mutates it on every signal. The first tick fires
+    // right after the initial paint, so the dashboard loads without a special
+    // startup fetch.
+    let url = config.server_url;
+    let mut data = DashboardData::new();
+
+    runner
+        .run(
             &theme,
-            move |_frame| element(LiveView::new(render_data.clone(), ui::dashboard)),
-            move |event| match event {
-                Event::Key(key)
-                    if key.plain() && matches!(key.code, KeyCode::Char('q') | KeyCode::Esc) =>
-                {
-                    ControlFlow::Break(())
-                }
-                Event::Key(key) if key.plain() && matches!(key.code, KeyCode::Char('r')) => {
-                    // Force an immediate refresh out of the poll cadence.
-                    render_notify.notify_one();
+            &mut data,
+            |data, _frame| ui::dashboard(data),
+            async |data, signal| match signal {
+                Signal::Tick => {
+                    poll(&url, data).await;
                     ControlFlow::Continue(())
                 }
+                Signal::Event(Event::Key(key)) if key.plain() => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => ControlFlow::Break(()),
+                    KeyCode::Char('r') => {
+                        // Force an immediate refresh out of the tick cadence.
+                        poll(&url, data).await;
+                        ControlFlow::Continue(())
+                    }
+                    _ => ControlFlow::Continue(()),
+                },
                 _ => ControlFlow::Continue(()),
             },
         )
-    })
-    .await;
-
-    // Tear down the poller once the UI has exited.
-    stop.store(true, Ordering::Release);
-    notify.notify_one();
-    poller.abort();
-    let _ = poller.await;
-
-    match run_result {
-        Ok(result) => result,
-        Err(join_error) => Err(io::Error::other(join_error)),
-    }
+        .await
 }
 
 #[cfg(test)]

@@ -44,7 +44,7 @@ cli = ["server", "dep:clap", "dep:tracing-subscriber"]
 # layout, alt-screen host, focus, live redraw) and renders its data panels
 # through `tuika`'s safe ratatui interop, so `ratatui` stays a direct dep for
 # the widget code while `tuika` owns the layout/host/event loop.
-tui = ["cli", "dep:tuika", "dep:ratatui", "tokio/io-util"]
+tui = ["cli", "dep:tuika", "tuika/async", "dep:ratatui", "tokio/io-util"]
 
 [dependencies]
 # Async runtime
@@ -84,7 +84,9 @@ thiserror = "2.0"
 # `Buffer`/`Rect` types line up across the `RatatuiView` interop boundary. The
 # host machinery (crossterm, alt-screen, event loop) now lives inside `tuika`.
 ratatui = { version = "0.30", optional = true }
-tuika = { version = "0.3", optional = true }
+# Tracking tuika `main` for the async runner (not yet in a published release);
+# pin to git until the next crates.io version ships.
+tuika = { git = "https://github.com/everruns/yolop", branch = "main", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

@@ -250,8 +250,9 @@ The `tui` feature enables a real-time terminal dashboard built with
 [Ratatui](https://ratatui.rs/) providing flexbox layout, an alternate-screen
 host, focus, and live redraw:
 
-- **app.rs**: tuika `Runner`/`Live` host loop; stats polled on a Tokio task and
-  fed into the view through a redraw-on-write `Live` value
+- **app.rs**: tuika `AsyncRunner` host loop on the caller's Tokio runtime; the
+  dashboard state is a plain local value the loop owns, with stats polled inline
+  on each tick (and on manual `r` refresh)
 - **ui.rs**: tuika `Flex` view tree; data panels (tables, sparklines, bar
   charts) are Ratatui widgets rendered through `RatatuiView` interop
 
