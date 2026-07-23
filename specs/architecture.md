@@ -19,8 +19,8 @@ llmsim/
 │   │   └── state.rs    # Application state (config + stats)
 │   ├── tui/            # Terminal UI dashboard
 │   │   ├── mod.rs      # TUI module entry point
-│   │   ├── app.rs      # Application state and event loop
-│   │   └── ui.rs       # Ratatui widget rendering
+│   │   ├── app.rs      # Application state and tuika host loop
+│   │   └── ui.rs       # tuika view tree (ratatui widgets via RatatuiView)
 │   ├── openai/         # OpenAI API types
 │   │   ├── mod.rs
 │   │   ├── types.rs
@@ -129,7 +129,7 @@ them. The features form a chain, each enabling the previous one:
 | `tokens` | `tokens`                       | `tiktoken-rs`                        |
 | `server` | `cli` (router/handlers) + `tokens` | `axum`, `tower-http` (+ axum `ws`) |
 | `cli`    | binary + `server`              | `clap`, `tracing-subscriber`         |
-| `tui`    | `tui` dashboard + `cli`        | `ratatui`, `crossterm`               |
+| `tui`    | `tui` dashboard + `cli`        | `tuika`, `ratatui`                   |
 
 `server` implies `tokens` because the handlers count tokens for usage
 accounting. `cli` implies `server` because the binary's job is to run the
@@ -204,7 +204,7 @@ See `specs/anthropic-api.md` for detailed Anthropic API specification.
 - **Public modules** (`openai`, `openresponses`, `anthropic`, `generator`, `latency`, `stream`, `responses_stream`, `imagegen`, `image_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
 - **Token module** (`tokens`): Token counting behind the `tokens` feature (tiktoken-rs)
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration, behind the `server` feature
-- **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with Ratatui
+- **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with tuika (flexbox layout, alt-screen host, live redraw) over Ratatui widgets
 
 ### API Support
 
@@ -245,10 +245,15 @@ Stats are exposed via `/llmsim/stats` endpoint and consumed by the optional TUI 
 
 ### TUI Module
 
-The `tui` feature enables a real-time terminal dashboard built with [Ratatui](https://ratatui.rs/):
+The `tui` feature enables a real-time terminal dashboard built with
+[tuika](https://crates.io/crates/tuika) — a composable toolkit over
+[Ratatui](https://ratatui.rs/) providing flexbox layout, an alternate-screen
+host, focus, and live redraw:
 
-- **app.rs**: Event loop, state management, HTTP polling
-- **ui.rs**: Widget layout and rendering (tables, sparklines, bar charts)
+- **app.rs**: tuika `Runner`/`Live` host loop; stats polled on a Tokio task and
+  fed into the view through a redraw-on-write `Live` value
+- **ui.rs**: tuika `Flex` view tree; data panels (tables, sparklines, bar
+  charts) are Ratatui widgets rendered through `RatatuiView` interop
 
 ## Model Profiles
 

@@ -1,17 +1,25 @@
-//! TUI Application logic and event handling.
+//! TUI application logic: state, stats fetching, and the tuika host loop.
+//!
+//! Design note: the dashboard is driven by `tuika`'s synchronous [`Runner`],
+//! which owns the alternate screen, translates crossterm input, and schedules
+//! redraws. Because the runner blocks its thread on terminal I/O, it runs on a
+//! `spawn_blocking` thread while the stats poller stays on the async runtime;
+//! the two communicate through a [`Live`] value (redraw-on-write) and a `Notify`
+//! for the manual `r` refresh. This keeps `run_dashboard` an `async fn` so the
+//! caller can still race it against the server with `tokio::select!`.
 
 use super::ui;
 use crate::stats::StatsSnapshot;
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::style::Color;
 use std::io;
+use std::ops::ControlFlow;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tokio::sync::Notify;
+use tuika::{element, Event, KeyCode, Live, LiveView, Runner, RunnerConfig, Theme};
 
 /// Configuration for the dashboard
 #[derive(Debug, Clone)]
@@ -31,70 +39,65 @@ impl Default for DashboardConfig {
     }
 }
 
-/// Application state for the dashboard
-pub struct App {
+/// Live dashboard state, shared between the stats poller and the renderer.
+///
+/// The renderer reads it each frame ([`ui::dashboard`]); the poller mutates it
+/// through [`Live::update`], which requests a redraw from the runner.
+pub struct DashboardData {
     /// Current stats snapshot
     pub stats: Option<StatsSnapshot>,
     /// Last error message
     pub error: Option<String>,
-    /// Historical RPS values for sparkline (last 60 values)
+    /// Historical RPS values for the sparkline (last 60 values)
     pub rps_history: Vec<f64>,
-    /// Historical token rate values for sparkline
+    /// Historical token-rate values for the sparkline
     pub tokens_history: Vec<f64>,
-    /// Last fetch time
-    pub last_fetch: Instant,
-    /// Whether to exit
-    pub should_quit: bool,
-    /// Server URL
-    pub server_url: String,
-    /// Total tokens from last snapshot (for rate calculation)
-    pub last_total_tokens: u64,
+    /// Last fetch time, used to derive the token rate
+    last_fetch: Instant,
+    /// Total tokens from the last snapshot (for rate calculation)
+    last_total_tokens: u64,
 }
 
-impl App {
-    pub fn new(server_url: String) -> Self {
+impl DashboardData {
+    fn new() -> Self {
         Self {
             stats: None,
             error: None,
             rps_history: Vec::with_capacity(60),
             tokens_history: Vec::with_capacity(60),
             last_fetch: Instant::now(),
-            should_quit: false,
-            server_url,
             last_total_tokens: 0,
         }
     }
 
-    /// Update the stats by fetching from the server
-    pub async fn update_stats(&mut self) {
-        match fetch_stats(&self.server_url).await {
-            Ok(snapshot) => {
-                // Calculate token rate
-                let elapsed = self.last_fetch.elapsed().as_secs_f64();
-                if elapsed > 0.0 && self.last_total_tokens > 0 {
-                    let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
-                    let token_rate = token_diff as f64 / elapsed;
-                    self.tokens_history.push(token_rate);
-                    if self.tokens_history.len() > 60 {
-                        self.tokens_history.remove(0);
-                    }
-                }
-                self.last_total_tokens = snapshot.total_tokens;
-
-                // Update RPS history
-                self.rps_history.push(snapshot.requests_per_second);
-                if self.rps_history.len() > 60 {
-                    self.rps_history.remove(0);
-                }
-
-                self.stats = Some(snapshot);
-                self.error = None;
-                self.last_fetch = Instant::now();
-            }
-            Err(e) => {
-                self.error = Some(e);
+    /// Fold a freshly fetched snapshot into the rolling history and clear any
+    /// previous error.
+    fn ingest(&mut self, snapshot: StatsSnapshot) {
+        // Token rate over the interval since the previous successful fetch.
+        let elapsed = self.last_fetch.elapsed().as_secs_f64();
+        if elapsed > 0.0 && self.last_total_tokens > 0 {
+            let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
+            let token_rate = token_diff as f64 / elapsed;
+            self.tokens_history.push(token_rate);
+            if self.tokens_history.len() > 60 {
+                self.tokens_history.remove(0);
             }
         }
+        self.last_total_tokens = snapshot.total_tokens;
+
+        self.rps_history.push(snapshot.requests_per_second);
+        if self.rps_history.len() > 60 {
+            self.rps_history.remove(0);
+        }
+
+        self.stats = Some(snapshot);
+        self.error = None;
+        self.last_fetch = Instant::now();
+    }
+
+    /// Record a failed fetch; the header flips to DISCONNECTED.
+    fn set_error(&mut self, error: String) {
+        self.error = Some(error);
     }
 }
 
@@ -202,68 +205,89 @@ fn contains_invalid_request_chars(value: &str) -> bool {
         .any(|c| c.is_ascii_control() || c == ' ' || !c.is_ascii())
 }
 
-/// Run the TUI dashboard
+/// Run the TUI dashboard until the user quits with `q`/`Esc`.
 pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
-    // Setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
+    let refresh = Duration::from_millis(config.refresh_ms.max(1));
 
-    // Create app state
-    let mut app = App::new(config.server_url);
-    let tick_rate = Duration::from_millis(config.refresh_ms);
-    let mut last_tick = Instant::now();
+    // The runner owns redraw scheduling; hand its redraw handle to the Live
+    // value so poller writes wake the render loop.
+    let runner = Runner::new(RunnerConfig { tick_rate: refresh });
+    let data = Live::with_redraw(DashboardData::new(), runner.redraw_handle());
 
-    // Initial fetch
-    app.update_stats().await;
+    // `notify` lets the `r` key trigger an out-of-band refresh; `stop` unwinds
+    // the poller once the runner exits.
+    let notify = Arc::new(Notify::new());
+    let stop = Arc::new(AtomicBool::new(false));
 
-    loop {
-        // Draw UI
-        terminal.draw(|f| ui::draw(f, &app))?;
-
-        // Handle events with timeout
-        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-        if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => {
-                            app.should_quit = true;
-                        }
-                        KeyCode::Char('r') => {
-                            // Force refresh
-                            app.update_stats().await;
-                        }
-                        _ => {}
-                    }
+    // Producer: poll the stats endpoint on the async runtime.
+    let poller = {
+        let data = data.clone();
+        let notify = Arc::clone(&notify);
+        let stop = Arc::clone(&stop);
+        let url = config.server_url.clone();
+        tokio::spawn(async move {
+            loop {
+                match fetch_stats(&url).await {
+                    Ok(snapshot) => data.update(|d| d.ingest(snapshot)),
+                    Err(error) => data.update(|d| d.set_error(error)),
+                }
+                if stop.load(Ordering::Acquire) {
+                    break;
+                }
+                // Wake on the next tick or on a manual refresh, whichever first.
+                tokio::select! {
+                    _ = tokio::time::sleep(refresh) => {}
+                    _ = notify.notified() => {}
+                }
+                if stop.load(Ordering::Acquire) {
+                    break;
                 }
             }
-        }
+        })
+    };
 
-        // Check if we should quit
-        if app.should_quit {
-            break;
-        }
+    // Consumer: the synchronous tuika runner drives the terminal. It blocks its
+    // thread on input, so it belongs on a blocking worker rather than the async
+    // reactor.
+    let render_data = data.clone();
+    let render_notify = Arc::clone(&notify);
+    let run_result = tokio::task::spawn_blocking(move || {
+        // Match the previous look: keep the terminal's own background instead of
+        // tuika's themed fill, so only the widgets paint color.
+        let theme = Theme {
+            background: Color::Reset,
+            ..Theme::default()
+        };
+        runner.run(
+            &theme,
+            move |_frame| element(LiveView::new(render_data.clone(), ui::dashboard)),
+            move |event| match event {
+                Event::Key(key)
+                    if key.plain() && matches!(key.code, KeyCode::Char('q') | KeyCode::Esc) =>
+                {
+                    ControlFlow::Break(())
+                }
+                Event::Key(key) if key.plain() && matches!(key.code, KeyCode::Char('r')) => {
+                    // Force an immediate refresh out of the poll cadence.
+                    render_notify.notify_one();
+                    ControlFlow::Continue(())
+                }
+                _ => ControlFlow::Continue(()),
+            },
+        )
+    })
+    .await;
 
-        // Update stats on tick
-        if last_tick.elapsed() >= tick_rate {
-            app.update_stats().await;
-            last_tick = Instant::now();
-        }
+    // Tear down the poller once the UI has exited.
+    stop.store(true, Ordering::Release);
+    notify.notify_one();
+    poller.abort();
+    let _ = poller.await;
+
+    match run_result {
+        Ok(result) => result,
+        Err(join_error) => Err(io::Error::other(join_error)),
     }
-
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
-
-    Ok(())
 }
 
 #[cfg(test)]
