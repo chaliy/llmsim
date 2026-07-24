@@ -40,8 +40,11 @@ server = ["tokens", "dep:axum", "dep:tower-http"]
 cli = ["server", "dep:clap", "dep:tracing-subscriber"]
 
 # Real-time stats dashboard (`llmsim serve --tui`); only reachable via the
-# binary, so it implies `cli`.
-tui = ["cli", "dep:crossterm", "dep:ratatui", "tokio/io-util"]
+# binary, so it implies `cli`. The dashboard is composed with `tuika` (flexbox
+# layout, alt-screen host, focus, live redraw) and renders its data panels
+# through `tuika`'s safe ratatui interop, so `ratatui` stays a direct dep for
+# the widget code while `tuika` owns the layout/host/event loop.
+tui = ["cli", "dep:tuika", "tuika/async", "dep:ratatui", "tokio/io-util"]
 
 [dependencies]
 # Async runtime
@@ -75,9 +78,15 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 async-stream = "0.3"
 thiserror = "2.0"
 
-# TUI
+# TUI. `tuika` is a composable terminal UI toolkit over ratatui (flexbox
+# layout, overlays, focus, alt-screen host, live redraw) that pins ratatui
+# 0.30.2; keeping `ratatui = "0.30"` here unifies onto that same version so the
+# `Buffer`/`Rect` types line up across the `RatatuiView` interop boundary. The
+# host machinery (crossterm, alt-screen, async event loop) now lives inside
+# `tuika`; its `async` feature (enabled via the `tui` feature) is what brings in
+# the `AsyncRunner`.
 ratatui = { version = "0.30", optional = true }
-crossterm = { version = "0.29", optional = true }
+tuika = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

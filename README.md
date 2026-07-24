@@ -108,7 +108,7 @@ what they use. The defaults (`["cli"]`) give the full binary, so `cargo build`,
 | `tokens` | `tokens` module (token counting)                | `tiktoken-rs`                        |
 | `server` | `cli` module (axum router, handlers, websockets); implies `tokens` | `axum`, `tower-http` |
 | `cli`    | the `llmsim` binary; implies `server`           | `clap`, `tracing-subscriber`         |
-| `tui`    | `serve --tui` dashboard; implies `cli`          | `ratatui`, `crossterm`               |
+| `tui`    | `serve --tui` dashboard; implies `cli`          | `tuika`, `ratatui`                   |
 
 To embed only the core library modules (types, generators, latency,
 streaming, stats, scripts) and shed `axum`, `tower-http`, `tiktoken-rs`,

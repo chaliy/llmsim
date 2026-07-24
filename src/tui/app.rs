@@ -1,17 +1,23 @@
-//! TUI Application logic and event handling.
+//! TUI application logic: state, stats fetching, and the tuika host loop.
+//!
+//! Design note: the dashboard is driven by `tuika`'s [`AsyncRunner`], which ties
+//! the alternate-screen lifecycle, crossterm's async event stream, and a tick
+//! timer into one `tokio::select!` loop on the caller's runtime. The dashboard
+//! state is a plain local [`DashboardData`] the loop owns: `view` reads it to
+//! build each frame and `update` mutates it (and may `.await` a stats fetch) in
+//! response to a [`Signal`] — a tick or a key. No `spawn_blocking`, shared
+//! `RwLock`, `Notify`, or stop flag; `run_dashboard` stays an `async fn` the
+//! caller races against the server with `tokio::select!`.
 
 use super::ui;
 use crate::stats::StatsSnapshot;
-use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-    execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-};
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::style::Color;
 use std::io;
+use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
+use tuika::{AsyncRunner, Event, KeyCode, RunnerConfig, Signal, Theme};
 
 /// Configuration for the dashboard
 #[derive(Debug, Clone)]
@@ -31,70 +37,65 @@ impl Default for DashboardConfig {
     }
 }
 
-/// Application state for the dashboard
-pub struct App {
+/// Live dashboard state, shared between the stats poller and the renderer.
+///
+/// The renderer reads it each frame ([`ui::dashboard`]); the poller mutates it
+/// through [`Live::update`], which requests a redraw from the runner.
+pub struct DashboardData {
     /// Current stats snapshot
     pub stats: Option<StatsSnapshot>,
     /// Last error message
     pub error: Option<String>,
-    /// Historical RPS values for sparkline (last 60 values)
+    /// Historical RPS values for the sparkline (last 60 values)
     pub rps_history: Vec<f64>,
-    /// Historical token rate values for sparkline
+    /// Historical token-rate values for the sparkline
     pub tokens_history: Vec<f64>,
-    /// Last fetch time
-    pub last_fetch: Instant,
-    /// Whether to exit
-    pub should_quit: bool,
-    /// Server URL
-    pub server_url: String,
-    /// Total tokens from last snapshot (for rate calculation)
-    pub last_total_tokens: u64,
+    /// Last fetch time, used to derive the token rate
+    last_fetch: Instant,
+    /// Total tokens from the last snapshot (for rate calculation)
+    last_total_tokens: u64,
 }
 
-impl App {
-    pub fn new(server_url: String) -> Self {
+impl DashboardData {
+    fn new() -> Self {
         Self {
             stats: None,
             error: None,
             rps_history: Vec::with_capacity(60),
             tokens_history: Vec::with_capacity(60),
             last_fetch: Instant::now(),
-            should_quit: false,
-            server_url,
             last_total_tokens: 0,
         }
     }
 
-    /// Update the stats by fetching from the server
-    pub async fn update_stats(&mut self) {
-        match fetch_stats(&self.server_url).await {
-            Ok(snapshot) => {
-                // Calculate token rate
-                let elapsed = self.last_fetch.elapsed().as_secs_f64();
-                if elapsed > 0.0 && self.last_total_tokens > 0 {
-                    let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
-                    let token_rate = token_diff as f64 / elapsed;
-                    self.tokens_history.push(token_rate);
-                    if self.tokens_history.len() > 60 {
-                        self.tokens_history.remove(0);
-                    }
-                }
-                self.last_total_tokens = snapshot.total_tokens;
-
-                // Update RPS history
-                self.rps_history.push(snapshot.requests_per_second);
-                if self.rps_history.len() > 60 {
-                    self.rps_history.remove(0);
-                }
-
-                self.stats = Some(snapshot);
-                self.error = None;
-                self.last_fetch = Instant::now();
-            }
-            Err(e) => {
-                self.error = Some(e);
+    /// Fold a freshly fetched snapshot into the rolling history and clear any
+    /// previous error.
+    fn ingest(&mut self, snapshot: StatsSnapshot) {
+        // Token rate over the interval since the previous successful fetch.
+        let elapsed = self.last_fetch.elapsed().as_secs_f64();
+        if elapsed > 0.0 && self.last_total_tokens > 0 {
+            let token_diff = snapshot.total_tokens.saturating_sub(self.last_total_tokens);
+            let token_rate = token_diff as f64 / elapsed;
+            self.tokens_history.push(token_rate);
+            if self.tokens_history.len() > 60 {
+                self.tokens_history.remove(0);
             }
         }
+        self.last_total_tokens = snapshot.total_tokens;
+
+        self.rps_history.push(snapshot.requests_per_second);
+        if self.rps_history.len() > 60 {
+            self.rps_history.remove(0);
+        }
+
+        self.stats = Some(snapshot);
+        self.error = None;
+        self.last_fetch = Instant::now();
+    }
+
+    /// Record a failed fetch; the header flips to DISCONNECTED.
+    fn set_error(&mut self, error: String) {
+        self.error = Some(error);
     }
 }
 
@@ -202,73 +203,62 @@ fn contains_invalid_request_chars(value: &str) -> bool {
         .any(|c| c.is_ascii_control() || c == ' ' || !c.is_ascii())
 }
 
-/// Run the TUI dashboard
-pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
-    // Setup terminal
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-    let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
-
-    // Create app state
-    let mut app = App::new(config.server_url);
-    let tick_rate = Duration::from_millis(config.refresh_ms);
-    let mut last_tick = Instant::now();
-
-    // Initial fetch
-    app.update_stats().await;
-
-    loop {
-        // Draw UI
-        terminal.draw(|f| ui::draw(f, &app))?;
-
-        // Handle events with timeout
-        let timeout = tick_rate.saturating_sub(last_tick.elapsed());
-        if crossterm::event::poll(timeout)? {
-            if let Event::Key(key) = event::read()? {
-                if key.kind == KeyEventKind::Press {
-                    match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => {
-                            app.should_quit = true;
-                        }
-                        KeyCode::Char('r') => {
-                            // Force refresh
-                            app.update_stats().await;
-                        }
-                        _ => {}
-                    }
-                }
-            }
-        }
-
-        // Check if we should quit
-        if app.should_quit {
-            break;
-        }
-
-        // Update stats on tick
-        if last_tick.elapsed() >= tick_rate {
-            app.update_stats().await;
-            last_tick = Instant::now();
-        }
+/// Fetch a fresh snapshot and fold it into `data`, recording any failure as the
+/// disconnected state. Shared by the periodic tick and the manual `r` refresh.
+async fn poll(url: &str, data: &mut DashboardData) {
+    match fetch_stats(url).await {
+        Ok(snapshot) => data.ingest(snapshot),
+        Err(error) => data.set_error(error),
     }
+}
 
-    // Restore terminal
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+/// Run the TUI dashboard until the user quits with `q`/`Esc`.
+pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
+    let refresh = Duration::from_millis(config.refresh_ms.max(1));
+    let runner = AsyncRunner::new(RunnerConfig { tick_rate: refresh });
 
-    Ok(())
+    // Match the previous look: keep the terminal's own background instead of
+    // tuika's themed fill, so only the widgets paint color.
+    let theme = Theme {
+        background: Color::Reset,
+        ..Theme::default()
+    };
+
+    // The runner owns this state for the duration of the run. `view` reads it
+    // each frame; `update` mutates it on every signal. The first tick fires
+    // right after the initial paint, so the dashboard loads without a special
+    // startup fetch.
+    let url = config.server_url;
+    let mut data = DashboardData::new();
+
+    runner
+        .run(
+            &theme,
+            &mut data,
+            |data, _frame| ui::dashboard(data),
+            async |data, signal| match signal {
+                Signal::Tick => {
+                    poll(&url, data).await;
+                    ControlFlow::Continue(())
+                }
+                Signal::Event(Event::Key(key)) if key.plain() => match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => ControlFlow::Break(()),
+                    KeyCode::Char('r') => {
+                        // Force an immediate refresh out of the tick cadence.
+                        poll(&url, data).await;
+                        ControlFlow::Continue(())
+                    }
+                    _ => ControlFlow::Continue(()),
+                },
+                _ => ControlFlow::Continue(()),
+            },
+        )
+        .await
 }
 
 #[cfg(test)]
 mod tests {
-    use super::StatsEndpoint;
+    use super::{DashboardData, StatsEndpoint, StatsSnapshot};
 
     #[test]
     fn parse_rejects_crlf_in_host() {
@@ -286,5 +276,80 @@ mod tests {
             Err(err) => err,
         };
         assert!(err.contains("invalid path characters"));
+    }
+
+    /// A snapshot with the two fields `ingest` reads (`total_tokens`,
+    /// `requests_per_second`) set and everything else zeroed.
+    fn snapshot(total_tokens: u64, requests_per_second: f64) -> StatsSnapshot {
+        StatsSnapshot {
+            uptime_secs: 0,
+            total_requests: 0,
+            active_requests: 0,
+            streaming_requests: 0,
+            non_streaming_requests: 0,
+            completions_requests: 0,
+            responses_requests: 0,
+            websocket_requests: 0,
+            messages_requests: 0,
+            image_requests: 0,
+            active_websocket_connections: 0,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens,
+            total_errors: 0,
+            rate_limit_errors: 0,
+            server_errors: 0,
+            timeout_errors: 0,
+            requests_per_second,
+            avg_latency_ms: 0.0,
+            min_latency_ms: None,
+            max_latency_ms: None,
+            model_requests: Default::default(),
+        }
+    }
+
+    #[test]
+    fn ingest_derives_token_rate_after_the_first_snapshot() {
+        let mut data = DashboardData::new();
+
+        // First snapshot seeds the token baseline; no rate can be derived yet.
+        data.ingest(snapshot(100, 1.0));
+        assert_eq!(data.rps_history, vec![1.0]);
+        assert!(
+            data.tokens_history.is_empty(),
+            "no token rate on the first sample"
+        );
+
+        // Second snapshot has a baseline to diff against, so a rate is recorded.
+        data.ingest(snapshot(300, 2.0));
+        assert_eq!(data.rps_history, vec![1.0, 2.0]);
+        assert_eq!(data.tokens_history.len(), 1);
+        assert!(
+            data.tokens_history[0] > 0.0,
+            "200 new tokens over a positive interval is a positive rate"
+        );
+        assert_eq!(data.stats.as_ref().map(|s| s.total_tokens), Some(300));
+    }
+
+    #[test]
+    fn ingest_caps_rolling_history_at_60_samples() {
+        let mut data = DashboardData::new();
+        for i in 0..70 {
+            data.ingest(snapshot((i + 1) * 10, i as f64));
+        }
+        assert_eq!(data.rps_history.len(), 60, "rps history is bounded");
+        assert_eq!(data.tokens_history.len(), 60, "token history is bounded");
+    }
+
+    #[test]
+    fn set_error_marks_disconnected_then_ingest_clears_it() {
+        let mut data = DashboardData::new();
+
+        data.set_error("connection refused".to_string());
+        assert_eq!(data.error.as_deref(), Some("connection refused"));
+
+        // A successful fetch clears the disconnected state.
+        data.ingest(snapshot(10, 1.0));
+        assert!(data.error.is_none());
     }
 }

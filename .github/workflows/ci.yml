@@ -105,7 +105,10 @@ jobs:
         uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        # `--locked` uses cargo-audit's own pinned lockfile so a freshly
+        # published transitive dep can't raise the tool's MSRV above the
+        # toolchain pinned above (e.g. kstring 2.0.4 requiring rustc 1.96).
+        run: cargo install cargo-audit --locked
 
       - name: Run cargo-audit
         run: cargo audit
@@ -120,7 +123,9 @@ jobs:
         uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Install cargo-deny
-        run: cargo install cargo-deny
+        # See the cargo-audit note above: pin to the tool's own lockfile so a
+        # transitive MSRV bump can't break the install on the pinned toolchain.
+        run: cargo install cargo-deny --locked
 
       - name: Run cargo-deny
         run: cargo deny check
