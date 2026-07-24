@@ -82,11 +82,11 @@ thiserror = "2.0"
 # layout, overlays, focus, alt-screen host, live redraw) that pins ratatui
 # 0.30.2; keeping `ratatui = "0.30"` here unifies onto that same version so the
 # `Buffer`/`Rect` types line up across the `RatatuiView` interop boundary. The
-# host machinery (crossterm, alt-screen, event loop) now lives inside `tuika`.
+# host machinery (crossterm, alt-screen, async event loop) now lives inside
+# `tuika`; its `async` feature (enabled via the `tui` feature) is what brings in
+# the `AsyncRunner`.
 ratatui = { version = "0.30", optional = true }
-# Tracking tuika `main` for the async runner (not yet in a published release);
-# pin to git until the next crates.io version ships.
-tuika = { git = "https://github.com/everruns/yolop", branch = "main", optional = true }
+tuika = { version = "0.4", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
