@@ -258,7 +258,7 @@ pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::StatsEndpoint;
+    use super::{DashboardData, StatsEndpoint, StatsSnapshot};
 
     #[test]
     fn parse_rejects_crlf_in_host() {
@@ -276,5 +276,80 @@ mod tests {
             Err(err) => err,
         };
         assert!(err.contains("invalid path characters"));
+    }
+
+    /// A snapshot with the two fields `ingest` reads (`total_tokens`,
+    /// `requests_per_second`) set and everything else zeroed.
+    fn snapshot(total_tokens: u64, requests_per_second: f64) -> StatsSnapshot {
+        StatsSnapshot {
+            uptime_secs: 0,
+            total_requests: 0,
+            active_requests: 0,
+            streaming_requests: 0,
+            non_streaming_requests: 0,
+            completions_requests: 0,
+            responses_requests: 0,
+            websocket_requests: 0,
+            messages_requests: 0,
+            image_requests: 0,
+            active_websocket_connections: 0,
+            prompt_tokens: 0,
+            completion_tokens: 0,
+            total_tokens,
+            total_errors: 0,
+            rate_limit_errors: 0,
+            server_errors: 0,
+            timeout_errors: 0,
+            requests_per_second,
+            avg_latency_ms: 0.0,
+            min_latency_ms: None,
+            max_latency_ms: None,
+            model_requests: Default::default(),
+        }
+    }
+
+    #[test]
+    fn ingest_derives_token_rate_after_the_first_snapshot() {
+        let mut data = DashboardData::new();
+
+        // First snapshot seeds the token baseline; no rate can be derived yet.
+        data.ingest(snapshot(100, 1.0));
+        assert_eq!(data.rps_history, vec![1.0]);
+        assert!(
+            data.tokens_history.is_empty(),
+            "no token rate on the first sample"
+        );
+
+        // Second snapshot has a baseline to diff against, so a rate is recorded.
+        data.ingest(snapshot(300, 2.0));
+        assert_eq!(data.rps_history, vec![1.0, 2.0]);
+        assert_eq!(data.tokens_history.len(), 1);
+        assert!(
+            data.tokens_history[0] > 0.0,
+            "200 new tokens over a positive interval is a positive rate"
+        );
+        assert_eq!(data.stats.as_ref().map(|s| s.total_tokens), Some(300));
+    }
+
+    #[test]
+    fn ingest_caps_rolling_history_at_60_samples() {
+        let mut data = DashboardData::new();
+        for i in 0..70 {
+            data.ingest(snapshot((i + 1) * 10, i as f64));
+        }
+        assert_eq!(data.rps_history.len(), 60, "rps history is bounded");
+        assert_eq!(data.tokens_history.len(), 60, "token history is bounded");
+    }
+
+    #[test]
+    fn set_error_marks_disconnected_then_ingest_clears_it() {
+        let mut data = DashboardData::new();
+
+        data.set_error("connection refused".to_string());
+        assert_eq!(data.error.as_deref(), Some("connection refused"));
+
+        // A successful fetch clears the disconnected state.
+        data.ingest(snapshot(10, 1.0));
+        assert!(data.error.is_none());
     }
 }
