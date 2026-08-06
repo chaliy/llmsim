@@ -75,7 +75,8 @@ gh pr view --json url 2>/dev/null
 If no PR exists, create one using the PR template (`.github/pull_request_template.md`):
 
 - **Title**: conventional commit style from the branch commits
-- **Body**: fill in the PR template sections (What, Why, How, Risk, Checklist) based on the actual changes. Include what tests were added/verified.
+- **Body**: fill in the PR template sections based on the actual changes; center it on functional change and impact, not a code-location walkthrough. Include what tests were added/verified.
+- **Evidence**: attach a Before / After with proof — `curl`/API output, server stats/metrics, or a TUI screenshot. Say so when there is no observable behavior change.
 - Use `gh pr create`
 
 If a PR already exists, update it if needed and report its URL.
