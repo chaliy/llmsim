@@ -3,6 +3,10 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "openai>=2.44.0",
+#     # Used directly for the raw Responses API call below. Declared explicitly
+#     # because `openai` 3.x depends on `httpx2`, not `httpx`, so it is no longer
+#     # pulled in transitively.
+#     "httpx",
 # ]
 # ///
 """

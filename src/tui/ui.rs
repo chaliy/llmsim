@@ -20,7 +20,9 @@ use ratatui::{
     text::{Line, Span},
     widgets::{Bar, BarChart, BarGroup, Block, Borders, Paragraph, Row, Sparkline, Table, Widget},
 };
-use tuika::{element, Dimension, Element, Flex, Padding, RatatuiView};
+use tuika::components::Flex;
+use tuika::interop::RatatuiView;
+use tuika::{element, Dimension, Element, Padding};
 
 /// Build the whole dashboard tree for the current snapshot.
 ///
