@@ -86,7 +86,7 @@ thiserror = "2.0"
 # `tuika`; its `async` feature (enabled via the `tui` feature) is what brings in
 # the `AsyncRunner`.
 ratatui = { version = "0.30", optional = true }
-tuika = { version = "0.4", optional = true }
+tuika = { version = "0.9", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"

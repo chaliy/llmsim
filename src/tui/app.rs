@@ -13,11 +13,12 @@ use super::ui;
 use crate::stats::StatsSnapshot;
 use ratatui::style::Color;
 use std::io;
-use std::ops::ControlFlow;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
-use tuika::{AsyncRunner, Event, KeyCode, RunnerConfig, Signal, Theme};
+use tuika::{
+    async_from_fn, AsyncRunner, Event, KeyCode, RunnerConfig, Signal, Theme, UpdateResult,
+};
 
 /// Configuration for the dashboard
 #[derive(Debug, Clone)]
@@ -212,10 +213,42 @@ async fn poll(url: &str, data: &mut DashboardData) {
     }
 }
 
+/// Map one runner signal onto the dashboard state.
+///
+/// Split out of the runner closure so the key/tick contract is testable without
+/// a terminal: the runner only forwards signals here and acts on the returned
+/// [`UpdateResult`].
+async fn update(url: &str, data: &mut DashboardData, signal: Signal) -> UpdateResult {
+    match signal {
+        Signal::Tick => {
+            poll(url, data).await;
+            // A tick always folds a fresh sample (or an error) into the state,
+            // so the frame is repainted on every tick as it was before
+            // `UpdateResult` started gating redraws.
+            UpdateResult::Dirty
+        }
+        Signal::Event(Event::Key(key)) if key.plain() => match key.code {
+            KeyCode::Char('q') | KeyCode::Esc => UpdateResult::Exit,
+            KeyCode::Char('r') => {
+                // Force an immediate refresh out of the tick cadence.
+                poll(url, data).await;
+                UpdateResult::Dirty
+            }
+            // Unhandled: `Clean` lets the runner apply its own default
+            // interactions (such as drag-to-select) to the input.
+            _ => UpdateResult::Clean,
+        },
+        _ => UpdateResult::Clean,
+    }
+}
+
 /// Run the TUI dashboard until the user quits with `q`/`Esc`.
 pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
     let refresh = Duration::from_millis(config.refresh_ms.max(1));
-    let runner = AsyncRunner::new(RunnerConfig { tick_rate: refresh });
+    let runner = AsyncRunner::new(RunnerConfig {
+        tick_rate: refresh,
+        ..RunnerConfig::default()
+    });
 
     // Match the previous look: keep the terminal's own background instead of
     // tuika's themed fill, so only the widgets paint color.
@@ -234,31 +267,21 @@ pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
     runner
         .run(
             &theme,
-            &mut data,
-            |data, _frame| ui::dashboard(data),
-            async |data, signal| match signal {
-                Signal::Tick => {
-                    poll(&url, data).await;
-                    ControlFlow::Continue(())
-                }
-                Signal::Event(Event::Key(key)) if key.plain() => match key.code {
-                    KeyCode::Char('q') | KeyCode::Esc => ControlFlow::Break(()),
-                    KeyCode::Char('r') => {
-                        // Force an immediate refresh out of the tick cadence.
-                        poll(&url, data).await;
-                        ControlFlow::Continue(())
-                    }
-                    _ => ControlFlow::Continue(()),
-                },
-                _ => ControlFlow::Continue(()),
-            },
+            async_from_fn(
+                &mut data,
+                |data, _frame| ui::dashboard(data),
+                async |data, signal| update(&url, data, signal).await,
+            ),
         )
         .await
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{DashboardData, StatsEndpoint, StatsSnapshot};
+    use super::{update, DashboardData, StatsEndpoint, StatsSnapshot};
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpListener;
+    use tuika::{Event, Key, KeyCode, Signal, UpdateResult};
 
     #[test]
     fn parse_rejects_crlf_in_host() {
@@ -339,6 +362,126 @@ mod tests {
         }
         assert_eq!(data.rps_history.len(), 60, "rps history is bounded");
         assert_eq!(data.tokens_history.len(), 60, "token history is bounded");
+    }
+
+    /// Serve the `/llmsim/stats` JSON to any number of connections, closing
+    /// each one so the fetch's `read_to_end` completes. Returns the base URL to
+    /// point the dashboard at.
+    async fn stub_stats_server(snapshot: StatsSnapshot) -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let body = serde_json::to_string(&snapshot).unwrap();
+
+        tokio::spawn(async move {
+            while let Ok((mut socket, _)) = listener.accept().await {
+                let body = body.clone();
+                tokio::spawn(async move {
+                    let mut buf = [0u8; 1024];
+                    let _ = socket.read(&mut buf).await;
+                    let response = format!(
+                        "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\n\r\n{}",
+                        body.len(),
+                        body
+                    );
+                    let _ = socket.write_all(response.as_bytes()).await;
+                    let _ = socket.shutdown().await;
+                });
+            }
+        });
+
+        format!("http://{}", addr)
+    }
+
+    /// An address nothing is listening on: bind a port, then drop the listener.
+    async fn unbound_url() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        drop(listener);
+        format!("http://{}", addr)
+    }
+
+    fn key(code: KeyCode) -> Signal {
+        Signal::Event(Event::Key(Key::new(code)))
+    }
+
+    #[tokio::test]
+    async fn tick_polls_stats_and_repaints() {
+        let url = stub_stats_server(snapshot(500, 3.0)).await;
+        let mut data = DashboardData::new();
+
+        let result = update(&url, &mut data, Signal::Tick).await;
+
+        assert_eq!(result, UpdateResult::Dirty, "a fresh sample must repaint");
+        assert_eq!(data.stats.as_ref().map(|s| s.total_tokens), Some(500));
+        assert_eq!(data.rps_history, vec![3.0]);
+        assert!(data.error.is_none());
+    }
+
+    #[tokio::test]
+    async fn tick_against_a_dead_server_records_the_error_and_still_repaints() {
+        let url = unbound_url().await;
+        let mut data = DashboardData::new();
+
+        let result = update(&url, &mut data, Signal::Tick).await;
+
+        assert_eq!(
+            result,
+            UpdateResult::Dirty,
+            "flipping to DISCONNECTED is a visible change"
+        );
+        assert!(data.error.is_some(), "the failed fetch is recorded");
+        assert!(data.stats.is_none());
+    }
+
+    #[tokio::test]
+    async fn r_refreshes_out_of_the_tick_cadence() {
+        let url = stub_stats_server(snapshot(42, 1.0)).await;
+        let mut data = DashboardData::new();
+
+        let result = update(&url, &mut data, key(KeyCode::Char('r'))).await;
+
+        assert_eq!(result, UpdateResult::Dirty);
+        assert_eq!(data.stats.as_ref().map(|s| s.total_tokens), Some(42));
+    }
+
+    #[tokio::test]
+    async fn q_and_esc_quit() {
+        let url = unbound_url().await;
+        let mut data = DashboardData::new();
+
+        for code in [KeyCode::Char('q'), KeyCode::Esc] {
+            assert_eq!(
+                update(&url, &mut data, key(code)).await,
+                UpdateResult::Exit,
+                "{:?} quits the dashboard",
+                code
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn unhandled_input_stays_clean() {
+        let url = unbound_url().await;
+        let mut data = DashboardData::new();
+
+        // An unbound key: no state change, and the runner keeps its default
+        // handling for the input.
+        assert_eq!(
+            update(&url, &mut data, key(KeyCode::Char('x'))).await,
+            UpdateResult::Clean
+        );
+
+        // A modified chord is not the bare `q` binding, so it must not quit.
+        let ctrl_q = Signal::Event(Event::Key(Key {
+            code: KeyCode::Char('q'),
+            ctrl: true,
+            alt: false,
+            shift: false,
+        }));
+        assert_eq!(update(&url, &mut data, ctrl_q).await, UpdateResult::Clean);
+
+        assert!(data.stats.is_none(), "no fetch was triggered");
+        assert!(data.error.is_none());
     }
 
     #[test]
