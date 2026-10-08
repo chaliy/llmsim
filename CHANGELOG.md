@@ -19,6 +19,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   sequence, the Anthropic error envelope, scripted `tool_use` support, and a
   `messages_requests` stat counter. New examples for Python, TypeScript, Go,
   curl, and LangChain. See `specs/anthropic-api.md`.
+- **New models**: GPT-5.6 (Sol/Terra/Luna), GPT-6 Astra/Sol/Luna, GPT-6.1 Sol,
+  gpt-image-2, Claude Opus 5 / 5.5, Sonnet 5 / 5.5, Haiku 5.5, Fable 5.1,
+  Gemini 3.5 Flash / Flash Lite and 3.6 / 3.7 / 3.8 Flash, DeepSeek V4 Pro and
+  V4.1 Flash (`deepseek-flash`), with profiles from models.dev.
+- **Anthropic extended thinking**: `thinking` and `output_config.effort` are
+  honored. Claude 5.x / Fable models (and any model sent
+  `thinking: {type: "adaptive"}`) return a `thinking` block with a signature
+  before the text, streamed as `thinking_delta` / `signature_delta`; thinking
+  tokens scale with effort and count in `usage.output_tokens`. Configurations
+  the real API rejects return `400 invalid_request_error`.
+- **Anthropic token counting**: `POST /anthropic/v1/messages/count_tokens`.
+- **Chat Completions `reasoning_effort`**: reasoning models report
+  `completion_tokens_details.reasoning_tokens` (included in
+  `completion_tokens`). New `max` effort level on chat and Responses.
+
+### Changed
+
+- Reasoning-model detection uses model profiles, so GPT-5.6/GPT-6 produce
+  reasoning tokens and `gpt-5.3-chat-latest` no longer does.
+- Claude Opus 4.8 and Fable 5 release dates corrected; Opus 4.8 now carries
+  its published knowledge cutoff.
+- Rust toolchain pinned to 1.99; `tuika` 0.13, `tokio-tungstenite` 0.30.
 
 ## [0.5.1] - 2026-06-28
 
