@@ -11,7 +11,6 @@
 
 use super::ui;
 use crate::stats::StatsSnapshot;
-use ratatui::style::Color;
 use std::io;
 use std::time::{Duration, Instant};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -253,7 +252,7 @@ pub async fn run_dashboard(config: DashboardConfig) -> io::Result<()> {
     // Match the previous look: keep the terminal's own background instead of
     // tuika's themed fill, so only the widgets paint color.
     let theme = Theme {
-        background: Color::Reset,
+        background: tuika::prelude::Color::Reset,
         ..Theme::default()
     };
 

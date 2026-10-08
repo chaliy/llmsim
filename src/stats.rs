@@ -296,7 +296,7 @@ impl Stats {
     /// Returns true if a slot was successfully reserved, false if the cap is already reached.
     pub fn try_reserve_ws_connection(&self, max_connections: u64) -> bool {
         self.active_websocket_connections
-            .fetch_update(ORDERING, ORDERING, |current| {
+            .try_update(ORDERING, ORDERING, |current| {
                 (current < max_connections).then_some(current + 1)
             })
             .is_ok()

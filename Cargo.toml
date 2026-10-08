@@ -44,7 +44,7 @@ cli = ["server", "dep:clap", "dep:tracing-subscriber"]
 # layout, alt-screen host, focus, live redraw) and renders its data panels
 # through `tuika`'s safe ratatui interop, so `ratatui` stays a direct dep for
 # the widget code while `tuika` owns the layout/host/event loop.
-tui = ["cli", "dep:tuika", "tuika/async", "dep:ratatui", "tokio/io-util"]
+tui = ["cli", "dep:tuika", "tuika/async", "tuika/ratatui", "dep:ratatui", "tokio/io-util"]
 
 [dependencies]
 # Async runtime
@@ -78,17 +78,17 @@ futures-util = { version = "0.3", default-features = false, features = ["sink", 
 async-stream = "0.3"
 thiserror = "2.0"
 
-# TUI. `tuika` is a composable terminal UI toolkit over ratatui (flexbox
-# layout, overlays, focus, alt-screen host, live redraw) that pins ratatui
-# 0.30.2; keeping `ratatui = "0.30"` here unifies onto that same version so the
-# `Buffer`/`Rect` types line up across the `RatatuiView` interop boundary. The
-# host machinery (crossterm, alt-screen, async event loop) now lives inside
-# `tuika`; its `async` feature (enabled via the `tui` feature) is what brings in
-# the `AsyncRunner`.
+# TUI. `tuika` is a composable terminal UI toolkit (flexbox layout, overlays,
+# focus, alt-screen host, live redraw) with its own style types; its optional
+# `ratatui` feature (enabled via the `tui` feature) provides the `RatatuiView`
+# interop over `ratatui-core` 0.1, which `ratatui = "0.30"` here unifies onto so
+# the `Buffer`/`Rect` types line up across that boundary. The host machinery
+# (crossterm, alt-screen, async event loop) lives inside `tuika`; its `async`
+# feature (also enabled via `tui`) is what brings in the `AsyncRunner`.
 ratatui = { version = "0.30", optional = true }
-tuika = { version = "0.9", optional = true }
+tuika = { version = "0.13", optional = true }
 
 [dev-dependencies]
 tokio-test = "0.4"
-tokio-tungstenite = "0.29"
+tokio-tungstenite = "0.30"
 tower = { version = "0.5", features = ["util"] }
