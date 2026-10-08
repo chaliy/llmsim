@@ -6,6 +6,7 @@
 
 mod models;
 mod stream;
+pub mod thinking;
 mod types;
 
 pub use models::*;

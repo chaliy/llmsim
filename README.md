@@ -150,7 +150,8 @@ Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/message
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming) |
+| `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming, extended thinking) |
+| `/anthropic/v1/messages/count_tokens` | POST | Count input tokens for a Messages request |
 | `/anthropic/v1/models` | GET | List available Claude models |
 | `/anthropic/v1/models/{model_id}` | GET | Get specific model details |
 

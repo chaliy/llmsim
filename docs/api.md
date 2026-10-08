@@ -468,6 +468,34 @@ curl http://localhost:8080/anthropic/v1/messages \
 | `tools` | array | no | Tool definitions |
 | `tool_choice` | object | no | |
 | `metadata` | object | no | E.g. `{"user_id": "..."}` |
+| `thinking` | object | no | `{"type": "adaptive"}` (or `"enabled"` + `budget_tokens` on older models, `"disabled"`), optional `display`: `"summarized"` / `"omitted"` |
+| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}` |
+
+#### Extended thinking
+
+Claude 5.x and Fable models (`claude-opus-5-5`, `claude-sonnet-5-5`,
+`claude-haiku-5-5`, `claude-fable-5-1`, ...) think on every request, so their
+responses start with a `thinking` block before the `text` block. Other models
+add one only when you send `thinking: {"type": "adaptive"}` (or `"enabled"`
+with `budget_tokens` on pre-4.7 models). The thinking text is empty by default
+on Opus 4.7+ and 5.x models; send `"display": "summarized"` to get a short
+synthetic summary. Thinking tokens are counted in `usage.output_tokens` and
+grow with `output_config.effort`.
+
+```json
+{
+  "content": [
+    {"type": "thinking", "thinking": "", "signature": "EqX9..."},
+    {"type": "text", "text": "The capital of France is Paris."}
+  ],
+  "usage": {"input_tokens": 10, "output_tokens": 35}
+}
+```
+
+Configurations the real API rejects return `400 invalid_request_error`, e.g.
+`budget_tokens` on Opus 4.7+ / 5.x / Fable, `{"type": "disabled"}` on Fable,
+Opus 5.5 and Sonnet 5.5, or an unknown `effort`. Scripted responses never
+include a thinking block.
 
 #### Response
 
@@ -506,12 +534,27 @@ curl -N http://localhost:8080/anthropic/v1/messages \
 | Event Type | Description |
 |------------|-------------|
 | `message_start` | Message object created (seeds `usage.input_tokens`) |
-| `content_block_start` | Text content block opened at `index` 0 |
+| `content_block_start` | Content block opened (`thinking` at `index` 0 when present, then `text`) |
 | `ping` | Keep-alive |
-| `content_block_delta` | Text chunk (`delta.type == "text_delta"`) |
+| `content_block_delta` | `text_delta` chunk, or `thinking_delta` / `signature_delta` for the thinking block |
 | `content_block_stop` | Content block complete |
 | `message_delta` | Final `stop_reason` + cumulative `usage.output_tokens` |
 | `message_stop` | Stream complete |
+
+### Count Tokens
+
+```bash
+curl http://localhost:8080/anthropic/v1/messages/count_tokens \
+  -H "content-type: application/json" \
+  -d '{
+    "model": "claude-opus-5-5",
+    "messages": [{"role": "user", "content": "How many tokens is this?"}]
+  }'
+# {"input_tokens": 16}
+```
+
+The count equals the `usage.input_tokens` a Messages request with the same
+`system` and `messages` would report.
 
 ### List Models
 

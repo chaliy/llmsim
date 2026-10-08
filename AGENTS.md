@@ -109,6 +109,7 @@ Examples:
 
 **Anthropic endpoints:**
 - `POST /anthropic/v1/messages` - Messages API (streaming supported)
+- `POST /anthropic/v1/messages/count_tokens` - Count input tokens
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:id` - Get model details
 
