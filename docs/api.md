@@ -583,12 +583,14 @@ curl http://localhost:8080/llmsim/stats
 
 | Family | Models |
 |--------|--------|
-| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.3-codex-spark, gpt-5.3-chat-latest, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.5, gpt-5.5-pro |
+| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.3-codex-spark, gpt-5.3-chat-latest, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.5, gpt-5.5-pro, gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna |
+| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol |
 | O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano |
-| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5 |
-| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite |
-| DeepSeek | deepseek-chat, deepseek-reasoner |
+| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5, claude-opus-5, claude-opus-5.5, claude-sonnet-5, claude-sonnet-5.5, claude-haiku-5.5, claude-fable-5, claude-fable-5.1 |
+| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash |
+| DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
+| Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2 |
 
 ## Scripted Mode
 

@@ -220,15 +220,17 @@ available = [
 
 | Family | Models |
 |--------|--------|
-| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.4, gpt-5.5 |
+| GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.4, gpt-5.5, gpt-5.6 (Sol/Terra/Luna) |
+| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol |
 | O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1 |
-| Claude | claude-opus, claude-sonnet, claude-haiku (with 4.x versions through Opus 4.8 and Sonnet 4.6) |
-| Gemini | gemini-2.0-flash, gemini-2.5-pro, gemini-3 and gemini-3.1 previews |
+| Claude | claude-opus, claude-sonnet, claude-haiku, claude-fable (4.x and 5.x, through Fable 5.1, Opus 5.5, Sonnet 5.5, and Haiku 5.5) |
+| Gemini | gemini-2.0-flash, gemini-2.5-pro, gemini-3 / 3.1 previews, gemini-3.5 through gemini-3.8 flash |
+| DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
 
 > The Anthropic endpoints (`/anthropic/v1/...`) use the **real Anthropic API
 > model IDs** (dash-separated, e.g. `claude-opus-4-8`, `claude-sonnet-4-6`,
-> `claude-haiku-4-5`, `claude-fable-5`), including dated-snapshot and `-latest`
+> `claude-haiku-4-5`, `claude-opus-5-5`, `claude-fable-5-1`), including dated-snapshot and `-latest`
 > aliases. List them via `GET /anthropic/v1/models`.
 
 ## Latency Profiles

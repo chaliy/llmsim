@@ -42,7 +42,8 @@ pub struct ModelProfile {
     pub created: i64,
     /// Model capabilities
     pub capabilities: ModelCapabilities,
-    /// Knowledge cutoff date (YYYY-MM-DD format)
+    /// Knowledge cutoff date (`YYYY-MM-DD`, or `YYYY-MM` when the source only
+    /// publishes month precision)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub knowledge_cutoff: Option<String>,
 }
@@ -318,6 +319,47 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_created(1776902400) // 2026-04-23
             .with_capabilities(gpt5_capabilities())
             .with_knowledge_cutoff("2025-12-01"),
+        // GPT-5.6 (Sol = frontier, Terra = balanced, Luna = cost-efficient;
+        // bare `gpt-5.6` is the Sol alias)
+        ModelProfile::new("gpt-5.6", "GPT-5.6", "openai", 1_050_000, 128_000)
+            .with_created(1783555200) // 2026-07-09
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-02-16"),
+        ModelProfile::new("gpt-5.6-sol", "GPT-5.6 Sol", "openai", 1_050_000, 128_000)
+            .with_created(1783555200) // 2026-07-09
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-02-16"),
+        ModelProfile::new(
+            "gpt-5.6-terra",
+            "GPT-5.6 Terra",
+            "openai",
+            1_050_000,
+            128_000,
+        )
+        .with_created(1783555200) // 2026-07-09
+        .with_capabilities(gpt5_capabilities())
+        .with_knowledge_cutoff("2026-02-16"),
+        ModelProfile::new("gpt-5.6-luna", "GPT-5.6 Luna", "openai", 1_050_000, 128_000)
+            .with_created(1783555200) // 2026-07-09
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-02-16"),
+        // GPT-6 family (Astra = most capable tier)
+        ModelProfile::new("gpt-6-astra", "GPT-6 Astra", "openai", 1_050_000, 128_000)
+            .with_created(1788480000) // 2026-09-04
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-04-30"),
+        ModelProfile::new("gpt-6-sol", "GPT-6 Sol", "openai", 1_050_000, 128_000)
+            .with_created(1790035200) // 2026-09-22
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-04-20"),
+        ModelProfile::new("gpt-6-luna", "GPT-6 Luna", "openai", 1_050_000, 128_000)
+            .with_created(1790035200) // 2026-09-22
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-05-18"),
+        ModelProfile::new("gpt-6.1-sol", "GPT-6.1 Sol", "openai", 1_050_000, 128_000)
+            .with_created(1790640000) // 2026-09-29
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-04-30"),
     ];
 
     // O-series reasoning models
@@ -497,10 +539,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1776297600) // 2026-04-16
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2026-01-31"),
-        // Claude Opus 4.8 (current flagship Opus, sourced from the claude-api
-        // reference). knowledge_cutoff is intentionally omitted: models.dev had
-        // not yet published an authoritative cutoff for 4.8 at maintenance time,
-        // and we prefer omission over a guessed value.
+        // Claude Opus 4.8
         ModelProfile::new(
             "claude-opus-4.8",
             "Claude Opus 4.8",
@@ -508,8 +547,85 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             1_000_000,
             128_000,
         )
-        .with_created(1779235200) // 2026-05-20 (approximate)
+        .with_created(1779926400) // 2026-05-28
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-01"),
+        // Claude Opus 5
+        ModelProfile::new(
+            "claude-opus-5",
+            "Claude Opus 5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1784851200) // 2026-07-24
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-05"),
+        // Claude Opus 5.5
+        ModelProfile::new(
+            "claude-opus-5.5",
+            "Claude Opus 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1790035200) // 2026-09-22
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-06"),
+        // Claude Sonnet 5
+        ModelProfile::new(
+            "claude-sonnet-5",
+            "Claude Sonnet 5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1782691200) // 2026-06-29
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-01-31"),
+        // Claude Sonnet 5.5
+        ModelProfile::new(
+            "claude-sonnet-5.5",
+            "Claude Sonnet 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1790553600) // 2026-09-28
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-06"),
+        // Claude Haiku 5.5
+        ModelProfile::new(
+            "claude-haiku-5.5",
+            "Claude Haiku 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1791331200) // 2026-10-07
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-06"),
+        // Claude Fable 5 (models.dev publishes no knowledge cutoff)
+        ModelProfile::new(
+            "claude-fable-5",
+            "Claude Fable 5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1780790400) // 2026-06-07
         .with_capabilities(claude_reasoning_capabilities()),
+        // Claude Fable 5.1 (most capable widely released Claude model)
+        ModelProfile::new(
+            "claude-fable-5.1",
+            "Claude Fable 5.1",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1788220800) // 2026-09-01
+        .with_capabilities(claude_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-06"),
         // Claude Haiku 4.5
         ModelProfile::new(
             "claude-haiku-4.5",
@@ -592,6 +708,55 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1778112000) // 2026-05-07
         .with_capabilities(gemini_reasoning_capabilities())
         .with_knowledge_cutoff("2025-01-31"),
+        ModelProfile::new(
+            "gemini-3.5-flash",
+            "Gemini 3.5 Flash",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1779148800) // 2026-05-19
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2025-01"),
+        ModelProfile::new(
+            "gemini-3.5-flash-lite",
+            "Gemini 3.5 Flash Lite",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1784592000) // 2026-07-21
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-03"),
+        ModelProfile::new(
+            "gemini-3.6-flash",
+            "Gemini 3.6 Flash",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1784592000) // 2026-07-21
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-03"),
+        ModelProfile::new(
+            "gemini-3.7-flash",
+            "Gemini 3.7 Flash",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1786579200) // 2026-08-13
+        .with_capabilities(gemini_reasoning_capabilities())
+        .with_knowledge_cutoff("2026-03"),
+        ModelProfile::new(
+            "gemini-3.8-flash",
+            "Gemini 3.8 Flash",
+            "google",
+            1_048_576,
+            65_536,
+        )
+        .with_created(1788307200) // 2026-09-02
+        .with_capabilities(gemini_reasoning_capabilities()),
     ];
 
     // DeepSeek family
@@ -614,6 +779,29 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         )
         .with_created(1735689600) // 2025-01
         .with_capabilities(deepseek_reasoning_capabilities()),
+        // DeepSeek V4 (1M context, thinking + non-thinking modes, open weights)
+        ModelProfile::new(
+            "deepseek-v4-pro",
+            "DeepSeek V4 Pro",
+            "deepseek",
+            1_000_000,
+            393_216,
+        )
+        .with_created(1786492800) // 2026-08-12
+        .with_capabilities(deepseek_reasoning_capabilities()),
+        ModelProfile::new(
+            "deepseek-flash",
+            "DeepSeek V4.1 Flash",
+            "deepseek",
+            1_000_000,
+            393_216,
+        )
+        .with_created(1788998400) // 2026-09-10
+        .with_capabilities(ModelCapabilities {
+            vision: true,
+            ..deepseek_reasoning_capabilities()
+        })
+        .with_knowledge_cutoff("2025-05"),
     ];
 
     // OpenAI image generation models (gpt-image / "ChatGPT Images" family).
@@ -638,6 +826,11 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_created(1761955200) // 2025-11
             .with_capabilities(image_capabilities())
             .with_knowledge_cutoff("2024-06-30"),
+        // models.dev publishes no token limits for gpt-image-2; reuse the
+        // gpt-image-1.x prompt/output ceilings.
+        ModelProfile::new("gpt-image-2", "GPT Image 2", "openai", 32_000, 4_160)
+            .with_created(1776729600) // 2026-04-21
+            .with_capabilities(image_capabilities()),
     ];
 
     // Add all models to registry
@@ -782,8 +975,97 @@ mod tests {
         assert_eq!(profile.context_window, 1_000_000);
         assert_eq!(profile.max_output_tokens, 128_000);
         assert!(profile.capabilities.reasoning);
-        // knowledge_cutoff is intentionally omitted for 4.8 (see profile comment).
-        assert_eq!(profile.knowledge_cutoff, None);
+        assert_eq!(profile.created, 1779926400); // 2026-05-28
+        assert_eq!(profile.knowledge_cutoff.as_deref(), Some("2026-01"));
+    }
+
+    #[test]
+    fn test_claude_5_family_profiles() {
+        for (id, cutoff) in [
+            ("claude-opus-5", Some("2026-05")),
+            ("claude-opus-5.5", Some("2026-06")),
+            ("claude-sonnet-5", Some("2026-01-31")),
+            ("claude-sonnet-5.5", Some("2026-06")),
+            ("claude-haiku-5.5", Some("2026-06")),
+            ("claude-fable-5", None),
+            ("claude-fable-5.1", Some("2026-06")),
+        ] {
+            let profile = get_model_profile(id).unwrap_or_else(|| panic!("{id} should exist"));
+            assert_eq!(profile.owned_by, "anthropic", "{id}");
+            assert_eq!(profile.context_window, 1_000_000, "{id}");
+            assert_eq!(profile.max_output_tokens, 128_000, "{id}");
+            assert!(profile.capabilities.reasoning, "{id}");
+            assert!(profile.capabilities.vision, "{id}");
+            assert_eq!(profile.knowledge_cutoff.as_deref(), cutoff, "{id}");
+        }
+    }
+
+    #[test]
+    fn test_gpt_5_6_and_gpt_6_profiles() {
+        for (id, created, cutoff) in [
+            ("gpt-5.6", 1783555200, "2026-02-16"),
+            ("gpt-5.6-sol", 1783555200, "2026-02-16"),
+            ("gpt-5.6-terra", 1783555200, "2026-02-16"),
+            ("gpt-5.6-luna", 1783555200, "2026-02-16"),
+            ("gpt-6-astra", 1788480000, "2026-04-30"),
+            ("gpt-6-sol", 1790035200, "2026-04-20"),
+            ("gpt-6-luna", 1790035200, "2026-05-18"),
+            ("gpt-6.1-sol", 1790640000, "2026-04-30"),
+        ] {
+            let profile = get_model_profile(id).unwrap_or_else(|| panic!("{id} should exist"));
+            assert_eq!(profile.owned_by, "openai", "{id}");
+            assert_eq!(profile.context_window, 1_050_000, "{id}");
+            assert_eq!(profile.max_output_tokens, 128_000, "{id}");
+            assert_eq!(profile.created, created, "{id}");
+            assert_eq!(profile.capabilities, gpt5_capabilities(), "{id}");
+            assert_eq!(profile.knowledge_cutoff.as_deref(), Some(cutoff), "{id}");
+        }
+    }
+
+    #[test]
+    fn test_gpt_image_2_profile() {
+        let profile = get_model_profile("gpt-image-2").expect("gpt-image-2 should exist");
+        assert_eq!(profile.owned_by, "openai");
+        assert_eq!(profile.capabilities, image_capabilities());
+        assert_eq!(profile.created, 1776729600); // 2026-04-21
+    }
+
+    #[test]
+    fn test_new_gemini_flash_profiles() {
+        for id in [
+            "gemini-3.5-flash",
+            "gemini-3.5-flash-lite",
+            "gemini-3.6-flash",
+            "gemini-3.7-flash",
+            "gemini-3.8-flash",
+        ] {
+            let profile = get_model_profile(id).unwrap_or_else(|| panic!("{id} should exist"));
+            assert_eq!(profile.owned_by, "google", "{id}");
+            assert_eq!(profile.context_window, 1_048_576, "{id}");
+            assert_eq!(profile.max_output_tokens, 65_536, "{id}");
+            assert!(profile.capabilities.reasoning, "{id}");
+        }
+        assert_eq!(
+            get_model_profile("gemini-3.8-flash")
+                .unwrap()
+                .knowledge_cutoff,
+            None
+        );
+    }
+
+    #[test]
+    fn test_deepseek_v4_profiles() {
+        let pro = get_model_profile("deepseek-v4-pro").expect("deepseek-v4-pro should exist");
+        assert_eq!(pro.context_window, 1_000_000);
+        assert_eq!(pro.max_output_tokens, 393_216);
+        assert!(pro.capabilities.reasoning);
+        assert!(!pro.capabilities.vision);
+
+        let flash = get_model_profile("deepseek-flash").expect("deepseek-flash should exist");
+        assert_eq!(flash.name, "DeepSeek V4.1 Flash");
+        assert!(flash.capabilities.reasoning);
+        assert!(flash.capabilities.vision);
+        assert_eq!(flash.knowledge_cutoff.as_deref(), Some("2025-05"));
     }
 
     #[test]

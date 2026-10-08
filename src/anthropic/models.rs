@@ -12,7 +12,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::LazyLock;
 
-/// Capabilities for modern Claude models with extended thinking (3.7+, 4.x, Fable).
+/// Capabilities for modern Claude models with extended thinking (3.7+, 4.x, 5.x, Fable).
 fn reasoning_caps() -> ModelCapabilities {
     ModelCapabilities {
         function_calling: true,
@@ -51,7 +51,22 @@ fn insert_with_aliases(
 fn build_registry() -> HashMap<String, ModelProfile> {
     let mut registry = HashMap::new();
 
-    // --- Claude Fable 5 (most capable widely-released model) ---
+    // --- Claude Fable 5.x (most capable widely released tier) ---
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-fable-5-1",
+            "Claude Fable 5.1",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1788220800) // 2026-09-01
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-06"),
+        &[],
+    );
+    // models.dev publishes no knowledge cutoff for Fable 5.
     insert_with_aliases(
         &mut registry,
         ModelProfile::new(
@@ -61,8 +76,84 @@ fn build_registry() -> HashMap<String, ModelProfile> {
             1_000_000,
             128_000,
         )
-        .with_created(1780272000) // 2026-06-01
+        .with_created(1780790400) // 2026-06-07
         .with_capabilities(reasoning_caps()),
+        &[],
+    );
+
+    // --- Opus 5.x family ---
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-opus-5-5",
+            "Claude Opus 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1790035200) // 2026-09-22
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-06"),
+        &[],
+    );
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-opus-5",
+            "Claude Opus 5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1784851200) // 2026-07-24
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-05"),
+        &[],
+    );
+
+    // --- Sonnet 5.x family ---
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-sonnet-5-5",
+            "Claude Sonnet 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1790553600) // 2026-09-28
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-06"),
+        &[],
+    );
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-sonnet-5",
+            "Claude Sonnet 5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1782691200) // 2026-06-29
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-01-31"),
+        &[],
+    );
+
+    // --- Haiku 5.5 ---
+    insert_with_aliases(
+        &mut registry,
+        ModelProfile::new(
+            "claude-haiku-5-5",
+            "Claude Haiku 5.5",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1791331200) // 2026-10-07
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-06"),
         &[],
     );
 
@@ -76,8 +167,9 @@ fn build_registry() -> HashMap<String, ModelProfile> {
             1_000_000,
             128_000,
         )
-        .with_created(1779235200) // 2026-05-20 (approximate)
-        .with_capabilities(reasoning_caps()),
+        .with_created(1779926400) // 2026-05-28
+        .with_capabilities(reasoning_caps())
+        .with_knowledge_cutoff("2026-01"),
         &[],
     );
     insert_with_aliases(
@@ -299,7 +391,13 @@ pub fn get_anthropic_model_profile(model_id: &str) -> Option<&'static ModelProfi
 /// stable, human-friendly order (newest/most-capable first).
 pub fn default_anthropic_model_ids() -> Vec<&'static str> {
     vec![
+        "claude-fable-5-1",
         "claude-fable-5",
+        "claude-opus-5-5",
+        "claude-opus-5",
+        "claude-sonnet-5-5",
+        "claude-sonnet-5",
+        "claude-haiku-5-5",
         "claude-opus-4-8",
         "claude-opus-4-7",
         "claude-opus-4-6",
@@ -413,6 +511,29 @@ mod tests {
     }
 
     #[test]
+    fn test_claude_5_family_profiles() {
+        for (id, name) in [
+            ("claude-fable-5-1", "Claude Fable 5.1"),
+            ("claude-opus-5-5", "Claude Opus 5.5"),
+            ("claude-opus-5", "Claude Opus 5"),
+            ("claude-sonnet-5-5", "Claude Sonnet 5.5"),
+            ("claude-sonnet-5", "Claude Sonnet 5"),
+            ("claude-haiku-5-5", "Claude Haiku 5.5"),
+        ] {
+            let p = get_anthropic_model_profile(id).unwrap_or_else(|| panic!("{id} missing"));
+            assert_eq!(p.name, name);
+            assert_eq!(p.context_window, 1_000_000);
+            assert_eq!(p.max_output_tokens, 128_000);
+            assert!(p.capabilities.reasoning);
+            assert!(
+                default_anthropic_model_ids().contains(&id),
+                "{id} not advertised"
+            );
+        }
+        assert_eq!(default_anthropic_model_ids()[0], "claude-fable-5-1");
+    }
+
+    #[test]
     fn test_opus_4_8_profile() {
         let p = get_anthropic_model_profile("claude-opus-4-8").unwrap();
         assert_eq!(p.owned_by, "anthropic");
@@ -475,7 +596,7 @@ mod tests {
             .map(|id| AnthropicModel::from_profile(get_anthropic_model_profile(id).unwrap()))
             .collect();
         let resp = AnthropicModelsResponse::new(models);
-        assert_eq!(resp.first_id.as_deref(), Some("claude-fable-5"));
+        assert_eq!(resp.first_id.as_deref(), Some("claude-fable-5-1"));
         assert_eq!(resp.last_id.as_deref(), Some("claude-3-haiku"));
         assert!(!resp.has_more);
     }

@@ -223,6 +223,15 @@ fn default_models() -> Vec<String> {
         "gpt-5.4-nano".to_string(),
         "gpt-5.5".to_string(),
         "gpt-5.5-pro".to_string(),
+        "gpt-5.6".to_string(),
+        "gpt-5.6-sol".to_string(),
+        "gpt-5.6-terra".to_string(),
+        "gpt-5.6-luna".to_string(),
+        // GPT-6 family
+        "gpt-6-astra".to_string(),
+        "gpt-6-sol".to_string(),
+        "gpt-6-luna".to_string(),
+        "gpt-6.1-sol".to_string(),
         // O-series reasoning models
         "o1".to_string(),
         "o1-mini".to_string(),
@@ -241,6 +250,7 @@ fn default_models() -> Vec<String> {
         "gpt-image-1".to_string(),
         "gpt-image-1-mini".to_string(),
         "gpt-image-1.5".to_string(),
+        "gpt-image-2".to_string(),
         // Claude family
         "claude-3.5-sonnet".to_string(),
         "claude-3.7-sonnet".to_string(),
@@ -254,6 +264,13 @@ fn default_models() -> Vec<String> {
         "claude-opus-4.7".to_string(),
         "claude-opus-4.8".to_string(),
         "claude-haiku-4.5".to_string(),
+        "claude-opus-5".to_string(),
+        "claude-opus-5.5".to_string(),
+        "claude-sonnet-5".to_string(),
+        "claude-sonnet-5.5".to_string(),
+        "claude-haiku-5.5".to_string(),
+        "claude-fable-5".to_string(),
+        "claude-fable-5.1".to_string(),
         // Gemini family
         "gemini-2.0-flash".to_string(),
         "gemini-2.5-flash".to_string(),
@@ -262,9 +279,16 @@ fn default_models() -> Vec<String> {
         "gemini-3-flash-preview".to_string(),
         "gemini-3.1-pro-preview".to_string(),
         "gemini-3.1-flash-lite".to_string(),
+        "gemini-3.5-flash".to_string(),
+        "gemini-3.5-flash-lite".to_string(),
+        "gemini-3.6-flash".to_string(),
+        "gemini-3.7-flash".to_string(),
+        "gemini-3.8-flash".to_string(),
         // DeepSeek family
         "deepseek-chat".to_string(),
         "deepseek-reasoner".to_string(),
+        "deepseek-v4-pro".to_string(),
+        "deepseek-flash".to_string(),
     ]
 }
 
@@ -290,6 +314,17 @@ pub enum ConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_default_models_all_have_profiles() {
+        // Every advertised default model must resolve to a registry profile.
+        for id in default_models() {
+            assert!(
+                crate::openai::get_model_profile(&id).is_some(),
+                "{id} has no profile"
+            );
+        }
+    }
 
     #[test]
     fn test_default_config() {

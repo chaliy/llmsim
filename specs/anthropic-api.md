@@ -109,7 +109,7 @@ turns MUST both render through this envelope. A `429` SHOULD include a
 `GET /anthropic/v1/models/:model_id`.
 
 **R4.2**: Model IDs MUST use the real Anthropic API form (dash-separated, e.g.
-`claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-fable-5`).
+`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`).
 Dated snapshot IDs (e.g. `claude-haiku-4-5-20251001`) and `-latest` aliases
 (e.g. `claude-3-5-sonnet-latest`) MUST resolve to the same profile.
 
