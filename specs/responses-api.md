@@ -102,7 +102,7 @@ Support reasoning configuration for reasoning models (o-series and GPT-5 family)
 ```json
 {
   "reasoning": {
-    "effort": "none|minimal|low|medium|high|xhigh",
+    "effort": "none|minimal|low|medium|high|xhigh|max",
     "summary": "auto|concise|detailed"
   }
 }
@@ -114,7 +114,12 @@ Support reasoning configuration for reasoning models (o-series and GPT-5 family)
 - `low`: ~1.5x output tokens as reasoning
 - `medium`: ~3x output tokens as reasoning (default)
 - `high`: ~6x output tokens as reasoning
-- `xhigh`: ~10x output tokens as reasoning (GPT-5.2 only, most thorough)
+- `xhigh`: ~10x output tokens as reasoning (GPT-5.2+)
+- `max`: ~15x output tokens as reasoning (GPT-5.6+ / GPT-6, most thorough)
+
+**R4.3.0**: A model is a reasoning model when its profile is owned by OpenAI
+and reports the reasoning capability; IDs without a profile fall back to the
+`o1`/`o3`/`o4`/`gpt-5*`/`gpt-6*` name patterns.
 
 **R4.3.2**: Include reasoning tokens in usage statistics:
 ```json

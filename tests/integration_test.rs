@@ -209,6 +209,7 @@ mod generator_tests {
             tool_choice: None,
             response_format: None,
             seed: None,
+            reasoning_effort: None,
         }
     }
 
@@ -259,6 +260,7 @@ mod stream_tests {
             prompt_tokens: 10,
             completion_tokens: 20,
             total_tokens: 30,
+            completion_tokens_details: None,
         };
 
         let stream = TokenStreamBuilder::new("gpt-4", "Test")

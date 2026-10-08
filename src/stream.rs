@@ -303,6 +303,7 @@ mod tests {
             prompt_tokens: 10,
             completion_tokens: 5,
             total_tokens: 15,
+            completion_tokens_details: None,
         };
 
         let stream = TokenStreamBuilder::new("gpt-4", "Hi")

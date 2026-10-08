@@ -12,9 +12,9 @@ use crate::{
             estimate_image_tokens, image_total_duration, ImageData, ImageGenerationRequest,
             ImageGenerationResponse, ImageInputTokensDetails, ImagesUsage,
         },
-        ChatCompletionRequest, ChatCompletionResponse, ErrorResponse, InputItem, InputRole,
-        MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem, OutputRole,
-        OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
+        ChatCompletionRequest, ChatCompletionResponse, CompletionTokensDetails, ErrorResponse,
+        InputItem, InputRole, MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem,
+        OutputRole, OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
         ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
     },
     openresponses::{
@@ -113,6 +113,7 @@ pub(crate) fn generate_responses_result(
             tool_choice: None,
             response_format: None,
             seed: None,
+            reasoning_effort: None,
         };
 
         let generator = create_generator(
@@ -242,14 +243,29 @@ pub async fn chat_completions(
     );
     let content = generator.generate(&request);
 
-    // Count tokens
+    // Count tokens. Reasoning models bill hidden reasoning tokens inside
+    // completion_tokens and break them out in completion_tokens_details.
     let prompt_tokens = count_request_tokens(&request);
-    let completion_tokens =
+    let visible_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
+    let reasoning = request
+        .reasoning_effort
+        .clone()
+        .map(|effort| ReasoningConfig {
+            effort: Some(effort),
+            summary: None,
+        });
+    let reasoning_tokens = calculate_reasoning_tokens(&request.model, &reasoning, visible_tokens);
+    let completion_tokens = visible_tokens + reasoning_tokens;
     let usage = Usage {
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
+        completion_tokens_details: is_reasoning_model(&request.model).then_some(
+            CompletionTokensDetails {
+                reasoning_tokens: reasoning_tokens as u32,
+            },
+        ),
     };
 
     if request.stream {
@@ -335,6 +351,7 @@ async fn handle_scripted_chat_completions(
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
+        completion_tokens_details: None,
     };
 
     let wire_calls = materialize_tool_calls(turn_index, &tool_calls);
@@ -659,6 +676,7 @@ pub async fn create_openresponses_response(
             tool_choice: None,
             response_format: None,
             seed: None,
+            reasoning_effort: None,
         };
         generator.generate(&chat_request)
     };
@@ -1269,17 +1287,23 @@ fn generate_reasoning_text(_model: &str, word_count: usize) -> String {
     result
 }
 
-/// Check if a model is a reasoning model (o-series or GPT-5 family)
+/// Check if a model is an OpenAI reasoning model. Known models use their
+/// profile's reasoning capability; unknown IDs fall back to name patterns
+/// (o-series, GPT-5 and GPT-6 families).
 fn is_reasoning_model(model: &str) -> bool {
+    if let Some(profile) = crate::openai::get_model_profile(model) {
+        return profile.owned_by == "openai" && profile.capabilities.reasoning;
+    }
+
     let is_o_series = model.starts_with("o1")
         || model.starts_with("o3")
         || model.starts_with("o4")
         || model.contains("-o1")
         || model.contains("-o3");
 
-    let is_gpt5 = model.starts_with("gpt-5");
+    let is_gpt5_or_6 = model.starts_with("gpt-5") || model.starts_with("gpt-6");
 
-    is_o_series || is_gpt5
+    is_o_series || is_gpt5_or_6
 }
 
 /// Calculate simulated reasoning tokens for reasoning models (o-series and GPT-5)
@@ -1293,7 +1317,7 @@ fn calculate_reasoning_tokens(
     }
 
     // Determine effort level
-    // GPT-5 supports: minimal, low, medium, high, xhigh
+    // GPT-5 supports: minimal, low, medium, high, xhigh (GPT-5.6+ adds max)
     // o-series supports: low, medium, high
     let effort = reasoning
         .as_ref()
@@ -1308,7 +1332,8 @@ fn calculate_reasoning_tokens(
         "low" => 1.5,
         "medium" => 3.0,
         "high" => 6.0,
-        "xhigh" => 10.0, // GPT-5.2 only: most thorough reasoning
+        "xhigh" => 10.0, // GPT-5.2+: very thorough reasoning
+        "max" => 15.0,   // GPT-5.6+ / GPT-6: most thorough reasoning
         _ => 3.0,        // default to medium
     };
 
@@ -1421,6 +1446,7 @@ mod tests {
             tool_choice: None,
             response_format: None,
             seed: None,
+            reasoning_effort: None,
         };
 
         let tokens = count_request_tokens(&request);
@@ -1544,6 +1570,7 @@ mod tests {
             tool_choice: None,
             response_format: None,
             seed: None,
+            reasoning_effort: None,
         };
         assert!(validate_input_modalities(&request).is_ok());
     }
@@ -1574,6 +1601,29 @@ mod tests {
         assert!(!is_reasoning_model("gpt-4o-mini"));
         assert!(!is_reasoning_model("gpt-4"));
         assert!(!is_reasoning_model("claude-sonnet-4"));
+    }
+
+    #[test]
+    fn test_is_reasoning_model_new_families() {
+        // GPT-5.6 / GPT-6 tiers come from profiles
+        assert!(is_reasoning_model("gpt-5.6-luna"));
+        assert!(is_reasoning_model("gpt-6-astra"));
+        assert!(is_reasoning_model("gpt-6.1-sol"));
+        // Unknown future ids fall back to the name pattern
+        assert!(is_reasoning_model("gpt-6.9-preview"));
+        // The non-reasoning chat alias and non-OpenAI reasoning models
+        assert!(!is_reasoning_model("gpt-5.3-chat-latest"));
+        assert!(!is_reasoning_model("claude-opus-5.5"));
+        assert!(!is_reasoning_model("gemini-3.8-flash"));
+    }
+
+    #[test]
+    fn test_calculate_reasoning_tokens_max_effort() {
+        let config = Some(ReasoningConfig {
+            effort: Some("max".to_string()),
+            summary: None,
+        });
+        assert_eq!(calculate_reasoning_tokens("gpt-6-sol", &config, 100), 1500);
     }
 
     #[test]

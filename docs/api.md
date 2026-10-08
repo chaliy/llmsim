@@ -48,6 +48,24 @@ curl http://localhost:8080/openai/v1/chat/completions \
 | `temperature` | number | No | Sampling temperature (0-2) |
 | `max_tokens` | integer | No | Maximum tokens to generate |
 | `top_p` | number | No | Nucleus sampling parameter |
+| `reasoning_effort` | string | No | Reasoning models only: `none`, `minimal`, `low`, `medium` (default), `high`, `xhigh`, `max` |
+
+#### Reasoning tokens
+
+For OpenAI reasoning models (o-series, GPT-5.x, GPT-6.x) the simulated hidden
+reasoning is billed inside `usage.completion_tokens` and broken out the same
+way the real API does. The amount scales with `reasoning_effort`:
+
+```json
+"usage": {
+  "prompt_tokens": 12,
+  "completion_tokens": 120,
+  "total_tokens": 132,
+  "completion_tokens_details": {"reasoning_tokens": 90}
+}
+```
+
+Non-reasoning models omit `completion_tokens_details`.
 
 #### Multimodal (image) input
 
@@ -156,7 +174,7 @@ The response includes a `reasoning` output item before the `message`:
 
 | Parameter | Values | Description |
 |-----------|--------|-------------|
-| `reasoning.effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh` | Controls reasoning token count |
+| `reasoning.effort` | `none`, `minimal`, `low`, `medium`, `high`, `xhigh`, `max` | Controls reasoning token count |
 | `reasoning.summary` | `auto`, `concise`, `detailed` | Controls summary text generation |
 
 When streaming, additional SSE events are emitted for the reasoning item (`response.reasoning_summary_text.delta`, etc.) before the message text deltas.

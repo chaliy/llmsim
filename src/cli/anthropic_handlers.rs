@@ -328,6 +328,7 @@ fn generate_content(state: &AppState, request: &MessagesRequest) -> String {
         tool_choice: None,
         response_format: None,
         seed: None,
+        reasoning_effort: None,
     };
     generator.generate(&chat_request)
 }
