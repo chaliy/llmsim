@@ -100,13 +100,39 @@ def main() -> None:
     # Example 4: Multiple models
     print("4. Different Claude Models")
     print("-" * 30)
-    for model in ["claude-fable-5", "claude-opus-4-8", "claude-sonnet-4-6", "claude-haiku-4-5"]:
+    for model in ["claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-opus-4-8"]:
         m = client.messages.create(
             model=model,
             max_tokens=48,
             messages=[{"role": "user", "content": "Hello!"}],
         )
-        print(f"{model}: {m.content[0].text[:50]}...")
+        # Claude 5.x models think by default, so a thinking block may come first.
+        text = next(b.text for b in m.content if b.type == "text")
+        print(f"{model}: {text[:50]}...")
+    print()
+
+    # Example 4b: Extended thinking with a visible summary
+    print("4b. Extended Thinking")
+    print("-" * 30)
+    m = client.messages.create(
+        model="claude-opus-5-5",
+        max_tokens=1024,
+        thinking={"type": "adaptive", "display": "summarized"},
+        output_config={"effort": "high"},
+        messages=[{"role": "user", "content": "Plan a weekend trip."}],
+    )
+    for block in m.content:
+        if block.type == "thinking":
+            print(f"Thinking: {block.thinking[:60]}...")
+        elif block.type == "text":
+            print(f"Answer: {block.text[:60]}...")
+    print(f"Output tokens (incl. thinking): {m.usage.output_tokens}")
+
+    count = client.messages.count_tokens(
+        model="claude-opus-5-5",
+        messages=[{"role": "user", "content": "Plan a weekend trip."}],
+    )
+    print(f"count_tokens: {count.input_tokens}")
     print()
 
     # Example 5: Tool definitions (the model only emits tool_use blocks in
