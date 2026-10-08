@@ -286,7 +286,7 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 }
 ```
 
-### GPT-5 Family
+### GPT-5 / GPT-6 Family
 | Model | Context | Max Output | Capabilities |
 |-------|---------|------------|--------------|
 | gpt-5 | 400K | 128K | Vision, Reasoning, Tools, JSON |
@@ -310,6 +310,14 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-5.4-nano | 400K | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.5 | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
 | gpt-5.5-pro | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.6 | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.6-sol | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.6-terra | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-5.6-luna | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-6-astra | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-6-sol | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-6-luna | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
+| gpt-6.1-sol | 1.05M | 128K | Vision, Reasoning, Tools, JSON |
 
 ### O-Series Reasoning Models
 | Model | Context | Max Output | Capabilities |
@@ -337,6 +345,7 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gpt-image-1 | 32K | 4160 img tokens | Vision (image in/out) |
 | gpt-image-1-mini | 32K | 4160 img tokens | Vision (image in/out) |
 | gpt-image-1.5 | 32K | 4160 img tokens | Vision (image in/out) |
+| gpt-image-2 | 32K | 4160 img tokens | Vision (image in/out) |
 
 ### Claude Family
 | Model | Context | Max Output | Capabilities |
@@ -353,6 +362,13 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | claude-opus-4.7 | 1M | 128K | Vision, Reasoning, Tools, JSON |
 | claude-opus-4.8 | 1M | 128K | Vision, Reasoning, Tools, JSON |
 | claude-haiku-4.5 | 200K | 64K | Vision, Reasoning, Tools, JSON |
+| claude-opus-5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-opus-5.5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-sonnet-5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-sonnet-5.5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-haiku-5.5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-fable-5 | 1M | 128K | Vision, Reasoning, Tools, JSON |
+| claude-fable-5.1 | 1M | 128K | Vision, Reasoning, Tools, JSON |
 
 ### Gemini Family
 | Model | Context | Max Output | Capabilities |
@@ -364,12 +380,19 @@ The `/openai/v1/models` endpoint returns realistic model data including context 
 | gemini-3-flash-preview | 1M | 65K | Vision, Reasoning, Tools, JSON |
 | gemini-3.1-pro-preview | 1M | 65K | Vision, Reasoning, Tools, JSON |
 | gemini-3.1-flash-lite | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.5-flash | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.5-flash-lite | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.6-flash | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.7-flash | 1M | 65K | Vision, Reasoning, Tools, JSON |
+| gemini-3.8-flash | 1M | 65K | Vision, Reasoning, Tools, JSON |
 
 ### DeepSeek Family
 | Model | Context | Max Output | Capabilities |
 |-------|---------|------------|--------------|
 | deepseek-chat | 128K | 8K | Tools, JSON |
 | deepseek-reasoner | 128K | 128K | Reasoning, Tools, JSON |
+| deepseek-v4-pro | 1M | 393K | Reasoning, Tools, JSON |
+| deepseek-flash | 1M | 393K | Vision, Reasoning, Tools, JSON |
 
 ### Context Window Emulation (Future)
 

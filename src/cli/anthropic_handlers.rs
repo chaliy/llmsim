@@ -1,12 +1,17 @@
 // Anthropic Messages API HTTP Handlers
-// Implements POST /anthropic/v1/messages, GET /anthropic/v1/models, and
-// GET /anthropic/v1/models/:id, mirroring the Anthropic API wire format.
+// Implements POST /anthropic/v1/messages, POST /anthropic/v1/messages/count_tokens,
+// GET /anthropic/v1/models, and GET /anthropic/v1/models/:id, mirroring the
+// Anthropic API wire format.
+//
+// Decision: scripted turns never carry a thinking block, so scripts replay
+// exactly what they declare; generated responses follow the model's thinking
+// defaults (see `crate::anthropic::thinking`).
 
 use super::state::AppState;
 use crate::anthropic::{
-    default_anthropic_model_ids, get_anthropic_model_profile, AnthropicErrorResponse,
-    AnthropicModel, AnthropicModelsResponse, ContentBlock, MessagesRequest, MessagesResponse,
-    MessagesStreamBuilder, StopReason, Usage,
+    default_anthropic_model_ids, get_anthropic_model_profile, thinking, AnthropicErrorResponse,
+    AnthropicModel, AnthropicModelsResponse, ContentBlock, CountTokensRequest, CountTokensResponse,
+    MessagesRequest, MessagesResponse, MessagesStreamBuilder, StopReason, Usage,
 };
 use crate::ids::prefixed_compact_id;
 use crate::script::{ScriptedResponse, SimError, SimToolCall, SimTurn};
@@ -79,6 +84,17 @@ pub async fn create_message(
         return response;
     }
 
+    // Reject thinking/effort combinations the real API rejects.
+    if let Err(message) = thinking::validate(
+        &request.model,
+        Some(request.max_tokens),
+        request.thinking.as_ref(),
+        request.output_config.as_ref(),
+    ) {
+        state.stats.record_error(400);
+        return anthropic_error(400, message);
+    }
+
     // Model-specific latency (unless overridden in config).
     let latency =
         if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
@@ -117,8 +133,22 @@ pub async fn create_message(
     };
 
     let input_tokens = count_input_tokens(&request);
-    let output_tokens =
+    let text_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
+
+    // Thinking block for generated (non-scripted) responses; its tokens are
+    // billed in output_tokens like the real API.
+    let thinking_plan = if state.script.is_none() {
+        thinking::plan(
+            &request.model,
+            request.thinking.as_ref(),
+            request.output_config.as_ref(),
+            text_tokens,
+        )
+    } else {
+        None
+    };
+    let output_tokens = text_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
     let usage = Usage::new(input_tokens as u32, output_tokens as u32);
 
     if request.stream {
@@ -126,9 +156,13 @@ pub async fn create_message(
         let input_tok = usage.input_tokens;
         let output_tok = usage.output_tokens;
 
-        let stream = MessagesStreamBuilder::new(&request.model, content)
+        let mut builder = MessagesStreamBuilder::new(&request.model, content)
             .latency(latency)
-            .usage(usage)
+            .usage(usage);
+        if let Some(plan) = thinking_plan {
+            builder = builder.thinking(plan.text, plan.signature);
+        }
+        let stream = builder
             .on_complete(move || {
                 stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
             })
@@ -152,9 +186,45 @@ pub async fn create_message(
             usage.input_tokens,
             usage.output_tokens,
         );
-        let response = MessagesResponse::text(request.model.clone(), content, usage);
+        let mut blocks = Vec::with_capacity(2);
+        if let Some(plan) = thinking_plan {
+            blocks.push(ContentBlock::Thinking {
+                thinking: plan.text,
+                signature: plan.signature,
+            });
+        }
+        blocks.push(ContentBlock::text(content));
+        let response = MessagesResponse::with_content(
+            request.model.clone(),
+            blocks,
+            StopReason::EndTurn,
+            usage,
+        );
         Json(response).into_response()
     }
+}
+
+/// POST /anthropic/v1/messages/count_tokens
+///
+/// Returns the `input_tokens` a Messages request with the same prompt would
+/// report, without generating anything.
+pub async fn count_tokens(
+    State(_state): State<Arc<AppState>>,
+    Json(request): Json<CountTokensRequest>,
+) -> Response {
+    if let Err(message) = thinking::validate(
+        &request.model,
+        None,
+        request.thinking.as_ref(),
+        request.output_config.as_ref(),
+    ) {
+        return anthropic_error(400, message);
+    }
+    let input_tokens = count_prompt_tokens(&request.prompt_text(), request.messages.len());
+    Json(CountTokensResponse {
+        input_tokens: input_tokens as u32,
+    })
+    .into_response()
 }
 
 /// Non-streaming scripted path: emits text and/or `tool_use` content blocks,
@@ -258,16 +328,21 @@ fn generate_content(state: &AppState, request: &MessagesRequest) -> String {
         tool_choice: None,
         response_format: None,
         seed: None,
+        reasoning_effort: None,
     };
     generator.generate(&chat_request)
 }
 
 /// Count input tokens for a Messages request (prompt text + small overhead).
 fn count_input_tokens(request: &MessagesRequest) -> usize {
-    let text = request.prompt_text();
-    let base = crate::count_tokens_default(&text).unwrap_or(text.split_whitespace().count());
+    count_prompt_tokens(&request.prompt_text(), request.messages.len())
+}
+
+/// Token count for a flattened prompt plus per-message framing overhead.
+fn count_prompt_tokens(text: &str, message_count: usize) -> usize {
+    let base = crate::count_tokens_default(text).unwrap_or(text.split_whitespace().count());
     // Per-message + request framing overhead, similar to the OpenAI handler.
-    base + request.messages.len() * 3 + 5
+    base + message_count * 3 + 5
 }
 
 /// Approximate output tokens contributed by a scripted tool call.

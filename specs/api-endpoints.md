@@ -86,6 +86,7 @@ the official Anthropic SDKs work when configured with `{base_url}/anthropic`.
 | Method | Path | Description |
 |--------|------|-------------|
 | `POST` | `/anthropic/v1/messages` | Messages API (streaming and non-streaming) |
+| `POST` | `/anthropic/v1/messages/count_tokens` | Count input tokens |
 | `GET` | `/anthropic/v1/models` | List available Claude models |
 | `GET` | `/anthropic/v1/models/:model_id` | Get model details |
 
@@ -94,6 +95,9 @@ event sequence when `stream: true` (`message_start`, `content_block_start`,
 `content_block_delta`, `content_block_stop`, `message_delta`, `message_stop`).
 Unlike the OpenAI SSE format, Anthropic events carry an explicit `event:` line
 and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
+
+**R4.2.1**: `POST /anthropic/v1/messages/count_tokens` returns
+`{"input_tokens": N}` for a Messages-shaped body (no `max_tokens` needed).
 
 **R4.3**: Errors use the Anthropic error envelope:
 `{"type": "error", "error": {"type": "...", "message": "..."}}`, with the inner

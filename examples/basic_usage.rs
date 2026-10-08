@@ -58,6 +58,7 @@ async fn main() {
         tool_choice: None,
         response_format: None,
         seed: None,
+        reasoning_effort: None,
     };
 
     // Lorem generator - generates lorem ipsum to target token count
@@ -115,6 +116,7 @@ async fn main() {
         prompt_tokens: 15,
         completion_tokens: 8,
         total_tokens: 23,
+        completion_tokens_details: None,
     };
 
     // Use fast profile for demo (instant would be too fast to see)

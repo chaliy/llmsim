@@ -180,9 +180,12 @@ impl LatencyProfile {
         let model_lower = model.to_lowercase();
 
         // GPT-5 family (check specific variants first)
-        if model_lower.contains("gpt-5-mini") {
+        // (GPT-5.6+/GPT-6 "Luna" is the cost-efficient tier, so it gets the mini profile)
+        if model_lower.contains("gpt-5-mini")
+            || (model_lower.starts_with("gpt-") && model_lower.contains("luna"))
+        {
             Self::gpt5_mini()
-        } else if model_lower.contains("gpt-5") {
+        } else if model_lower.contains("gpt-5") || model_lower.contains("gpt-6") {
             Self::gpt5()
         // O-series reasoning models (o1, o3, o4)
         } else if model_lower.starts_with("o1")
@@ -196,7 +199,7 @@ impl LatencyProfile {
         } else if model_lower.contains("gpt-4") {
             Self::gpt4()
         // Claude family
-        } else if model_lower.contains("opus") {
+        } else if model_lower.contains("opus") || model_lower.contains("fable") {
             Self::claude_opus()
         } else if model_lower.contains("sonnet") {
             Self::claude_sonnet()
@@ -358,6 +361,19 @@ mod tests {
 
         let gpt4o = LatencyProfile::from_model("gpt-4o-mini");
         assert_eq!(gpt4o.ttft_mean_ms, LatencyProfile::gpt4o().ttft_mean_ms);
+
+        // GPT-5.6 / GPT-6 tiers (Luna is the cost-efficient tier)
+        let gpt6 = LatencyProfile::from_model("gpt-6-sol");
+        assert_eq!(gpt6.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
+        let luna = LatencyProfile::from_model("gpt-6-luna");
+        assert_eq!(luna.ttft_mean_ms, LatencyProfile::gpt5_mini().ttft_mean_ms);
+
+        // Claude Fable uses the Opus-tier profile
+        let fable = LatencyProfile::from_model("claude-fable-5-1");
+        assert_eq!(
+            fable.ttft_mean_ms,
+            LatencyProfile::claude_opus().ttft_mean_ms
+        );
 
         // Claude family
         let claude = LatencyProfile::from_model("claude-3-opus-20240229");

@@ -32,6 +32,8 @@ requests and returning simulated responses.
 | `tools` | array | no | Tool definitions |
 | `tool_choice` | object | no | |
 | `metadata` | object | no | E.g. `{"user_id": "..."}` |
+| `thinking` | object | no | `{"type": "adaptive" \| "enabled" \| "disabled" \| "between_tools", "budget_tokens"?, "display"?}` (see R7) |
+| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max", "format"?}` (see R7) |
 
 **R1.3**: `messages[].content` MUST accept either a bare string or an array of
 content blocks. The simulator MUST tolerate (without erroring) content block
@@ -57,6 +59,10 @@ and `tool_result` — only the embedded text contributes to the prompt.
 `stop_sequence`, `tool_use`, `pause_turn`, `refusal`. Default text responses use
 `end_turn`; scripted tool-call turns use `tool_use`.
 
+**R1.6**: When a thinking block is produced (R7), the non-streaming `content`
+array starts with `{"type": "thinking", "thinking": "...", "signature": "..."}`
+followed by the `text` block.
+
 ### R2: Streaming
 
 **R2.1**: When `stream: true`, the endpoint MUST emit the Anthropic streaming
@@ -69,6 +75,12 @@ event sequence as Server-Sent Events, in order:
 5. `content_block_stop`
 6. `message_delta` (carries final `stop_reason` and cumulative `usage.output_tokens`)
 7. `message_stop`
+
+**R2.1.1**: When a thinking block is produced (R7), it streams first at
+`index` 0: `content_block_start` with `{"type": "thinking", "thinking": "",
+"signature": ""}`, zero or more `thinking_delta` deltas (none when display is
+omitted), one `signature_delta`, then `content_block_stop`. The text block
+follows at `index` 1.
 
 **R2.2**: Each event MUST carry both an `event:` line and a `data:` line.
 
@@ -109,7 +121,7 @@ turns MUST both render through this envelope. A `429` SHOULD include a
 `GET /anthropic/v1/models/:model_id`.
 
 **R4.2**: Model IDs MUST use the real Anthropic API form (dash-separated, e.g.
-`claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-fable-5`).
+`claude-opus-5-5`, `claude-sonnet-5-5`, `claude-haiku-5-5`, `claude-fable-5-1`).
 Dated snapshot IDs (e.g. `claude-haiku-4-5-20251001`) and `-latest` aliases
 (e.g. `claude-3-5-sonnet-latest`) MUST resolve to the same profile.
 
@@ -157,6 +169,46 @@ model-derived latency profile (Opus/Sonnet/Haiku) from the model ID.
 **R6.2**: Each request MUST be recorded in stats under a dedicated
 `messages_requests` counter, in addition to the shared request/token counters.
 
+### R7: Extended Thinking and Effort
+
+**R7.1**: Generated (non-scripted) responses carry a `thinking` block when
+thinking is on: always on Claude 5.x / Fable models (`claude-fable-*`,
+`claude-opus-5*`, `claude-sonnet-5*`, `claude-haiku-5*`) unless `thinking.type`
+is `disabled` or `between_tools`; on other models only when `thinking.type` is
+`adaptive` or `enabled`. Scripted turns never add a thinking block.
+
+**R7.2**: Thinking tokens scale with `output_config.effort` (default `high`,
+`medium` on Opus 5.5 / Haiku 5.5), are capped by `thinking.budget_tokens` when
+set, and are billed inside `usage.output_tokens`.
+
+**R7.3**: The thinking text is a synthetic summary when `thinking.display` is
+`summarized`, and empty when it is `omitted` or `updates`. Without `display`,
+Opus 4.7+ and 5.x / Fable models default to omitted; older models to
+summarized. Each block carries a random opaque `signature`.
+
+**R7.4**: The endpoint MUST reject with `400 invalid_request_error`:
+- an `output_config.effort` outside `low`/`medium`/`high`/`xhigh`/`max`;
+- `thinking.type: "enabled"` on models where `budget_tokens` was removed
+  (Opus 4.7+, Sonnet 5.x, Haiku 5.5, Fable);
+- `thinking.type: "disabled"` on Fable, Opus 5.5, and Sonnet 5.5;
+- `thinking.type: "enabled"` without `budget_tokens`, with `budget_tokens`
+  below 1024, or with `budget_tokens >= max_tokens`;
+- an unknown `thinking.type`.
+
+Unknown/custom model IDs are never rejected for model-specific rules.
+
+### R8: Token Counting
+
+**R8.1**: Implement `POST /anthropic/v1/messages/count_tokens`, accepting the
+Messages request shape without `max_tokens`/`stream`, and returning
+`{"input_tokens": N}`.
+
+**R8.2**: `input_tokens` MUST equal the `usage.input_tokens` a Messages call
+with the same `model`, `system`, and `messages` reports.
+
+**R8.3**: `thinking` / `output_config` are validated with the R7.4 rules
+(except the `max_tokens` bound).
+
 ## Rationale
 
 - **SDK compatibility**: Using the exact Anthropic wire shape (including the
@@ -172,6 +224,8 @@ model-derived latency profile (Opus/Sonnet/Haiku) from the model ID.
 
 - Authentication/authorization (LLMSim is for local testing; the `x-api-key`
   and `anthropic-version` headers are accepted but ignored).
-- Real token-budget enforcement, extended-thinking content, prompt caching,
-  the Batches API, the Files API, or Managed Agents.
+- Real token-budget enforcement, real chain-of-thought content, prompt
+  caching, the Batches API, the Files API, or Managed Agents.
+- Per-model rules beyond R7.4 (forced `tool_choice` rejection, sampling
+  parameter rejection, preserved-thinking history checks).
 - A WebSocket transport for Messages (the real API has none).

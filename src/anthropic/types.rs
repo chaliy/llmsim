@@ -155,6 +155,32 @@ pub struct Metadata {
     pub user_id: Option<String>,
 }
 
+/// Extended-thinking configuration (`thinking` request field).
+///
+/// `type` is `"adaptive"` (current models), `"enabled"` (legacy fixed budget,
+/// requires `budget_tokens`), `"disabled"`, or `"between_tools"` (Sonnet 5.5's
+/// thinking-off mode). `display` is `"summarized"`, `"omitted"`, or `"updates"`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ThinkingConfig {
+    #[serde(rename = "type")]
+    pub thinking_type: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub budget_tokens: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display: Option<String>,
+}
+
+/// Output configuration (`output_config` request field).
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct OutputConfig {
+    /// Effort level: `low`, `medium`, `high`, `xhigh`, or `max`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub effort: Option<String>,
+    /// Structured-output format (accepted, not enforced by the simulator).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub format: Option<serde_json::Value>,
+}
+
 /// Anthropic Messages API request body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MessagesRequest {
@@ -180,25 +206,65 @@ pub struct MessagesRequest {
     pub tool_choice: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub metadata: Option<Metadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_config: Option<OutputConfig>,
 }
 
 impl MessagesRequest {
     /// Build the flattened prompt text used by the response generator and for
     /// input-token accounting: system prompt followed by each message.
     pub fn prompt_text(&self) -> String {
-        let mut parts = Vec::new();
-        if let Some(system) = &self.system {
-            parts.push(system.extract_text());
-        }
-        for msg in &self.messages {
-            let role = match msg.role {
-                Role::User => "user",
-                Role::Assistant => "assistant",
-            };
-            parts.push(format!("{}: {}", role, msg.content.extract_text()));
-        }
-        parts.join("\n")
+        flatten_prompt(self.system.as_ref(), &self.messages)
     }
+}
+
+/// Request body for `POST /v1/messages/count_tokens`. Same shape as a Messages
+/// request minus the generation-only fields (`max_tokens`, `stream`, ...).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CountTokensRequest {
+    pub model: String,
+    pub messages: Vec<AnthropicMessage>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub system: Option<SystemPrompt>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tools: Option<Vec<Tool>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_choice: Option<serde_json::Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingConfig>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_config: Option<OutputConfig>,
+}
+
+impl CountTokensRequest {
+    /// Same flattening as [`MessagesRequest::prompt_text`], so counts match
+    /// the `usage.input_tokens` a real Messages call would report.
+    pub fn prompt_text(&self) -> String {
+        flatten_prompt(self.system.as_ref(), &self.messages)
+    }
+}
+
+/// Response body for `POST /v1/messages/count_tokens`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CountTokensResponse {
+    pub input_tokens: u32,
+}
+
+fn flatten_prompt(system: Option<&SystemPrompt>, messages: &[AnthropicMessage]) -> String {
+    let mut parts = Vec::new();
+    if let Some(system) = system {
+        parts.push(system.extract_text());
+    }
+    for msg in messages {
+        let role = match msg.role {
+            Role::User => "user",
+            Role::Assistant => "assistant",
+        };
+        parts.push(format!("{}: {}", role, msg.content.extract_text()));
+    }
+    parts.join("\n")
 }
 
 /// A content block on the response. The simulator emits `text` blocks for prose
@@ -206,6 +272,12 @@ impl MessagesRequest {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentBlock {
+    /// Extended-thinking block. `thinking` is empty when the request's display
+    /// mode is `"omitted"`; `signature` is an opaque token clients echo back.
+    Thinking {
+        thinking: String,
+        signature: String,
+    },
     Text {
         text: String,
     },

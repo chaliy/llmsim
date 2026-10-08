@@ -238,6 +238,10 @@ pub struct ChatCompletionRequest {
     pub response_format: Option<ResponseFormat>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub seed: Option<i64>,
+    /// Reasoning effort for reasoning models: `none`, `minimal`, `low`,
+    /// `medium` (default), `high`, `xhigh`, or `max`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reasoning_effort: Option<String>,
 }
 
 /// Stop condition for generation
@@ -252,8 +256,17 @@ pub enum StopCondition {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Usage {
     pub prompt_tokens: u32,
+    /// Includes any reasoning tokens (broken out in `completion_tokens_details`).
     pub completion_tokens: u32,
     pub total_tokens: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub completion_tokens_details: Option<CompletionTokensDetails>,
+}
+
+/// Breakdown of completion tokens (reasoning models only).
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct CompletionTokensDetails {
+    pub reasoning_tokens: u32,
 }
 
 /// A choice in the completion response
@@ -628,6 +641,7 @@ mod tests {
             prompt_tokens: 10,
             completion_tokens: 20,
             total_tokens: 30,
+            completion_tokens_details: None,
         };
         let response = ChatCompletionResponse::new(
             "gpt-4".to_string(),

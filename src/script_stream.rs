@@ -376,6 +376,7 @@ mod tests {
             prompt_tokens: 1,
             completion_tokens: 1,
             total_tokens: 2,
+            completion_tokens_details: None,
         };
         let resp = build_chat_completion_response("gpt-5".to_string(), None, calls, usage);
         assert_eq!(resp.choices[0].finish_reason.as_deref(), Some("tool_calls"));

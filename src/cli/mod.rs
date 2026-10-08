@@ -53,6 +53,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/anthropic/v1/messages",
             post(anthropic_handlers::create_message),
         )
+        .route(
+            "/anthropic/v1/messages/count_tokens",
+            post(anthropic_handlers::count_tokens),
+        )
         .route("/anthropic/v1/models", get(anthropic_handlers::list_models))
         .route(
             "/anthropic/v1/models/{model_id}",
@@ -93,7 +97,7 @@ pub async fn run_server_with_stats(
     tracing::info!(
         "OpenResponses endpoint: /openresponses/v1/responses (https://www.openresponses.org)"
     );
-    tracing::info!("Anthropic endpoints: /anthropic/v1/messages, /anthropic/v1/models");
+    tracing::info!("Anthropic endpoints: /anthropic/v1/messages, /anthropic/v1/messages/count_tokens, /anthropic/v1/models");
     tracing::info!("Stats endpoint: /llmsim/stats");
 
     let mut state = AppState::new(config, stats);

@@ -3,6 +3,10 @@
 // content_block_start, content_block_delta, content_block_stop, message_delta,
 // message_stop) as Server-Sent Events with realistic latency.
 //
+// When a thinking block is planned, it streams first at index 0
+// (`thinking_delta` events, then one `signature_delta`) and the text block
+// follows at index 1, matching the real extended-thinking stream.
+//
 // The Anthropic SSE wire format differs from OpenAI's: each event carries an
 // explicit `event:` line in addition to `data:`, and there is NO terminal
 // `[DONE]` sentinel — the stream simply ends after `message_stop`.
@@ -28,6 +32,8 @@ pub struct MessagesTokenStream {
     content: String,
     input_tokens: u32,
     output_tokens: u32,
+    /// Optional thinking block: (visible text, signature).
+    thinking: Option<(String, String)>,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -40,8 +46,15 @@ impl MessagesTokenStream {
             content,
             input_tokens: 0,
             output_tokens: 0,
+            thinking: None,
             on_complete: None,
         }
+    }
+
+    /// Stream a thinking block (visible text may be empty) before the text.
+    pub fn with_thinking(mut self, text: impl Into<String>, signature: impl Into<String>) -> Self {
+        self.thinking = Some((text.into(), signature.into()));
+        self
     }
 
     pub fn with_usage(mut self, usage: Usage) -> Self {
@@ -61,23 +74,7 @@ impl MessagesTokenStream {
     /// Word-level tokenization (keeps whitespace as separate tokens) to
     /// approximate token-by-token streaming.
     fn tokenize(&self) -> Vec<String> {
-        let mut tokens = Vec::new();
-        let mut current_word = String::new();
-        for ch in self.content.chars() {
-            if ch.is_whitespace() {
-                if !current_word.is_empty() {
-                    tokens.push(current_word.clone());
-                    current_word.clear();
-                }
-                tokens.push(ch.to_string());
-            } else {
-                current_word.push(ch);
-            }
-        }
-        if !current_word.is_empty() {
-            tokens.push(current_word);
-        }
-        tokens
+        tokenize_words(&self.content)
     }
 
     /// Render the Anthropic streaming event sequence as SSE.
@@ -88,6 +85,7 @@ impl MessagesTokenStream {
         let latency = self.latency.clone();
         let input_tokens = self.input_tokens;
         let output_tokens = self.output_tokens;
+        let thinking = self.thinking;
         let on_complete = self.on_complete;
 
         Box::pin(stream! {
@@ -113,16 +111,55 @@ impl MessagesTokenStream {
             });
             yield format_event("message_start", &message_start);
 
-            // 2. content_block_start (text block at index 0).
+            // Optional thinking block at index 0.
+            let mut text_index = 0;
+            if let Some((thinking_text, signature)) = thinking {
+                let block_start = json!({
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "thinking", "thinking": "", "signature": ""}
+                });
+                yield format_event("content_block_start", &block_start);
+                yield format_event("ping", &json!({"type": "ping"}));
+
+                for token in tokenize_words(&thinking_text) {
+                    let tbt = latency.sample_tbt();
+                    if !tbt.is_zero() {
+                        sleep(tbt).await;
+                    }
+                    let delta = json!({
+                        "type": "content_block_delta",
+                        "index": 0,
+                        "delta": {"type": "thinking_delta", "thinking": token}
+                    });
+                    yield format_event("content_block_delta", &delta);
+                }
+
+                let delta = json!({
+                    "type": "content_block_delta",
+                    "index": 0,
+                    "delta": {"type": "signature_delta", "signature": signature}
+                });
+                yield format_event("content_block_delta", &delta);
+                yield format_event(
+                    "content_block_stop",
+                    &json!({"type": "content_block_stop", "index": 0}),
+                );
+                text_index = 1;
+            }
+
+            // 2. content_block_start (text block).
             let block_start = json!({
                 "type": "content_block_start",
-                "index": 0,
+                "index": text_index,
                 "content_block": {"type": "text", "text": ""}
             });
             yield format_event("content_block_start", &block_start);
 
             // 3. ping (Anthropic interleaves these to keep the connection warm).
-            yield format_event("ping", &json!({"type": "ping"}));
+            if text_index == 0 {
+                yield format_event("ping", &json!({"type": "ping"}));
+            }
 
             // 4. content_block_delta for each token.
             for token in tokens {
@@ -132,7 +169,7 @@ impl MessagesTokenStream {
                 }
                 let delta = json!({
                     "type": "content_block_delta",
-                    "index": 0,
+                    "index": text_index,
                     "delta": {"type": "text_delta", "text": token}
                 });
                 yield format_event("content_block_delta", &delta);
@@ -141,7 +178,7 @@ impl MessagesTokenStream {
             // 5. content_block_stop.
             yield format_event(
                 "content_block_stop",
-                &json!({"type": "content_block_stop", "index": 0}),
+                &json!({"type": "content_block_stop", "index": text_index}),
             );
 
             // 6. message_delta with final stop_reason + cumulative output usage.
@@ -162,6 +199,27 @@ impl MessagesTokenStream {
     }
 }
 
+/// Word-level tokenization (keeps whitespace as separate tokens).
+fn tokenize_words(content: &str) -> Vec<String> {
+    let mut tokens = Vec::new();
+    let mut current_word = String::new();
+    for ch in content.chars() {
+        if ch.is_whitespace() {
+            if !current_word.is_empty() {
+                tokens.push(current_word.clone());
+                current_word.clear();
+            }
+            tokens.push(ch.to_string());
+        } else {
+            current_word.push(ch);
+        }
+    }
+    if !current_word.is_empty() {
+        tokens.push(current_word);
+    }
+    tokens
+}
+
 /// Format an Anthropic SSE event with both `event:` and `data:` lines.
 pub fn format_event(event_type: &str, payload: &serde_json::Value) -> String {
     let data = serde_json::to_string(payload).unwrap_or_else(|_| "{}".to_string());
@@ -175,6 +233,7 @@ pub struct MessagesStreamBuilder {
     content: String,
     latency: LatencyProfile,
     usage: Option<Usage>,
+    thinking: Option<(String, String)>,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -186,8 +245,15 @@ impl MessagesStreamBuilder {
             content: content.into(),
             latency: LatencyProfile::default(),
             usage: None,
+            thinking: None,
             on_complete: None,
         }
+    }
+
+    /// Emit a thinking block (index 0) before the text block.
+    pub fn thinking(mut self, text: impl Into<String>, signature: impl Into<String>) -> Self {
+        self.thinking = Some((text.into(), signature.into()));
+        self
     }
 
     pub fn id(mut self, id: impl Into<String>) -> Self {
@@ -218,6 +284,9 @@ impl MessagesStreamBuilder {
         let mut stream = MessagesTokenStream::new(id, self.model, self.content, self.latency);
         if let Some(usage) = self.usage {
             stream = stream.with_usage(usage);
+        }
+        if let Some((text, signature)) = self.thinking {
+            stream = stream.with_thinking(text, signature);
         }
         if let Some(on_complete) = self.on_complete {
             stream = stream.with_on_complete(on_complete);

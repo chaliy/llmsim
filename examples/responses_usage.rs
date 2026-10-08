@@ -146,6 +146,7 @@ async fn main() {
         tool_choice: None,
         response_format: None,
         seed: None,
+        reasoning_effort: None,
     };
 
     let content = generator.generate(&chat_request);

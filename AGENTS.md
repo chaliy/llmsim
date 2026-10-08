@@ -63,7 +63,7 @@ When making changes that affect user-facing behavior or operations, update the r
 
 ### Local dev expectations
 
-- Rust stable toolchain (edition 2021), pinned to **1.95** via `rust-toolchain.toml`
+- Rust stable toolchain (edition 2021), pinned to **1.99** via `rust-toolchain.toml`
 - Run `cargo build` to build, `cargo run -- serve` to start the server
 - Default server runs on `http://0.0.0.0:8080`
 
@@ -109,6 +109,7 @@ Examples:
 
 **Anthropic endpoints:**
 - `POST /anthropic/v1/messages` - Messages API (streaming supported)
+- `POST /anthropic/v1/messages/count_tokens` - Count input tokens
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:id` - Get model details
 

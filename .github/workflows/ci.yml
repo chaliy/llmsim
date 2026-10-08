@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -44,7 +44,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: rustfmt
 
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
         with:
           components: clippy
 
@@ -81,7 +81,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -102,7 +102,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Install cargo-audit
         # `--locked` uses cargo-audit's own pinned lockfile so a freshly
@@ -120,7 +120,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Install cargo-deny
         # See the cargo-audit note above: pin to the tool's own lockfile so a
@@ -137,7 +137,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -163,7 +163,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4
@@ -184,7 +184,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.99.0
 
       - name: Cache cargo registry
         uses: actions/cache@v4

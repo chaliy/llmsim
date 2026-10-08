@@ -458,3 +458,268 @@ async fn messages_missing_max_tokens_is_rejected() {
     let resp = router.clone().oneshot(req).await.unwrap();
     assert!(resp.status().is_client_error());
 }
+
+// --- Extended thinking + effort ---
+
+#[tokio::test]
+async fn messages_5x_model_thinks_by_default_with_omitted_text() {
+    let router = router();
+    let (status, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-5-5",
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": "think about this"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let v: Value = serde_json::from_str(&body).unwrap();
+    let content = v["content"].as_array().unwrap();
+    assert_eq!(content.len(), 2);
+    assert_eq!(content[0]["type"], "thinking");
+    assert_eq!(content[0]["thinking"], "");
+    assert!(!content[0]["signature"].as_str().unwrap().is_empty());
+    assert_eq!(content[1]["type"], "text");
+    assert_eq!(v["stop_reason"], "end_turn");
+}
+
+#[tokio::test]
+async fn messages_4x_model_has_no_thinking_unless_requested() {
+    let router = router();
+    let (_, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-4-8",
+            "max_tokens": 1024,
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .await;
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["content"].as_array().unwrap().len(), 1);
+    assert_eq!(v["content"][0]["type"], "text");
+
+    let (_, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-4-8",
+            "max_tokens": 1024,
+            "thinking": {"type": "adaptive", "display": "summarized"},
+            "output_config": {"effort": "xhigh"},
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .await;
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["content"][0]["type"], "thinking");
+    assert!(!v["content"][0]["thinking"].as_str().unwrap().is_empty());
+}
+
+#[tokio::test]
+async fn messages_thinking_tokens_billed_in_output_tokens() {
+    let router = router();
+    let body_for = |effort: &str| {
+        json!({
+            "model": "claude-sonnet-5-5",
+            "max_tokens": 1024,
+            "output_config": {"effort": effort},
+            "messages": [{"role": "user", "content": "same prompt every time"}]
+        })
+    };
+    let (_, low) = post_messages(&router, body_for("low")).await;
+    let (_, max) = post_messages(&router, body_for("max")).await;
+    let low: Value = serde_json::from_str(&low).unwrap();
+    let max: Value = serde_json::from_str(&max).unwrap();
+    assert!(max["usage"]["output_tokens"].as_u64() > low["usage"]["output_tokens"].as_u64());
+}
+
+#[tokio::test]
+async fn messages_disabled_thinking_turns_it_off_where_allowed() {
+    let router = router();
+    let (status, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-5",
+            "max_tokens": 1024,
+            "thinking": {"type": "disabled"},
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["content"][0]["type"], "text");
+}
+
+#[tokio::test]
+async fn messages_rejects_unsupported_thinking_configs() {
+    let router = router();
+    for (model, thinking) in [
+        // budget_tokens was removed on 4.7+ / 5.x models
+        (
+            "claude-fable-5-1",
+            json!({"type": "enabled", "budget_tokens": 2048}),
+        ),
+        // thinking cannot be disabled on Opus 5.5
+        ("claude-opus-5-5", json!({"type": "disabled"})),
+        // budget must be below max_tokens
+        (
+            "claude-sonnet-4-5",
+            json!({"type": "enabled", "budget_tokens": 4096}),
+        ),
+    ] {
+        let (status, body) = post_messages(
+            &router,
+            json!({
+                "model": model,
+                "max_tokens": 4096,
+                "thinking": thinking,
+                "messages": [{"role": "user", "content": "hi"}]
+            }),
+        )
+        .await;
+        assert_eq!(status, StatusCode::BAD_REQUEST, "{model}: {body}");
+        let v: Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(v["type"], "error");
+        assert_eq!(v["error"]["type"], "invalid_request_error");
+    }
+
+    let (status, _) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-5-5",
+            "max_tokens": 1024,
+            "output_config": {"effort": "ludicrous"},
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+}
+
+#[tokio::test]
+async fn messages_streaming_thinking_block_precedes_text() {
+    let router = router();
+    let (status, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-fable-5-1",
+            "max_tokens": 1024,
+            "stream": true,
+            "thinking": {"type": "adaptive", "display": "summarized"},
+            "messages": [{"role": "user", "content": "stream with thinking"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let thinking_start = body.find(r#""type":"thinking""#).expect("thinking block");
+    let thinking_delta = body.find("thinking_delta").expect("thinking_delta");
+    let signature = body.find("signature_delta").expect("signature_delta");
+    let text_start = body.find(r#""type":"text""#).expect("text block");
+    let text_delta = body.find("text_delta").expect("text_delta");
+    assert!(thinking_start < thinking_delta);
+    assert!(thinking_delta < signature);
+    assert!(signature < text_start);
+    assert!(text_start < text_delta);
+    // The text block streams at index 1 after the thinking block.
+    let starts: Vec<Value> = body
+        .lines()
+        .filter_map(|l| l.strip_prefix("data: "))
+        .map(|d| serde_json::from_str::<Value>(d).unwrap())
+        .filter(|v| v["type"] == "content_block_start")
+        .collect();
+    assert_eq!(starts.len(), 2);
+    assert_eq!(starts[0]["index"], 0);
+    assert_eq!(starts[0]["content_block"]["type"], "thinking");
+    assert_eq!(starts[1]["index"], 1);
+    assert_eq!(starts[1]["content_block"]["type"], "text");
+}
+
+#[tokio::test]
+async fn messages_scripted_turns_have_no_thinking() {
+    let spec = ScriptSpec {
+        turns: vec![SimTurn::Assistant {
+            text: "scripted".to_string(),
+        }],
+        on_exhausted: OnExhausted::Error,
+    };
+    let router = router_with_script(Script::from_spec(spec).unwrap());
+    let (_, body) = post_messages(
+        &router,
+        json!({
+            "model": "claude-opus-5-5",
+            "max_tokens": 64,
+            "messages": [{"role": "user", "content": "hi"}]
+        }),
+    )
+    .await;
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["content"].as_array().unwrap().len(), 1);
+    assert_eq!(v["content"][0]["text"], "scripted");
+}
+
+// --- Token counting ---
+
+async fn post_count_tokens(router: &axum::Router, body: Value) -> (StatusCode, String) {
+    let req = Request::builder()
+        .method("POST")
+        .uri("/anthropic/v1/messages/count_tokens")
+        .header("content-type", "application/json")
+        .body(Body::from(body.to_string()))
+        .unwrap();
+    let resp = router.clone().oneshot(req).await.unwrap();
+    let status = resp.status();
+    let bytes = to_bytes(resp.into_body(), 1024 * 1024).await.unwrap();
+    (status, String::from_utf8(bytes.to_vec()).unwrap())
+}
+
+#[tokio::test]
+async fn count_tokens_matches_messages_input_tokens() {
+    let router = router();
+    let prompt = json!({
+        "model": "claude-opus-5-5",
+        "system": "You are terse.",
+        "messages": [
+            {"role": "user", "content": "How many tokens is this?"},
+            {"role": "assistant", "content": "Let me count."},
+            {"role": "user", "content": [{"type": "text", "text": "Please do."}]}
+        ]
+    });
+    let (status, body) = post_count_tokens(&router, prompt.clone()).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let counted: Value = serde_json::from_str(&body).unwrap();
+    let counted = counted["input_tokens"].as_u64().unwrap();
+    assert!(counted > 0);
+
+    let mut msg = prompt;
+    msg["max_tokens"] = json!(64);
+    let (_, body) = post_messages(&router, msg).await;
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["usage"]["input_tokens"].as_u64().unwrap(), counted);
+}
+
+#[tokio::test]
+async fn count_tokens_does_not_need_max_tokens_and_validates_thinking() {
+    let router = router();
+    let (status, _) = post_count_tokens(
+        &router,
+        json!({"model": "claude-haiku-5-5", "messages": [{"role": "user", "content": "x"}]}),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    let (status, body) = post_count_tokens(
+        &router,
+        json!({
+            "model": "claude-opus-5-5",
+            "thinking": {"type": "enabled", "budget_tokens": 2048},
+            "messages": [{"role": "user", "content": "x"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::BAD_REQUEST);
+    let v: Value = serde_json::from_str(&body).unwrap();
+    assert_eq!(v["error"]["type"], "invalid_request_error");
+}
