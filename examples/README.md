@@ -2,13 +2,14 @@
 
 ## API Endpoints
 
-LLMSim provides two API providers:
+LLMSim provides these API providers:
 
 | Provider | Base Path | Description |
 |----------|-----------|-------------|
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 | **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
+| **TypeSafe** | `/typesafe/v1/` | [TypeSafe System One API](https://docs.typesafe.ai/api) |
 
 ### OpenAI API Endpoints
 
@@ -33,6 +34,13 @@ LLMSim provides two API providers:
 | `/anthropic/v1/messages` | POST | Messages API (streaming supported) |
 | `/anthropic/v1/models` | GET | List available Claude models |
 | `/anthropic/v1/models/:id` | GET | Get model details |
+
+### TypeSafe API Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/typesafe/v1/systemone` | POST | System One evaluation (Jev; noul, choice, score) |
+| `/typesafe/v1/models` | GET | List Jev models and aliases |
 
 ## Running the Examples
 
@@ -125,6 +133,16 @@ Using LangChain's `ChatAnthropic` client:
 
 ```bash
 uv run examples/anthropic_langchain.py
+```
+
+### TypeSafe SDK
+
+Direct usage of the official TypeSafe Python SDK (`typesafe-sdk`): System One
+with noul, choice, and score questions, deterministic answers, a server-side
+validation error, and model listing:
+
+```bash
+uv run examples/typesafe_client.py
 ```
 
 ### Scripted mode

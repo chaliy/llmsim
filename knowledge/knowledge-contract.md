@@ -35,7 +35,7 @@ success bars, and rejected options. Everything else has a better home:
 | Content | Source of truth |
 |---|---|
 | struct fields, enum variants, model profile tables | Rust source in `src/` |
-| request/response shapes of the simulated providers | the upstream provider API docs and `src/{openai,anthropic,openresponses}/` |
+| request/response shapes of the simulated providers | the upstream provider API docs and `src/{openai,anthropic,openresponses,typesafe}/` |
 | commands, flags, and procedures | `justfile`, scripts, `.claude/skills/`, `.claude/commands/` |
 | user-facing usage | `docs/` |
 

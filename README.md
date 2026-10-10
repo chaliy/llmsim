@@ -17,7 +17,7 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 
 ## Features
 
-- **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), and Anthropic Messages APIs
+- **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), Anthropic Messages, and TypeSafe System One APIs
 - **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
 - **Streaming Support** - Server-Sent Events (SSE) for OpenAI, OpenResponses, and Anthropic streaming formats
 - **Image Generation** - Simulated gpt-image ("ChatGPT Images") endpoint returning watermarked PNGs, with streaming partial images
@@ -172,6 +172,30 @@ print(msg.content[0].text)
 Runnable examples for Python, TypeScript, Go, curl, and LangChain live in
 [`examples/`](examples/) (see [`examples/README.md`](examples/README.md)).
 
+### TypeSafe API (`/typesafe/v1/...`)
+
+Simulates TypeSafe's [System One API](https://docs.typesafe.ai/api) with the
+Jev model: typed questions (noul, choice, score) about a state, answered with
+deterministic, well-formed calibrated probabilities.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/typesafe/v1/systemone` | POST | Answer noul, choice, and score questions |
+| `/typesafe/v1/models` | GET | List Jev models and aliases |
+
+With the official `typesafe-sdk`, set the base URL to `http://localhost:8080/typesafe`:
+
+```python
+from typesafe_sdk import Noul, TypeSafeClient
+
+with TypeSafeClient(base_url="http://localhost:8080/typesafe", api_key="not-needed") as client:
+    response = client.system_one(
+        state="Help! My payouts have been failing for 3 days.",
+        questions={"is_urgent": Noul(instructions="Does this convey urgency?")},
+    )
+    print(response.nouls["is_urgent"].noul)
+```
+
 ### LLMSim endpoints
 
 | Endpoint | Method | Description |
@@ -231,6 +255,7 @@ available = [
 | Claude | claude-opus, claude-sonnet, claude-haiku, claude-fable (4.x and 5.x, through Fable 5.1, Opus 5.5, Sonnet 5.5, and Haiku 5.5) |
 | Gemini | gemini-2.0-flash, gemini-2.5-pro, gemini-3 / 3.1 previews, gemini-3.5 through gemini-3.8 flash |
 | DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
+| TypeSafe | jev-latest, jev-preview, jev-1.13.0 (System One, `/typesafe/v1/systemone`) |
 
 > The Anthropic endpoints (`/anthropic/v1/...`) use the **real Anthropic API
 > model IDs** (dash-separated, e.g. `claude-opus-4-8`, `claude-sonnet-4-6`,
@@ -249,6 +274,7 @@ available = [
 | claude-opus | 1000ms | 60ms |
 | claude-sonnet | 500ms | 30ms |
 | claude-haiku | 200ms | 15ms |
+| jev | 150ms | — (single verdict) |
 | instant | 0ms | 0ms |
 | fast | 10ms | 1ms |
 

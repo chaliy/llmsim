@@ -31,6 +31,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | OpenAI | `/openai` | `/v1/images/generations` | `/openai/v1/images/generations` |
 | OpenResponses | `/openresponses` | `/v1/responses` | `/openresponses/v1/responses` |
 | Anthropic | `/anthropic` | `/v1/messages` | `/anthropic/v1/messages` |
+| TypeSafe | `/typesafe` | `/v1/systemone` | `/typesafe/v1/systemone` |
 
 ### R2: OpenAI Endpoints
 
@@ -116,6 +117,21 @@ and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
 e.g. `claude-opus-4-8`) plus dated snapshot and `-latest` aliases. See
 [anthropic-api](../apis/anthropic-api.md) for the full specification.
 
+### R4a: TypeSafe Endpoints
+
+**R4a.1**: TypeSafe endpoints follow the provider-prefixed pattern and accept
+the same request/response formats as the TypeSafe System One API, so the
+official `typesafe-sdk` clients work when configured with `{base_url}/typesafe`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/typesafe/v1/systemone` | System One evaluation (noul, choice, score) |
+| `GET` | `/typesafe/v1/models` | List available Jev models and aliases |
+
+**R4a.2**: Validation errors return `422` with the FastAPI `{"detail": [...]}`
+body; other errors use `{"detail": {"error_type": "...", "message": "..."}}`.
+See [TypeSafe System One API Specification](../apis/typesafe-api.md) for the full specification.
+
 ### R5: System Endpoints
 
 **R5.1**: System endpoints are not provider-specific and use simple paths:
@@ -152,6 +168,15 @@ const client = new OpenAI({
 from anthropic import Anthropic
 client = Anthropic(
     base_url="http://localhost:8080/anthropic",
+    api_key="not-needed"
+)
+```
+
+```python
+# TypeSafe Python SDK (typesafe-sdk)
+from typesafe_sdk import TypeSafeClient
+client = TypeSafeClient(
+    base_url="http://localhost:8080/typesafe",
     api_key="not-needed"
 )
 ```

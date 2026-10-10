@@ -57,6 +57,7 @@ pub mod script;
 pub mod script_stream;
 pub mod stats;
 pub mod stream;
+pub mod typesafe;
 
 // Token counting via tiktoken-rs (enabled by the `tokens` feature)
 #[cfg(feature = "tokens")]
