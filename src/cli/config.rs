@@ -55,6 +55,8 @@ impl Config {
                 // DeepSeek
                 "deepseek" | "deepseek-chat" => LatencyProfile::deepseek(),
                 "deepseek-reasoner" => LatencyProfile::deepseek_reasoner(),
+                // TypeSafe System One
+                "jev" => LatencyProfile::jev(),
                 // Special profiles
                 "instant" => LatencyProfile::instant(),
                 "fast" => LatencyProfile::fast(),

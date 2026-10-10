@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **TypeSafe System One API support**: new `POST /typesafe/v1/systemone` and
+  `GET /typesafe/v1/models` endpoints, wire-compatible with the official
+  `typesafe-sdk` clients when pointed at `{base_url}/typesafe`. Simulates the
+  Jev model (`jev-latest` / `jev-preview` → `jev-1.13.0`) answering noul,
+  choice, and score questions with deterministic, well-formed probabilities,
+  FastAPI-style `422` validation errors, TypeSafe's error envelope for injected
+  errors, a `jev` latency profile, and a `systemone_requests` stat counter. New
+  Python SDK example. See `knowledge/apis/typesafe-api.md`.
 - **Anthropic Messages API support**: new `/anthropic/v1/messages` endpoint
   (streaming and non-streaming) plus `/anthropic/v1/models` and
   `/anthropic/v1/models/:id`, wire-compatible with the official Anthropic SDKs

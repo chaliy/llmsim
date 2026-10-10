@@ -23,6 +23,7 @@ llmsim/
 │   │   ├── config.rs   # Configuration loading
 │   │   ├── handlers.rs # HTTP request handlers (OpenAI + OpenResponses)
 │   │   ├── anthropic_handlers.rs # Anthropic Messages + Models handlers
+│   │   ├── typesafe_handlers.rs # TypeSafe System One + Models handlers
 │   │   ├── ws_handler.rs # WebSocket request handler
 │   │   └── state.rs    # Application state (config + stats)
 │   ├── tui/            # Terminal UI dashboard
@@ -45,6 +46,10 @@ llmsim/
 │   │   ├── types.rs    # Messages request/response types
 │   │   ├── models.rs   # Claude model profiles (real API IDs)
 │   │   └── stream.rs   # Anthropic SSE streaming
+│   ├── typesafe/       # TypeSafe System One API (Jev)
+│   │   ├── types.rs    # Request parsing/validation, answers, errors
+│   │   ├── judge.rs    # Deterministic calibrated answer synthesis
+│   │   └── models.rs   # Jev model catalog and aliases
 │   ├── stats.rs        # Real-time statistics tracking
 │   ├── tokens.rs       # Token counting with tiktoken
 │   ├── latency.rs      # Latency profile simulation
@@ -208,16 +213,22 @@ detailed specification.
 
 See [anthropic-api](../apis/anthropic-api.md) for detailed Anthropic API specification.
 
+### TypeSafe System One API
+- `POST /typesafe/v1/systemone` - Answer typed questions (noul, choice, score) about a state
+- `GET /typesafe/v1/models` - List available Jev models and aliases
+
+See [TypeSafe System One API Specification](../apis/typesafe-api.md) for detailed TypeSafe API specification.
+
 ### Module Organization
 
-- **Public modules** (`openai`, `openresponses`, `anthropic`, `generator`, `latency`, `stream`, `responses_stream`, `imagegen`, `image_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
+- **Public modules** (`openai`, `openresponses`, `anthropic`, `typesafe`, `generator`, `latency`, `stream`, `responses_stream`, `imagegen`, `image_stream`, `errors`, `stats`): Core library functionality, re-exported from `lib.rs`, always available
 - **Token module** (`tokens`): Token counting behind the `tokens` feature (tiktoken-rs)
 - **CLI modules** (`cli/*`): Server-specific code, HTTP handlers and configuration, behind the `server` feature
 - **TUI modules** (`tui/*`): Optional terminal dashboard behind the `tui` feature, built with tuika (flexbox layout, alt-screen host, live redraw) over Ratatui widgets
 
 ### API Support
 
-The server implements three LLM API specifications with provider-namespaced routes:
+The server implements four LLM API specifications with provider-namespaced routes:
 
 1. **OpenAI API** (`/openai/v1/...`)
    - `/openai/v1/chat/completions` - Chat completions (streaming & non-streaming)
@@ -239,6 +250,11 @@ The server implements three LLM API specifications with provider-namespaced rout
    - Real Claude model IDs (`claude-opus-4-8`, ...) with dated/`-latest` aliases
    - Anthropic SSE event sequence (message_start, content_block_delta, message_stop)
    - Anthropic error envelope and scripted tool_use support
+
+4. **TypeSafe API** (`/typesafe/v1/...`) - [docs.typesafe.ai](https://docs.typesafe.ai/api)
+   - `/typesafe/v1/systemone` - System One evaluation with the Jev model
+   - `/typesafe/v1/models` - List Jev models and aliases
+   - Deterministic, well-formed calibrated answers; FastAPI-style 422 validation errors
 
 ### Stats Module
 

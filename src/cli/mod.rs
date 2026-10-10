@@ -6,6 +6,7 @@ mod anthropic_handlers;
 mod config;
 mod handlers;
 mod state;
+mod typesafe_handlers;
 mod ws_handler;
 
 pub use config::{Config, ConfigError};
@@ -63,6 +64,9 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/anthropic/v1/models/{model_id}",
             get(anthropic_handlers::get_model),
         )
+        // TypeSafe API routes (System One)
+        .route("/typesafe/v1/systemone", post(typesafe_handlers::systemone))
+        .route("/typesafe/v1/models", get(typesafe_handlers::list_models))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)
@@ -99,6 +103,7 @@ pub async fn run_server_with_stats(
         "OpenResponses endpoint: /openresponses/v1/responses (https://www.openresponses.org)"
     );
     tracing::info!("Anthropic endpoints: /anthropic/v1/messages, /anthropic/v1/messages/count_tokens, /anthropic/v1/models");
+    tracing::info!("TypeSafe endpoints: /typesafe/v1/systemone, /typesafe/v1/models");
     tracing::info!("Stats endpoint: /llmsim/stats");
 
     let mut state = AppState::new(config, stats);

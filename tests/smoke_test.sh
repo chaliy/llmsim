@@ -275,5 +275,51 @@ else
     exit 1
 fi
 
+# Test 14: TypeSafe System One API
+echo_info "Testing /typesafe/v1/systemone..."
+SYSTEMONE=$(curl -s -X POST "$BASE_URL/typesafe/v1/systemone" \
+    -H "Content-Type: application/json" \
+    -H "Authorization: Bearer not-needed" \
+    -d '{
+        "state": "Help! My payouts have been failing for 3 days.",
+        "model": "jev-latest",
+        "questions": {
+            "is_urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
+            "team": {"type": "choice", "criteria": {"billing": null, "technical": null}},
+            "severity": {"type": "score", "criteria": ["low", "medium", "high"]}
+        }
+    }')
+if echo "$SYSTEMONE" | grep -q '"model":"jev-1.13.0"' \
+    && echo "$SYSTEMONE" | grep -q '"type":"noul"' \
+    && echo "$SYSTEMONE" | grep -q '"type":"choice"' \
+    && echo "$SYSTEMONE" | grep -q '"type":"score"'; then
+    echo_pass "TypeSafe System One API passed"
+else
+    echo_fail "TypeSafe System One API failed: $SYSTEMONE"
+    exit 1
+fi
+
+# Test 15: TypeSafe System One validation error
+echo_info "Testing /typesafe/v1/systemone validation (422)..."
+SYSTEMONE_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "$BASE_URL/typesafe/v1/systemone" \
+    -H "Content-Type: application/json" \
+    -d '{"model": "jev-latest", "questions": {}}')
+if [ "$SYSTEMONE_STATUS" = "422" ]; then
+    echo_pass "TypeSafe validation passed"
+else
+    echo_fail "TypeSafe validation failed: expected 422, got $SYSTEMONE_STATUS"
+    exit 1
+fi
+
+# Test 16: TypeSafe models endpoint
+echo_info "Testing /typesafe/v1/models endpoint..."
+TYPESAFE_MODELS=$(curl -s "$BASE_URL/typesafe/v1/models")
+if echo "$TYPESAFE_MODELS" | grep -q '"name":"jev-latest"'; then
+    echo_pass "TypeSafe models endpoint passed"
+else
+    echo_fail "TypeSafe models endpoint failed: $TYPESAFE_MODELS"
+    exit 1
+fi
+
 echo ""
 echo -e "${GREEN}All smoke tests passed!${NC}"

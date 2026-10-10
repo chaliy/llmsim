@@ -41,6 +41,8 @@ pub enum EndpointType {
     Messages,
     /// Image generation API (/openai/v1/images/generations)
     Images,
+    /// TypeSafe System One API (/typesafe/v1/systemone)
+    SystemOne,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -68,6 +70,8 @@ pub struct Stats {
     pub messages_requests: AtomicU64,
     /// Image generation API requests
     pub image_requests: AtomicU64,
+    /// TypeSafe System One API requests
+    pub systemone_requests: AtomicU64,
     /// Currently active WebSocket connections
     pub active_websocket_connections: AtomicU64,
 
@@ -128,6 +132,7 @@ impl Stats {
             websocket_requests: AtomicU64::new(0),
             messages_requests: AtomicU64::new(0),
             image_requests: AtomicU64::new(0),
+            systemone_requests: AtomicU64::new(0),
             active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
@@ -171,6 +176,9 @@ impl Stats {
             }
             EndpointType::Images => {
                 self.image_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::SystemOne => {
+                self.systemone_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -397,6 +405,7 @@ impl Stats {
             websocket_requests: self.websocket_requests.load(ORDERING),
             messages_requests: self.messages_requests.load(ORDERING),
             image_requests: self.image_requests.load(ORDERING),
+            systemone_requests: self.systemone_requests.load(ORDERING),
             active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
@@ -429,6 +438,8 @@ pub struct StatsSnapshot {
     pub messages_requests: u64,
     #[serde(default)]
     pub image_requests: u64,
+    #[serde(default)]
+    pub systemone_requests: u64,
     pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,

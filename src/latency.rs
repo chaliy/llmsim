@@ -155,6 +155,17 @@ impl LatencyProfile {
         }
     }
 
+    /// TypeSafe Jev (System One) profile. A verdict is one forward pass with
+    /// no generated text, so latency is a single short wait with no tokens.
+    pub fn jev() -> Self {
+        Self {
+            ttft_mean_ms: 150,
+            ttft_stddev_ms: 40,
+            tbt_mean_ms: 0,
+            tbt_stddev_ms: 0,
+        }
+    }
+
     /// Instant profile - no delay (for fast tests)
     pub fn instant() -> Self {
         Self {
@@ -215,6 +226,9 @@ impl LatencyProfile {
             Self::deepseek_reasoner()
         } else if model_lower.contains("deepseek") {
             Self::deepseek()
+        // TypeSafe System One (Jev)
+        } else if model_lower.starts_with("jev-") {
+            Self::jev()
         } else {
             // Default to GPT-5-like latency
             Self::gpt5()

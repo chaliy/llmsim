@@ -9,6 +9,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 | **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
+| **TypeSafe** | `/typesafe/v1/` | [TypeSafe System One API](https://docs.typesafe.ai/api) (Jev) |
 
 ## OpenAI API (`/openai/v1/...`)
 
@@ -594,6 +595,90 @@ Errors use the Anthropic error envelope:
 {"type": "error", "error": {"type": "rate_limit_error", "message": "..."}}
 ```
 
+## TypeSafe API (`/typesafe/v1/...`)
+
+Simulates TypeSafe's [System One API](https://docs.typesafe.ai/api) with the
+Jev model. Instead of generating text, System One answers typed questions about
+a `state` with calibrated probabilities. Point the official `typesafe-sdk`
+clients at `http://localhost:8080/typesafe` (or set
+`TYPESAFE_BASE_URL=http://localhost:8080/typesafe`).
+
+### Endpoints
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/typesafe/v1/systemone` | POST | Answer noul, choice, and score questions |
+| `/typesafe/v1/models` | GET | List Jev models and aliases |
+
+### System One
+
+```bash
+curl -X POST http://localhost:8080/typesafe/v1/systemone \
+  -H "Content-Type: application/json" \
+  -d '{
+    "state": "Help! My payouts have been failing for 3 days.",
+    "model": "jev-latest",
+    "questions": {
+      "is_urgent": {"type": "noul", "instructions": "Does this convey urgency?"},
+      "team": {"type": "choice", "criteria": {"billing": "Payments", "technical": "Bugs"}},
+      "severity": {"type": "score", "criteria": ["low", "medium", "high"]}
+    }
+  }'
+```
+
+#### Question Types
+
+| `type` | `criteria` | Answer fields |
+|--------|-----------|---------------|
+| `noul` | optional `{"true": ..., "false": ...}` | `noul`: probability of yes (0–1) |
+| `choice` | option → description (or `null`), 1–255 options | `choice`, `probabilities`, `confidence` |
+| `score` | ordered level descriptions, 1–10 levels | `score`, `legend`, `probabilities`, `confidence` |
+
+`state` and `instructions` may be a string, an object, or an array.
+
+#### Response
+
+```json
+{
+  "model": "jev-1.13.0",
+  "answers": {
+    "is_urgent": {"type": "noul", "noul": 0.95},
+    "team": {"type": "choice", "choice": "billing", "confidence": 0.62,
+             "probabilities": {"billing": 0.81, "technical": 0.19}},
+    "severity": {"type": "score", "score": 1.4, "confidence": 0.31,
+                 "legend": {"0": "low", "1": "medium", "2": "high"},
+                 "probabilities": {"0": 0.2, "1": 0.2, "2": 0.6}}
+  },
+  "usage": {"input_tokens": 88, "output_tokens": 60}
+}
+```
+
+Answers are deterministic: the same state and question always get the same
+answer, so tests can assert on thresholds and routing. Probabilities always sum
+to 1, and `choice` is always the most likely option. Aliases (`jev-latest`,
+`jev-preview`) resolve to `jev-1.13.0` in `model`; other model names are echoed.
+
+### List Models
+
+```bash
+curl http://localhost:8080/typesafe/v1/models
+# {"models": [{"name": "jev-latest", "description": "...", "release_date": "2026-09-17"}, ...]}
+```
+
+### Errors
+
+Invalid requests return `422` with FastAPI validation details:
+
+```json
+{"detail": [{"type": "missing", "loc": ["body", "state"], "msg": "Field required", "input": {...}}]}
+```
+
+Other errors (including injected ones) use TypeSafe's envelope:
+
+```json
+{"detail": {"error_type": "rate_limit_error", "message": "..."}}
+```
+
 ## LLMSim Endpoints
 
 | Endpoint | Method | Description |
@@ -652,6 +737,7 @@ curl http://localhost:8080/llmsim/stats
 | Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash |
 | DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
 | Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2 |
+| TypeSafe | jev-latest, jev-preview, jev-1.13.0 |
 
 ## Scripted Mode
 

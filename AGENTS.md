@@ -30,7 +30,7 @@ LLMSim is a lightweight, high-performance LLM API simulator for testing and deve
 
 Domains:
 - `knowledge/foundations/` - Architecture, module organization, endpoint routing conventions
-- `knowledge/apis/` - OpenAI Responses, Anthropic Messages, and image generation simulations
+- `knowledge/apis/` - OpenAI Responses, Anthropic Messages, TypeSafe System One, and image generation simulations
 - `knowledge/simulation/` - Scripted mode and load-test scenarios
 - `knowledge/performance/` - Load testing and throughput benchmarks
 - `knowledge/project/` - Release process and routine maintenance
@@ -112,6 +112,10 @@ Examples:
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:id` - Get model details
 
+**TypeSafe endpoints:**
+- `POST /typesafe/v1/systemone` - System One evaluation (Jev model; noul, choice, score)
+- `GET /typesafe/v1/models` - List available Jev models and aliases
+
 **System endpoints:**
 - `GET /health` - Health check
 - `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
@@ -128,6 +132,7 @@ See `knowledge/foundations/api-endpoints.md` for the full specification.
 - `src/scenario_stream.rs` - Scenario pacing and chat completions SSE (stalls, cuts, reasoning)
 - `src/openresponses/` - OpenResponses API types and streaming
 - `src/anthropic/` - Anthropic Messages API types, model profiles, and streaming
+- `src/typesafe/` - TypeSafe System One API types, validation, Jev models, and answer synthesis
 - `src/cli/` - CLI server, configuration, and HTTP handlers
 - `src/tui/` - Terminal UI components
 - `tests/` - Integration tests
