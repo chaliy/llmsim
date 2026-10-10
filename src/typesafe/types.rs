@@ -11,9 +11,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use std::collections::BTreeMap;
 
-/// Most options a choice question may carry (https://docs.typesafe.ai/api).
+/// Most options a choice question may carry (<https://docs.typesafe.ai/api>).
 pub const MAX_CHOICE_OPTIONS: usize = 255;
-/// Most levels a score question may carry (https://docs.typesafe.ai/api).
+/// Most levels a score question may carry (<https://docs.typesafe.ai/api>).
 pub const MAX_SCORE_LEVELS: usize = 10;
 
 /// A validated `POST /v1/systemone` request.

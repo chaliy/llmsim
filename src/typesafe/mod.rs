@@ -1,7 +1,7 @@
 //! TypeSafe System One API simulation.
 //!
 //! Implements `POST /typesafe/v1/systemone` and `GET /typesafe/v1/models`,
-//! mirroring the TypeSafe API wire format (https://docs.typesafe.ai/api) so the
+//! mirroring the TypeSafe API wire format (<https://docs.typesafe.ai/api>) so the
 //! official `typesafe-sdk` clients work when pointed at `{base_url}/typesafe`.
 //!
 //! System One answers typed questions (noul, choice, score) about a `state`
