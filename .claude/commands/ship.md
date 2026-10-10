@@ -33,8 +33,8 @@ Review the changes on this branch (use `git diff origin/main...HEAD` and `git lo
 
 Review the changes and update project artifacts where applicable. Skip items that aren't affected.
 
-1. **Specs** (`specs/`): if the change adds/modifies behavior covered by a spec, update the relevant spec file to stay in sync
-2. **AGENTS.md**: if the change adds new specs, skills, commands, or modifies development workflows — update the relevant section
+1. **Knowledge** (`knowledge/`): if the change adds/modifies behavior covered by a concept, update it to stay in sync, add a `knowledge/log.md` entry for notable decisions, and run `just check-okf`
+2. **AGENTS.md**: if the change adds new knowledge domains, skills, commands, or modifies development workflows — update the relevant section
 3. **Documentation** (`docs/`): if the change affects user-facing APIs, configuration, or features — update the relevant docs
 
 ### Phase 4: Smoke Testing

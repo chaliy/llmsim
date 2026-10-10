@@ -1,12 +1,12 @@
 ---
 name: maintenance
-description: Run the routine maintenance workflow for llmsim — dependency updates, model profile refresh, code-quality + audit/deny checks, and spec alignment. Use when performing the periodic maintenance pass defined in specs/maintenance.md.
+description: Run the routine maintenance workflow for llmsim — dependency updates, model profile refresh, code-quality + audit/deny checks, and spec alignment. Use when performing the periodic maintenance pass defined in knowledge/project/maintenance.md.
 ---
 
 # Routine Maintenance Skill
 
 This skill walks the routine-maintenance workflow defined in
-[`specs/maintenance.md`](../../../specs/maintenance.md). Use it monthly,
+[`knowledge/project/maintenance.md`](../../../knowledge/project/maintenance.md). Use it monthly,
 before a minor/major release, or whenever a major-provider releases new
 models.
 
@@ -32,7 +32,7 @@ root — rustup will pick the right channel automatically.
 ## Workflow
 
 Follow the order below. Each step maps to a requirement in
-`specs/maintenance.md`.
+`knowledge/project/maintenance.md`.
 
 ### 1. Dependency updates (R1)
 
@@ -69,7 +69,7 @@ For each entry in the `cargo update --dry-run` output, decide:
 - Add new models from OpenAI, Anthropic, and Google (and DeepSeek where
   appropriate). Mirror the new IDs in `default_models()` in
   `src/cli/config.rs` so they appear in `/openai/v1/models`.
-- Update the model table in `specs/architecture.md`.
+- Update the model table in `knowledge/foundations/architecture.md`.
 - Add focused unit tests for each new profile (one assertion per field
   worth caring about; see existing tests as a template).
 
@@ -89,10 +89,11 @@ cargo test
 
 ### 4. Spec + AGENTS.md alignment (R5 + R6)
 
-- Read each file in `specs/` and confirm it still matches the code.
+- Read each concept in `knowledge/` and confirm it still matches the code.
+  Run `just check-okf` to keep the bundle OKF v0.2 conformant.
   Update tables, requirement lists, and example snippets where they've
   drifted.
-- Verify `AGENTS.md` lists every spec, every skill, and every command.
+- Verify `AGENTS.md` lists every knowledge domain, every skill, and every command.
 - Run a quick `grep -rn "PORT_NUMBER\|version-like-string"` for known
   stale references (e.g., the AGENTS.md default-port fix in PR #36).
 
@@ -105,7 +106,7 @@ diff:
    apply. Include the clippy fix if `dtolnay/rust-toolchain` rolled to
    a new version and surfaced new lints.
 2. **`feat(models)`** — new model profiles + spec table updates.
-3. **`docs(specs)`** — any spec drift discovered while reviewing the
+3. **`docs(knowledge)`** — any knowledge drift discovered while reviewing the
    code.
 4. *(optional)* **`chore(...)` / `refactor(...)`** for anything bigger
    that came out of the code-quality sweep.

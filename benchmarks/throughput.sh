@@ -2,7 +2,7 @@
 # llmsim Throughput Benchmark
 #
 # Measures llmsim's peak sustained request rate (req/s) and how it scales with
-# parallelism (async worker threads / CPU cores). See specs/throughput-benchmark.md.
+# parallelism (async worker threads / CPU cores). See knowledge/performance/throughput-benchmark.md.
 #
 # Generator: oha (Rust, MIT) -- chosen over k6 because this benchmark saturates
 # the server (instant latency), where the load generator competes for CPU. oha's

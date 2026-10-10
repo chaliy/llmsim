@@ -151,4 +151,4 @@ Tests pass if thresholds are met:
 - `benchmarks/config/chaos.toml` - Chaos mode config (error injection)
 - `benchmarks/k6/config.js` - k6 test configuration
 - `benchmarks/k6/*.js` - k6 test scripts
-- `specs/load-testing.md` - Full specification
+- `knowledge/performance/load-testing.md` - Full specification

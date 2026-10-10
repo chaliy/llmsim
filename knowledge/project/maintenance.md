@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Routine Maintenance Specification"
+description: "Periodic maintenance: dependency updates, model profile refresh, code quality, and knowledge alignment."
+tags:
+  - llmsim
+  - project
+---
 # Routine Maintenance Specification
 
 ## Abstract
@@ -61,7 +69,7 @@ This specification defines the routine maintenance process for llmsim. Regular m
 
 ### R5: Specification Alignment
 
-**R5.1**: Verify all specs in `specs/` accurately reflect the current implementation:
+**R5.1**: Verify all concepts in `knowledge/` accurately reflect the current implementation:
 - Model tables match the code
 - API endpoints match the router
 - Configuration options match the config struct

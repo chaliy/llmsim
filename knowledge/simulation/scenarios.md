@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Scenarios for Load Testing"
+description: "Named, stateless scenarios selected by a message marker, for realistic load tests."
+tags:
+  - llmsim
+  - simulation
+---
 # Scenarios for load testing
 
 ## Abstract
@@ -9,7 +17,7 @@ state. A scenario is a list of steps. A marker in the user message picks the
 scenario, and the step to play is counted from the conversation itself: the
 number of assistant replies since that user message.
 
-Scripted mode (`specs/scripted-mode.md`) plays one script per server through
+Scripted mode ([scripted-mode](scripted-mode.md)) plays one script per server through
 a single global cursor. That breaks as soon as two sessions share the server,
 a turn retries, or a worker restarts. Counting steps from the conversation
 fixes all three, because every request carries its own history. Scripted mode

@@ -305,7 +305,7 @@ Generation latency scales with quality and image size and is anchored to the
 configured latency profile; the `instant`/`fast` profiles make it effectively
 immediate for tests and load runs.
 
-See [`specs/image-generation.md`](../specs/image-generation.md) for the full
+See [`knowledge/apis/image-generation.md`](../knowledge/apis/image-generation.md) for the full
 specification.
 
 ## OpenResponses API (`/openresponses/v1/...`)
@@ -679,7 +679,7 @@ The script JSON has an `on_exhausted` policy (`repeat_last` /
 }
 ```
 
-See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the
+See [`knowledge/simulation/scripted-mode.md`](../knowledge/simulation/scripted-mode.md) for the
 full format, turn variants (`assistant` / `tool_calls` / `mixed` /
 `error`), and per-endpoint coverage. Example script and clients live
 in [`examples/scripted_demo/`](../examples/scripted_demo/).

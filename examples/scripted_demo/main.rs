@@ -88,7 +88,7 @@ fn main() -> Result<(), ScriptError> {
     println!(
         "  - Boot the server: cargo run -- serve --config examples/scripted_demo/scripted_demo.toml"
     );
-    println!("  - Drive it via any OpenAI-compatible client (see specs/scripted-mode.md).");
+    println!("  - Drive it via any OpenAI-compatible client (see knowledge/simulation/scripted-mode.md).");
 
     Ok(())
 }

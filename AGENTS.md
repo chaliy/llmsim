@@ -20,24 +20,22 @@ This repo is intended to be runnable locally and easy for coding agents to work 
 
 LLMSim is a lightweight, high-performance LLM API simulator for testing and development. It replicates realistic LLM API behavior without running actual models.
 
-### Specs
+### Knowledge
 
-`specs/` folder contains feature specifications outlining requirements for specific features and components. New code should comply with these specifications or propose changes to them.
+`knowledge/` is the canonical [Open Knowledge Format (OKF) v0.2](https://github.com/GoogleCloudPlatform/knowledge-catalog/blob/main/okf/SPEC.md) bundle: durable design intent, feature specifications, constraints, and success bars. It replaced the former `specs/` folder. New code should comply with these specifications or propose changes to them in the same PR. Start at `knowledge/index.md`; rules live in `knowledge/knowledge-contract.md`.
 
-Available specs:
-- `specs/architecture.md` - System architecture and module organization
-- `specs/api-endpoints.md` - API endpoint structure and routing conventions
-- `specs/responses-api.md` - OpenAI Responses API simulation
-- `specs/anthropic-api.md` - Anthropic Messages API simulation
-- `specs/image-generation.md` - OpenAI image generation (gpt-image / "ChatGPT Images") simulation
-- `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
-- `specs/scenarios.md` - Named, stateless scenarios selected by a message marker, for load testing
-- `specs/load-testing.md` - Load testing framework and benchmarks
-- `specs/throughput-benchmark.md` - Peak throughput (req/s) benchmark with parallelisation scaling
-- `specs/release-process.md` - Release workflow and versioning
-- `specs/maintenance.md` - Routine maintenance process
+- Concepts carry YAML frontmatter (`type`, `title`, `description`, `tags`); `index.md` files list every concept and subdirectory beside them; `log.md` records notable changes newest first.
+- Knowledge owns the why and what. Link to source, `docs/`, skills, and the justfile instead of copying fields or commands.
+- Run `just check-okf` (or `./scripts/test-knowledge-okf.sh`) after any knowledge change. CI also runs the pinned upstream `okf-lint`.
 
-Specification format: Abstract and Requirements sections.
+Domains:
+- `knowledge/foundations/` - Architecture, module organization, endpoint routing conventions
+- `knowledge/apis/` - OpenAI Responses, Anthropic Messages, and image generation simulations
+- `knowledge/simulation/` - Scripted mode and load-test scenarios
+- `knowledge/performance/` - Load testing and throughput benchmarks
+- `knowledge/project/` - Release process and routine maintenance
+
+Specification format: frontmatter, then Abstract and Requirements sections.
 
 ### Skills
 
@@ -45,7 +43,7 @@ Specification format: Abstract and Requirements sections.
 
 Available skills:
 - `load-test/` - Run load and stress tests for llmsim using k6
-- `maintenance/` - Run the routine maintenance workflow (deps, models, code quality, specs)
+- `maintenance/` - Run the routine maintenance workflow (deps, models, code quality, knowledge)
 
 ### Commands
 
@@ -118,7 +116,7 @@ Examples:
 - `GET /health` - Health check
 - `GET /llmsim/stats` - Server statistics (requests, tokens, latency)
 
-See `specs/api-endpoints.md` for the full specification.
+See `knowledge/foundations/api-endpoints.md` for the full specification.
 
 #### Code organization
 
@@ -134,7 +132,7 @@ See `specs/api-endpoints.md` for the full specification.
 - `src/tui/` - Terminal UI components
 - `tests/` - Integration tests
 - `examples/` - Usage examples (Rust, Python, TypeScript, Go); `examples/scenarios/` holds the starter scenario library
-- `specs/` - Feature specifications
+- `knowledge/` - OKF knowledge bundle (feature specifications and design intent)
 - `benchmarks/` - Load testing scripts (k6)
 - `docs/` - Public-facing user documentation
 
@@ -143,7 +141,7 @@ See `specs/api-endpoints.md` for the full specification.
 
 - CI is implemented using GitHub Actions
 - Runs on push to main and pull requests
-- Jobs: check, fmt, clippy, test, build (multi-platform)
+- Jobs: check, fmt, clippy, test, audit, deny, doc, knowledge (OKF), build (multi-platform), examples
 - **Never merge a PR when CI is not green.** Wait for all checks to pass before merging.
 
 ### Pre-PR checklist
@@ -154,7 +152,7 @@ Before creating a pull request, ensure:
 2. **Linting**: Run `cargo clippy` and fix all warnings
 3. **Tests**: Run `cargo test` to ensure all tests pass
 4. **Smoke tests**: Run smoke tests to verify the system works end-to-end
-5. **Update specs**: If your changes affect system behavior, update the relevant specs in `specs/`
+5. **Update knowledge**: If your changes affect system behavior, update the relevant concepts in `knowledge/`, add a `knowledge/log.md` entry for notable decisions, and run `just check-okf`
 6. **Update docs**: If your changes affect usage or configuration, update public docs in `./docs` folder
 
 CI will fail if formatting, linting, tests, or UI build fail. Always run these locally before pushing.
@@ -236,7 +234,7 @@ when possible). For changes with no observable behavior (pure refactor, docs), s
 
 "Ship" means: implement with extensive test coverage (positive and negative paths), then complete the full Pre-PR Checklist (especially smoke testing impacted functionality), create PR, and merge when CI is green.
 
-Use the [`/ship`](.claude/commands/ship.md) command to execute the full shipping workflow. It covers test coverage verification, artifact updates (specs, docs), smoke testing, quality gates, PR creation, and merge. When asked to "fix and ship", implement the fix first, then run `/ship`.
+Use the [`/ship`](.claude/commands/ship.md) command to execute the full shipping workflow. It covers test coverage verification, artifact updates (knowledge, docs), smoke testing, quality gates, PR creation, and merge. When asked to "fix and ship", implement the fix first, then run `/ship`.
 
 ## Testing the system
 

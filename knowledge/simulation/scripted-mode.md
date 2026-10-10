@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Scripted Response Mode"
+description: "Multi-turn scripted responses that drive deterministic agent scenario tests."
+tags:
+  - llmsim
+  - simulation
+---
 # Scripted response mode
 
 ## Abstract
@@ -166,7 +174,7 @@ let script = Script::from_file("/path/to/script.json")?;
 Wire into an `AppState` via `AppState::with_script(Arc::new(script))`.
 
 For many concurrent sessions (load tests), use scenarios instead
-(`specs/scenarios.md`): the step is derived from each request's own history,
+([scenarios](scenarios.md)): the step is derived from each request's own history,
 so sessions, retries and restarts do not interfere.
 
 ## Non-goals

@@ -16,7 +16,7 @@
  *     A default llmsim server returns simulated (lorem ipsum) text, so it does
  *     not emit schema-conforming JSON or tool calls. To exercise `generateObject`
  *     or tool calling deterministically, run the server in scripted mode — see
- *     specs/scripted-mode.md and examples/scripted_demo/.
+ *     knowledge/simulation/scripted-mode.md and examples/scripted_demo/.
  *
  * Prerequisites:
  *     Start the llmsim server first:

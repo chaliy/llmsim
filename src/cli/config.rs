@@ -145,13 +145,13 @@ pub struct ResponseConfig {
     pub target_tokens: usize,
     /// Optional path to a scripted response JSON file. When set, the
     /// server replays the script across requests and ignores
-    /// `generator`. See `specs/scripted-mode.md`.
+    /// `generator`. See `knowledge/simulation/scripted-mode.md`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script_path: Option<String>,
     /// Optional path to a scenario JSON file or a directory of them. Requests
     /// whose last user message carries `[[llmsim:<name>]]` (or whose model is
     /// `llmsim-scenario-<name>`) play that scenario; other requests keep the
-    /// script / generator behaviour. See `specs/scenarios.md`.
+    /// script / generator behaviour. See `knowledge/simulation/scenarios.md`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenarios_path: Option<String>,
 }

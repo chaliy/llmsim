@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "API Endpoints Specification"
+description: "Provider-prefixed URL structure and routing conventions that keep official SDKs compatible."
+tags:
+  - llmsim
+  - foundations
+---
 # API Endpoints Specification
 
 ## Abstract
@@ -51,7 +59,7 @@ Image parts contribute an approximate token cost to `usage` (`prompt_tokens` / R
 **R2.6**: The `/openai/v1/images/generations` endpoint simulates the gpt-image
 family ("ChatGPT Images"), returning a synthetic watermarked PNG of the
 requested size. It supports both non-streaming JSON and SSE streaming with
-progressive partial images. See `specs/image-generation.md` for the full
+progressive partial images. See [image-generation](../apis/image-generation.md) for the full
 specification.
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
@@ -106,7 +114,7 @@ and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
 
 **R4.4**: The models endpoints use real Anthropic model IDs (dash-separated,
 e.g. `claude-opus-4-8`) plus dated snapshot and `-latest` aliases. See
-`specs/anthropic-api.md` for the full specification.
+[anthropic-api](../apis/anthropic-api.md) for the full specification.
 
 ### R5: System Endpoints
 

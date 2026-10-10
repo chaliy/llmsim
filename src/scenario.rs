@@ -4,7 +4,7 @@
 // (what the model answers, how fast it streams, whether it fails first). A
 // marker in the user message (`[[llmsim:<name> seed=7 speed=0.5]]`) or a
 // `llmsim-scenario-<name>` model id picks the scenario. See
-// `specs/scenarios.md`.
+// `knowledge/simulation/scenarios.md`.
 //
 // Decisions:
 // - The step to play is derived from the request's messages alone: count the

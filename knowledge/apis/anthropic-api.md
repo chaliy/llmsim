@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Anthropic Messages API Specification"
+description: "Wire-compatible simulation of the Anthropic Messages, token counting, and models APIs."
+tags:
+  - llmsim
+  - apis
+---
 # Anthropic Messages API Specification
 
 ## Abstract
@@ -151,7 +159,7 @@ cutoff.
 
 ### R5: Scripted Mode
 
-**R5.1**: When the server runs with a script (see `specs/scripted-mode.md`), the
+**R5.1**: When the server runs with a script (see [scripted-mode](../simulation/scripted-mode.md)), the
 Messages endpoint MUST replay scripted turns:
 
 - `assistant` turns → a single `text` content block, `stop_reason: end_turn`.

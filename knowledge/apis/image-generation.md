@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "OpenAI Image Generation API Specification"
+description: "Simulated gpt-image generation returning watermarked placeholder PNGs, with streamed partial images."
+tags:
+  - llmsim
+  - apis
+---
 # OpenAI Image Generation API Specification
 
 ## Abstract
