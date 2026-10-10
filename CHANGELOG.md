@@ -7,48 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.6.0] - 2026-10-10
 
-- **TypeSafe System One API support**: new `POST /typesafe/v1/systemone` and
-  `GET /typesafe/v1/models` endpoints, wire-compatible with the official
-  `typesafe-sdk` clients when pointed at `{base_url}/typesafe`. Simulates the
-  Jev model (`jev-latest` / `jev-preview` → `jev-1.13.0`) answering noul,
-  choice, and score questions with deterministic, well-formed probabilities,
-  FastAPI-style `422` validation errors, TypeSafe's error envelope for injected
-  errors, a `jev` latency profile, and a `systemone_requests` stat counter. New
-  Python SDK example. See `knowledge/apis/typesafe-api.md`.
-- **Anthropic Messages API support**: new `/anthropic/v1/messages` endpoint
-  (streaming and non-streaming) plus `/anthropic/v1/models` and
-  `/anthropic/v1/models/:id`, wire-compatible with the official Anthropic SDKs
-  when pointed at `{base_url}/anthropic`. Includes realistic Claude model
-  profiles (sourced from models.dev) using the real Anthropic API model IDs
-  (`claude-opus-4-8`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-fable-5`,
-  …) with dated-snapshot and `-latest` aliases, the Anthropic SSE event
-  sequence, the Anthropic error envelope, scripted `tool_use` support, and a
-  `messages_requests` stat counter. New examples for Python, TypeScript, Go,
-  curl, and LangChain. See `knowledge/apis/anthropic-api.md`.
-- **New models**: GPT-5.6 (Sol/Terra/Luna), GPT-6 Astra/Sol/Luna, GPT-6.1 Sol,
-  gpt-image-2, Claude Opus 5 / 5.5, Sonnet 5 / 5.5, Haiku 5.5, Fable 5.1,
-  Gemini 3.5 Flash / Flash Lite and 3.6 / 3.7 / 3.8 Flash, DeepSeek V4 Pro and
-  V4.1 Flash (`deepseek-flash`), with profiles from models.dev.
-- **Anthropic extended thinking**: `thinking` and `output_config.effort` are
-  honored. Claude 5.x / Fable models (and any model sent
-  `thinking: {type: "adaptive"}`) return a `thinking` block with a signature
-  before the text, streamed as `thinking_delta` / `signature_delta`; thinking
-  tokens scale with effort and count in `usage.output_tokens`. Configurations
-  the real API rejects return `400 invalid_request_error`.
-- **Anthropic token counting**: `POST /anthropic/v1/messages/count_tokens`.
-- **Chat Completions `reasoning_effort`**: reasoning models report
-  `completion_tokens_details.reasoning_tokens` (included in
-  `completion_tokens`). New `max` effort level on chat and Responses.
+### Highlights
 
-### Changed
+- **Anthropic Messages API**: `/anthropic/v1/messages` (streaming and
+  non-streaming), `count_tokens`, and `/anthropic/v1/models`, wire-compatible
+  with the official Anthropic SDKs at `{base_url}/anthropic`. Claude model
+  profiles, extended thinking (`thinking`, `output_config.effort`), scripted
+  `tool_use`, and the Anthropic error envelope.
+- **TypeSafe System One API**: `POST /typesafe/v1/systemone` and
+  `GET /typesafe/v1/models` simulate the Jev model answering noul, choice,
+  and score questions, compatible with the `typesafe-sdk` clients.
+- **Image generation and multimodal input**: `POST /openai/v1/images/generations`
+  (gpt-image, with streamed partial images) returns real placeholder PNGs;
+  chat completions accept image content, gated on model vision capability,
+  and image inputs count toward token usage.
+- **Load-test scenarios**: stateless named scenarios that script pacing,
+  stalls, cuts, and reasoning for chat completions streams, with a starter
+  library in `examples/scenarios/`.
+- **New models and reasoning**: GPT-5.6, GPT-6 / 6.1, gpt-image-2, Claude
+  Opus / Sonnet 5.x, Haiku 5.5, Fable 5.1, Gemini 3.5–3.8 Flash, DeepSeek V4;
+  chat completions honor `reasoning_effort` (new `max` level) and report
+  reasoning tokens. The stats dashboard is rebuilt on `tuika`.
 
-- Reasoning-model detection uses model profiles, so GPT-5.6/GPT-6 produce
-  reasoning tokens and `gpt-5.3-chat-latest` no longer does.
-- Claude Opus 4.8 and Fable 5 release dates corrected; Opus 4.8 now carries
-  its published knowledge cutoff.
-- Rust toolchain pinned to 1.99; `tuika` 0.13, `tokio-tungstenite` 0.30.
+### What's Changed
+
+* feat(typesafe): simulate TypeSafe System One API with the Jev model ([#84](https://github.com/chaliy/llmsim/pull/84)) by @chaliy
+* chore(knowledge): adopt OKF v0.2 knowledge bundle in place of specs/ ([#83](https://github.com/chaliy/llmsim/pull/83)) by @chaliy
+* feat(scenario): stateless named scenarios for load testing ([#82](https://github.com/chaliy/llmsim/pull/82)) by @chaliy
+* chore: maintenance pass — new models, Claude extended thinking, count_tokens, reasoning_effort, deps ([#81](https://github.com/chaliy/llmsim/pull/81)) by @chaliy
+* chore(deps): bump tuika to 0.9 and migrate the dashboard runner ([#80](https://github.com/chaliy/llmsim/pull/80)) by @chaliy
+* chore(ship): prompt for PR evidence in the ship skill ([#79](https://github.com/chaliy/llmsim/pull/79)) by @chaliy
+* refactor(tui): reimplement stats dashboard on tuika ([#78](https://github.com/chaliy/llmsim/pull/78)) by @chaliy
+* chore: standardize PR descriptions on functional change + before/after ([#77](https://github.com/chaliy/llmsim/pull/77)) by @chaliy
+* feat(openai): simulate image generation endpoint (gpt-image / ChatGPT Images) ([#76](https://github.com/chaliy/llmsim/pull/76)) by @chaliy
+* feat(tokens): account for image inputs in token usage ([#75](https://github.com/chaliy/llmsim/pull/75)) by @chaliy
+* feat(anthropic): add Anthropic Messages API endpoints and Claude model profiles ([#74](https://github.com/chaliy/llmsim/pull/74)) by @chaliy
+* feat(openai): accept multimodal chat content, gate images on vision capability ([#73](https://github.com/chaliy/llmsim/pull/73)) by @chaliy
+* feat(examples): add Vercel AI SDK and Pydantic AI examples ([#72](https://github.com/chaliy/llmsim/pull/72)) by @chaliy
+* refactor(examples): group multifile scripted_demo into a folder ([#71](https://github.com/chaliy/llmsim/pull/71)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.5.1...v0.6.0
 
 ## [0.5.1] - 2026-06-28
 
@@ -251,7 +251,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.5.1...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/chaliy/llmsim/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/chaliy/llmsim/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/chaliy/llmsim/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/chaliy/llmsim/compare/v0.3.0...v0.4.0
