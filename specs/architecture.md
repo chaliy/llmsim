@@ -139,7 +139,8 @@ The default feature set is `["cli"]`, so `cargo build`, `cargo run -- serve`,
 and `cargo test` behave exactly as before. Library consumers opt out with
 `llmsim = { default-features = false }`, which sheds `axum`, `tower-http`,
 `tiktoken-rs`, `clap`, websockets, and `tracing-subscriber`, leaving just the
-core library modules (types, generators, latency, streaming, stats, scripts).
+core library modules (types, generators, latency, streaming, stats, scripts,
+scenarios).
 
 ### CLI Subcommand Pattern
 

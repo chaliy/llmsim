@@ -21,6 +21,8 @@ use crate::{
         self, OpenResponsesStreamBuilder, Response as OpenResponsesResponse, ResponseRequest,
         Usage as OpenResponsesUsage,
     },
+    scenario::{AttemptOutcome, ConversationMessage, Resolution, StepError, ToolSpec},
+    scenario_stream::{word_tokens, Pacing, ScenarioChatStream},
     script::{ScriptedResponse, SimError, SimTurn},
     script_stream::{build_chat_completion_response, materialize_tool_calls, ScriptedChatStream},
     EndpointType, ErrorInjector, LatencyProfile, ResponsesTokenStreamBuilder, TokenStreamBuilder,
@@ -230,6 +232,31 @@ pub async fn chat_completions(
             LatencyProfile::from_model(&request.model)
         };
 
+    // Scenario mode: a `[[llmsim:<name>]]` marker in the last user message
+    // (or an `llmsim-scenario-<name>` model) picks the step to play.
+    if let Some(scenarios) = state.scenarios.clone() {
+        let messages: Vec<ConversationMessage> = request.messages.iter().map(Into::into).collect();
+        let tools: Vec<ToolSpec> = request.tools.iter().flatten().map(Into::into).collect();
+        match crate::scenario::resolve(&messages, &tools, Some(&request.model), &scenarios) {
+            Ok(Some(resolution)) => {
+                return Ok(handle_scenario_chat_completions(
+                    state,
+                    request,
+                    request_start,
+                    latency,
+                    resolution,
+                )
+                .await);
+            }
+            Ok(None) => {}
+            Err(err) => {
+                tracing::warn!(error = %err, "Scenario resolution failed");
+                state.stats.record_error(err.status_code());
+                return Ok(sim_error_to_response(&err.to_sim_error()));
+            }
+        }
+    }
+
     // Scripted mode short-circuits the generator.
     if let Some(script) = state.script.clone() {
         return handle_scripted_chat_completions(state, request, request_start, latency, script)
@@ -393,6 +420,142 @@ async fn handle_scripted_chat_completions(
         let resp = build_chat_completion_response(request.model.clone(), text, wire_calls, usage);
         Ok(Json(resp).into_response())
     }
+}
+
+/// Play one resolved scenario step on the chat completions endpoint.
+async fn handle_scenario_chat_completions(
+    state: Arc<AppState>,
+    request: ChatCompletionRequest,
+    request_start: Instant,
+    latency: LatencyProfile,
+    resolution: Resolution,
+) -> Response {
+    let attempt = state.attempts.next_attempt(resolution.fingerprint);
+    tracing::debug!(
+        scenario = %resolution.scenario,
+        step = resolution.step,
+        attempt,
+        "Scenario step"
+    );
+    let trace_headers = |mut response: Response| {
+        let headers = response.headers_mut();
+        headers.insert(
+            "x-llmsim-scenario",
+            resolution
+                .scenario
+                .parse()
+                .expect("scenario names are ASCII"),
+        );
+        headers.insert("x-llmsim-step", resolution.step.into());
+        headers.insert("x-llmsim-attempt", attempt.into());
+        response
+    };
+
+    let cut_after_tokens = match resolution.outcome(attempt) {
+        AttemptOutcome::Fail(err) => {
+            state.stats.record_error(err.error.status_code());
+            return trace_headers(step_error_response(&err));
+        }
+        AttemptOutcome::Respond { cut_after_tokens } => cut_after_tokens,
+    };
+
+    let (text, tool_calls) = match resolution.turn.clone() {
+        SimTurn::Assistant { text } => (Some(text), Vec::new()),
+        SimTurn::ToolCalls { calls } => (None, calls),
+        SimTurn::Mixed { text, calls } => (Some(text), calls),
+        // `outcome` always fails error steps; keep a sane fallback.
+        SimTurn::Error(err) => {
+            state.stats.record_error(err.status_code());
+            return trace_headers(sim_error_to_response(&err));
+        }
+    };
+
+    let text_tokens = text.as_deref().map_or(0, |t| word_tokens(t).len());
+    let reasoning_tokens = resolution
+        .reasoning
+        .as_deref()
+        .map_or(0, |r| word_tokens(r).len());
+    let tool_call_tokens: usize = tool_calls
+        .iter()
+        .map(|c| {
+            let args = serde_json::to_string(&c.arguments).unwrap_or_default();
+            crate::count_tokens_default(&args).unwrap_or(args.split_whitespace().count()) + 1
+        })
+        .sum();
+    let prompt_tokens = count_request_tokens(&request);
+    let completion_tokens = text_tokens + reasoning_tokens + tool_call_tokens;
+    let usage = Usage {
+        prompt_tokens: prompt_tokens as u32,
+        completion_tokens: completion_tokens as u32,
+        total_tokens: (prompt_tokens + completion_tokens) as u32,
+        completion_tokens_details: (reasoning_tokens > 0).then_some(CompletionTokensDetails {
+            reasoning_tokens: reasoning_tokens as u32,
+        }),
+    };
+    let pacing = Pacing::new(resolution.timing.clone(), latency);
+
+    if request.stream {
+        let stats = state.stats.clone();
+        let cut_stats = state.stats.clone();
+        let (prompt_tok, completion_tok) = (usage.prompt_tokens, usage.completion_tokens);
+        let stream =
+            ScenarioChatStream::new(&request.model, text.unwrap_or_default(), tool_calls, pacing)
+                .with_reasoning(resolution.reasoning.clone())
+                .with_cut_after(cut_after_tokens)
+                .with_usage(usage)
+                .with_on_complete(move || {
+                    stats.record_request_end(request_start.elapsed(), prompt_tok, completion_tok);
+                })
+                .with_on_cut(move || cut_stats.record_error(0));
+
+        let response = Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "text/event-stream")
+            .header(header::CACHE_CONTROL, "no-cache")
+            .header(header::CONNECTION, "keep-alive")
+            .body(Body::from_stream(stream.into_stream()))
+            .unwrap();
+        return trace_headers(response);
+    }
+
+    // Non-streaming: wait as long as streaming the whole answer would take.
+    let tokens = text_tokens + reasoning_tokens;
+    if let Some(limit) = cut_after_tokens {
+        tokio::time::sleep(pacing.total(tokens.min(limit))).await;
+        state.stats.record_error(0);
+        // Headers go out, then the body aborts: the client sees a dropped
+        // connection, as with a provider that dies mid-response.
+        let body = Body::from_stream(futures_util::stream::once(async {
+            Err::<String, _>(std::io::Error::other("llmsim scenario: response cut"))
+        }));
+        let response = Response::builder()
+            .status(StatusCode::OK)
+            .header(header::CONTENT_TYPE, "application/json")
+            .body(body)
+            .unwrap();
+        return trace_headers(response);
+    }
+    tokio::time::sleep(pacing.total(tokens)).await;
+    state.stats.record_request_end(
+        request_start.elapsed(),
+        usage.prompt_tokens,
+        usage.completion_tokens,
+    );
+    let wire_calls = materialize_tool_calls(resolution.step, &tool_calls);
+    let resp = build_chat_completion_response(request.model.clone(), text, wire_calls, usage);
+    trace_headers(Json(resp).into_response())
+}
+
+/// Render a scenario step error, with `Retry-After` / `retry-after-ms` when
+/// the step sets `retry_after_ms`.
+fn step_error_response(err: &StepError) -> Response {
+    let mut response = sim_error_to_response(&err.error);
+    if let (Some(secs), Some(ms)) = (err.retry_after_secs(), err.retry_after_ms) {
+        let headers = response.headers_mut();
+        headers.insert(header::RETRY_AFTER, secs.into());
+        headers.insert("retry-after-ms", ms.into());
+    }
+    response
 }
 
 /// Non-streaming scripted Responses API. Produces `OutputItem`s that

@@ -31,6 +31,7 @@ Available specs:
 - `specs/anthropic-api.md` - Anthropic Messages API simulation
 - `specs/image-generation.md` - OpenAI image generation (gpt-image / "ChatGPT Images") simulation
 - `specs/scripted-mode.md` - Multi-turn scripted responses for agent scenario tests
+- `specs/scenarios.md` - Named, stateless scenarios selected by a message marker, for load testing
 - `specs/load-testing.md` - Load testing framework and benchmarks
 - `specs/throughput-benchmark.md` - Peak throughput (req/s) benchmark with parallelisation scaling
 - `specs/release-process.md` - Release workflow and versioning
@@ -125,12 +126,14 @@ See `specs/api-endpoints.md` for the full specification.
 - `src/openai/` - OpenAI API types and model profiles (includes `images.rs` for image generation)
 - `src/imagegen.rs` - Self-contained placeholder PNG synthesis (encoder + bitmap font)
 - `src/image_stream.rs` - Image generation streaming engine (partial images)
+- `src/scenario.rs` - Load-test scenarios: format, marker parser, stateless `resolve`
+- `src/scenario_stream.rs` - Scenario pacing and chat completions SSE (stalls, cuts, reasoning)
 - `src/openresponses/` - OpenResponses API types and streaming
 - `src/anthropic/` - Anthropic Messages API types, model profiles, and streaming
 - `src/cli/` - CLI server, configuration, and HTTP handlers
 - `src/tui/` - Terminal UI components
 - `tests/` - Integration tests
-- `examples/` - Usage examples (Rust, Python, TypeScript, Go)
+- `examples/` - Usage examples (Rust, Python, TypeScript, Go); `examples/scenarios/` holds the starter scenario library
 - `specs/` - Feature specifications
 - `benchmarks/` - Load testing scripts (k6)
 - `docs/` - Public-facing user documentation

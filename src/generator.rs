@@ -20,7 +20,7 @@ pub struct LoremGenerator {
 }
 
 impl LoremGenerator {
-    const LOREM_WORDS: &'static [&'static str] = &[
+    pub(crate) const LOREM_WORDS: &'static [&'static str] = &[
         "lorem",
         "ipsum",
         "dolor",
