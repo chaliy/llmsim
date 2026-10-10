@@ -107,7 +107,7 @@ uv run examples/pydantic_ai_client.py
 ```
 
 > Structured `output_type` results and tool calling require the server to be
-> running in [scripted mode](../specs/scripted-mode.md); a default server
+> running in [scripted mode](../knowledge/simulation/scripted-mode.md); a default server
 > returns simulated text.
 
 ### Anthropic SDK
@@ -140,7 +140,7 @@ cargo run -- serve --config examples/scripted_demo/scripted_demo.toml
 uv run examples/scripted_demo/scripted_demo.py
 ```
 
-See [`specs/scripted-mode.md`](../specs/scripted-mode.md) for the full
+See [`knowledge/simulation/scripted-mode.md`](../knowledge/simulation/scripted-mode.md) for the full
 script JSON format.
 
 ## TypeScript Examples
@@ -179,7 +179,7 @@ npx tsx vercel_ai_client.ts
 ```
 
 > `generateObject` and tool calling require the server to be running in
-> [scripted mode](../specs/scripted-mode.md); a default server returns
+> [scripted mode](../knowledge/simulation/scripted-mode.md); a default server returns
 > simulated text.
 
 ### Anthropic SDK

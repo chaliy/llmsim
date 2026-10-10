@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   …) with dated-snapshot and `-latest` aliases, the Anthropic SSE event
   sequence, the Anthropic error envelope, scripted `tool_use` support, and a
   `messages_requests` stat counter. New examples for Python, TypeScript, Go,
-  curl, and LangChain. See `specs/anthropic-api.md`.
+  curl, and LangChain. See `knowledge/apis/anthropic-api.md`.
 - **New models**: GPT-5.6 (Sol/Terra/Luna), GPT-6 Astra/Sol/Luna, GPT-6.1 Sol,
   gpt-image-2, Claude Opus 5 / 5.5, Sonnet 5 / 5.5, Haiku 5.5, Fable 5.1,
   Gemini 3.5 Flash / Flash Lite and 3.6 / 3.7 / 3.8 Flash, DeepSeek V4 Pro and
@@ -87,7 +87,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Scripted response mode** for agent scenario tests — replay an ordered
   list of assistant turns (text, tool calls, mixed, errors) with a
-  configurable `on_exhausted` policy. See `specs/scripted-mode.md`.
+  configurable `on_exhausted` policy. See `knowledge/simulation/scripted-mode.md`.
 - CLI now honors `LLMSIM_HOST` and preserves the host configured in the
   config file when not overridden on the command line.
 - Hardening across the streaming and WebSocket paths: stats callback

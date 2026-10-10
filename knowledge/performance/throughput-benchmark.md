@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Throughput Benchmark Specification"
+description: "Peak requests-per-second benchmark and how throughput scales with parallelism."
+tags:
+  - llmsim
+  - performance
+---
 # Throughput Benchmark Specification
 
 ## Abstract
@@ -6,7 +14,7 @@ This specification defines a dedicated **throughput benchmark** that measures th
 peak sustained request rate llmsim can serve, and how that rate scales with
 parallelism (CPU cores / async worker threads).
 
-It is distinct from the general load-testing framework (`specs/load-testing.md`),
+It is distinct from the general load-testing framework ([load-testing](load-testing.md)),
 which validates behavior under realistic, latency-shaped traffic using k6. The
 throughput benchmark deliberately strips away simulated latency and large
 payloads so the number it reports reflects llmsim's own request-handling
@@ -31,7 +39,7 @@ runtime.
 
 ## Tool Selection: oha (not k6)
 
-The general load-testing framework uses **k6** (`specs/load-testing.md`) and that
+The general load-testing framework uses **k6** ([load-testing](load-testing.md)) and that
 remains the reference tool for scenario-based, latency-shaped tests. The
 throughput benchmark instead uses **[`oha`](https://github.com/hatoo/oha)**, and
 the distinction is deliberate:
@@ -46,7 +54,7 @@ the distinction is deliberate:
   per-request overhead is near zero, so the measured rate reflects the server.
 - For latency-shaped load tests the generator is mostly idle (waiting on
   simulated TTFT), so k6's overhead is irrelevant there — hence k6 stays for
-  `specs/load-testing.md` and oha is scoped to throughput only.
+  [load-testing](load-testing.md) and oha is scoped to throughput only.
 
 `oha` is MIT-licensed (permissive, compatible with this repo's dependency
 policy).
@@ -178,7 +186,7 @@ conventions, e.g.:
 ./benchmarks/run-benchmark.sh throughput --concurrency 16,64,256  # override -c steps
 ```
 
-It MUST follow the existing runner contract from `specs/load-testing.md`:
+It MUST follow the existing runner contract from [load-testing](load-testing.md):
 auto-build (`cargo build --release`), start/stop the server, `--no-server` to
 target an existing server, `--output` for JSON, graceful cleanup on exit, and a
 clear failure with install guidance if `oha` is not installed

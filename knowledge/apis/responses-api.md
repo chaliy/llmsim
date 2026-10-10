@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "OpenAI Responses API Specification"
+description: "Simulation of the OpenAI Responses and OpenResponses APIs, including streaming and WebSocket transport."
+tags:
+  - llmsim
+  - apis
+---
 # OpenAI Responses API Specification
 
 ## Abstract

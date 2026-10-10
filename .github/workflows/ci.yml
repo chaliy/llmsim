@@ -153,6 +153,23 @@ jobs:
         env:
           RUSTDOCFLAGS: "-D warnings"
 
+  knowledge:
+    name: Knowledge Bundle (OKF v0.2)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Install okf-lint
+        run: cargo install okf-lint --version 0.1.1 --locked
+
+      - name: Check knowledge bundle
+        run: |
+          ./scripts/test-knowledge-okf.sh
+          okf-lint knowledge --max-line-length 10000
+
   build:
     name: Build
     runs-on: ${{ matrix.os }}

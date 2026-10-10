@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "LLMSim Architecture"
+description: "Crate layout, module organization, request flow, and model profiles."
+tags:
+  - llmsim
+  - foundations
+---
 # LLMSim Architecture
 
 ## Project Structure
@@ -172,7 +180,7 @@ supported through configuration knobs (env vars, CLI flags, `config.toml`).
 ## API Endpoints
 
 Provider-specific endpoints mirror their original API paths, prefixed with the provider name.
-See `specs/api-endpoints.md` for the full specification.
+See [api-endpoints](api-endpoints.md) for the full specification.
 
 ### OpenAI Chat Completions API
 - `POST /openai/v1/chat/completions` - Create a chat completion
@@ -184,13 +192,13 @@ See `specs/api-endpoints.md` for the full specification.
 ### OpenAI Responses API
 - `POST /openai/v1/responses` - Create a response (streaming and non-streaming)
 
-See `specs/responses-api.md` for detailed Responses API specification.
+See [responses-api](../apis/responses-api.md) for detailed Responses API specification.
 
 ### OpenAI Image Generation API
 - `POST /openai/v1/images/generations` - Generate images (streaming and non-streaming)
 
 Simulates the gpt-image family ("ChatGPT Images"), returning a synthetic
-watermarked PNG of the requested size. See `specs/image-generation.md` for the
+watermarked PNG of the requested size. See [image-generation](../apis/image-generation.md) for the
 detailed specification.
 
 ### Anthropic Messages API
@@ -198,7 +206,7 @@ detailed specification.
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:model_id` - Get model details
 
-See `specs/anthropic-api.md` for detailed Anthropic API specification.
+See [anthropic-api](../apis/anthropic-api.md) for detailed Anthropic API specification.
 
 ### Module Organization
 

@@ -95,4 +95,4 @@ headers to help debug a run.
 Attempt counts for `fail_first` and cuts are kept per server process, so a
 retry that lands on a different llmsim instance may see the error again.
 
-The full specification is in `specs/scenarios.md`.
+The full specification is in `knowledge/simulation/scenarios.md`.

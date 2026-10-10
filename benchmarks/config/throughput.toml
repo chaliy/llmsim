@@ -1,7 +1,7 @@
 # llmsim throughput benchmark configuration
 #
 # Purpose: measure llmsim's own request-handling ceiling (peak req/s), NOT the
-# latency it can simulate. See specs/throughput-benchmark.md.
+# latency it can simulate. See knowledge/performance/throughput-benchmark.md.
 #
 # Decisions encoded here (R1 of the spec):
 # - latency profile `instant` (0ms TTFT / 0ms inter-token) so the measured rate

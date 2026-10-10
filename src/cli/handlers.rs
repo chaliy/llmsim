@@ -79,7 +79,7 @@ pub(crate) fn generate_responses_result(
 
     // Scripted mode: take the next turn and reduce it to a text body.
     // (Tool calls in streaming Responses API aren't implemented in v1;
-    // see specs/scripted-mode.md.)
+    // see knowledge/simulation/scripted-mode.md.)
     let content = if let Some(script) = state.script.as_ref() {
         match script.next_turn() {
             ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,
@@ -798,7 +798,7 @@ pub async fn create_openresponses_response(
     // Scripted mode short-circuits to use the next scripted turn's text.
     // Error turns are surfaced as HTTP errors here (works for both
     // streaming and non-streaming); tool-call turns are not yet
-    // represented in OpenResponses output items (see specs/scripted-mode.md).
+    // represented in OpenResponses output items (see knowledge/simulation/scripted-mode.md).
     let content = if let Some(script) = state.script.as_ref() {
         match script.next_turn() {
             ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,

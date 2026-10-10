@@ -14,6 +14,22 @@ check:
 fmt:
     cargo fmt --all
 
+# Validate the canonical knowledge/ OKF v0.2 bundle. The upstream linter is
+# optional locally and pinned in CI; install it with `just install-okf-lint`.
+check-okf:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ./scripts/test-knowledge-okf.sh
+    if command -v okf-lint >/dev/null; then
+        okf-lint knowledge --max-line-length 10000
+    else
+        echo "okf-lint not installed — skipping upstream check"
+    fi
+
+# Install the upstream OKF v0.2 linter version used by CI.
+install-okf-lint:
+    cargo install okf-lint --version 0.1.1 --locked
+
 # Run the server locally
 run *ARGS:
     cargo run -- {{ARGS}}

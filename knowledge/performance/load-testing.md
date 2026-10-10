@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Load Testing Specification"
+description: "k6 load and stress testing profiles, metrics, and success thresholds for llmsim."
+tags:
+  - llmsim
+  - performance
+---
 # Load Testing Specification
 
 ## Abstract

@@ -83,7 +83,7 @@ export K6_TARGET_URL="https://llmsim.example.com"
 The `throughput` profile measures llmsim's own request-handling ceiling and how
 it scales with async worker threads. It uses [`oha`](https://github.com/hatoo/oha)
 (Rust) instead of k6, because it saturates the server and needs a load generator
-with near-zero per-request overhead. See `specs/throughput-benchmark.md`.
+with near-zero per-request overhead. See `knowledge/performance/throughput-benchmark.md`.
 
 ```bash
 # Install oha (the throughput generator)
@@ -196,5 +196,5 @@ Install k6 following the instructions at https://k6.io/docs/get-started/installa
 
 ## See Also
 
-- [Load Testing Specification](../specs/load-testing.md)
+- [Load Testing Specification](../knowledge/performance/load-testing.md)
 - [k6 Documentation](https://k6.io/docs/)

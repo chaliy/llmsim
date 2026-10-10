@@ -100,7 +100,7 @@ while [[ $# -gt 0 ]]; do
         throughput)
             # Throughput ceiling benchmark with parallelisation sweep.
             # Delegated to a dedicated runner (uses oha, not k6). All remaining
-            # args are forwarded. See specs/throughput-benchmark.md.
+            # args are forwarded. See knowledge/performance/throughput-benchmark.md.
             shift
             exec "$SCRIPT_DIR/throughput.sh" "$@"
             ;;

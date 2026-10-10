@@ -1,3 +1,11 @@
+---
+type: Specification
+title: "Release Process"
+description: "Release workflow, versioning, and CI automation for publishing llmsim."
+tags:
+  - llmsim
+  - project
+---
 # Release Process
 
 ## Abstract
