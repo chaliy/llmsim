@@ -51,6 +51,8 @@ pub mod latency;
 pub mod openai;
 pub mod openresponses;
 pub mod responses_stream;
+pub mod scenario;
+pub mod scenario_stream;
 pub mod script;
 pub mod script_stream;
 pub mod stats;
@@ -76,6 +78,10 @@ pub use generator::{
 };
 pub use latency::LatencyProfile;
 pub use responses_stream::{ResponsesTokenStream, ResponsesTokenStreamBuilder};
+pub use scenario::{
+    resolve, AttemptOutcome, AttemptTracker, ConversationMessage, MessageRole, Resolution,
+    ResolveError, Scenario, ScenarioLoadError, ScenarioSet, StepError, ToolSpec,
+};
 pub use script::{
     OnExhausted, Script, ScriptError, ScriptSpec, ScriptedResponse, SimError, SimToolCall, SimTurn,
 };

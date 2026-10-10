@@ -12,6 +12,7 @@ pub use config::{Config, ConfigError};
 pub use state::AppState;
 pub use ws_handler::ws_responses;
 
+use crate::scenario::ScenarioSet;
 use crate::script::Script;
 use crate::stats::{new_shared_stats, SharedStats};
 use axum::{
@@ -116,6 +117,22 @@ pub async fn run_server_with_stats(
             script.on_exhausted()
         );
         state = state.with_script(Arc::new(script));
+    }
+    if let Some(path) = state.config.response.scenarios_path.clone() {
+        let scenarios =
+            ScenarioSet::from_path(&path).map_err(|e| -> Box<dyn std::error::Error> {
+                Box::new(std::io::Error::other(format!(
+                    "Failed to load scenarios from {}: {}",
+                    path, e
+                )))
+            })?;
+        tracing::info!(
+            "Scenarios enabled: {} from {} ({})",
+            scenarios.len(),
+            path,
+            scenarios.names().join(", ")
+        );
+        state = state.with_scenarios(Arc::new(scenarios));
     }
     let app = build_router(Arc::new(state));
 

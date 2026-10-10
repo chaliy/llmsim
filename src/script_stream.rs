@@ -130,64 +130,9 @@ impl ScriptedChatStream {
                     sleep(tbt).await;
                 }
 
-                // Announce.
-                let announce = ChatCompletionChunk {
-                    id: id.clone(),
-                    object: "chat.completion.chunk".to_string(),
-                    created,
-                    model: model.clone(),
-                    system_fingerprint: Some("fp_llmsim".to_string()),
-                    usage: None,
-                    choices: vec![ChunkChoice {
-                        index: 0,
-                        delta: ChunkDelta {
-                            role: None,
-                            content: None,
-                            tool_calls: Some(vec![ChunkToolCall {
-                                index: index as u32,
-                                id: call.id.clone(),
-                                call_type: Some("function".to_string()),
-                                function: Some(ChunkFunctionCall {
-                                    name: Some(call.name.clone()),
-                                    arguments: Some(String::new()),
-                                }),
-                            }]),
-                        },
-                        finish_reason: None,
-                        logprobs: None,
-                    }],
-                };
+                let (announce, args_chunk) =
+                    tool_call_chunks(&id, &model, created, index, call);
                 yield format_sse(&announce);
-
-                // Arguments delta (single chunk).
-                let args_str = serde_json::to_string(&call.arguments)
-                    .unwrap_or_else(|_| "{}".to_string());
-                let args_chunk = ChatCompletionChunk {
-                    id: id.clone(),
-                    object: "chat.completion.chunk".to_string(),
-                    created,
-                    model: model.clone(),
-                    system_fingerprint: Some("fp_llmsim".to_string()),
-                    usage: None,
-                    choices: vec![ChunkChoice {
-                        index: 0,
-                        delta: ChunkDelta {
-                            role: None,
-                            content: None,
-                            tool_calls: Some(vec![ChunkToolCall {
-                                index: index as u32,
-                                id: None,
-                                call_type: None,
-                                function: Some(ChunkFunctionCall {
-                                    name: None,
-                                    arguments: Some(args_str),
-                                }),
-                            }]),
-                        },
-                        finish_reason: None,
-                        logprobs: None,
-                    }],
-                };
                 yield format_sse(&args_chunk);
             }
 
@@ -209,7 +154,57 @@ impl ScriptedChatStream {
     }
 }
 
-fn format_sse(chunk: &ChatCompletionChunk) -> String {
+/// The two chunks that stream one tool call: an "announce" with name, id and
+/// empty arguments, then a single chunk carrying the full arguments JSON.
+pub(crate) fn tool_call_chunks(
+    id: &str,
+    model: &str,
+    created: i64,
+    index: usize,
+    call: &SimToolCall,
+) -> (ChatCompletionChunk, ChatCompletionChunk) {
+    let chunk = |tool_call: ChunkToolCall| ChatCompletionChunk {
+        id: id.to_string(),
+        object: "chat.completion.chunk".to_string(),
+        created,
+        model: model.to_string(),
+        system_fingerprint: Some("fp_llmsim".to_string()),
+        usage: None,
+        choices: vec![ChunkChoice {
+            index: 0,
+            delta: ChunkDelta {
+                role: None,
+                content: None,
+                tool_calls: Some(vec![tool_call]),
+            },
+            finish_reason: None,
+            logprobs: None,
+        }],
+    };
+    let announce = chunk(ChunkToolCall {
+        index: index as u32,
+        id: call.id.clone(),
+        call_type: Some("function".to_string()),
+        function: Some(ChunkFunctionCall {
+            name: Some(call.name.clone()),
+            arguments: Some(String::new()),
+        }),
+    });
+    let args = chunk(ChunkToolCall {
+        index: index as u32,
+        id: None,
+        call_type: None,
+        function: Some(ChunkFunctionCall {
+            name: None,
+            arguments: Some(
+                serde_json::to_string(&call.arguments).unwrap_or_else(|_| "{}".to_string()),
+            ),
+        }),
+    });
+    (announce, args)
+}
+
+pub(crate) fn format_sse(chunk: &ChatCompletionChunk) -> String {
     let json = serde_json::to_string(chunk).unwrap_or_else(|_| "{}".to_string());
     format!("data: {}\n\n", json)
 }

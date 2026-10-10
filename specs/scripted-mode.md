@@ -165,6 +165,10 @@ let script = Script::from_file("/path/to/script.json")?;
 
 Wire into an `AppState` via `AppState::with_script(Arc::new(script))`.
 
+For many concurrent sessions (load tests), use scenarios instead
+(`specs/scenarios.md`): the step is derived from each request's own history,
+so sessions, retries and restarts do not interfere.
+
 ## Non-goals
 
 - No request-side matching (no `SimMatcher`). v1 advances strictly on

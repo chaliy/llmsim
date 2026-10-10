@@ -148,6 +148,12 @@ pub struct ResponseConfig {
     /// `generator`. See `specs/scripted-mode.md`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub script_path: Option<String>,
+    /// Optional path to a scenario JSON file or a directory of them. Requests
+    /// whose last user message carries `[[llmsim:<name>]]` (or whose model is
+    /// `llmsim-scenario-<name>`) play that scenario; other requests keep the
+    /// script / generator behaviour. See `specs/scenarios.md`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scenarios_path: Option<String>,
 }
 
 fn default_generator() -> String {
@@ -164,6 +170,7 @@ impl Default for ResponseConfig {
             generator: default_generator(),
             target_tokens: default_target_tokens(),
             script_path: None,
+            scenarios_path: None,
         }
     }
 }

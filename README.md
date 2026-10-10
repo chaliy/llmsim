@@ -199,6 +199,9 @@ profile = "gpt5"
 [response]
 generator = "lorem"
 target_tokens = 100
+# Named load-test scenarios, picked per message with [[llmsim:<name>]]
+# (see docs/scenarios.md):
+# scenarios_path = "examples/scenarios"
 
 [errors]
 rate_limit_rate = 0.01
@@ -251,7 +254,7 @@ available = [
 
 ## Use Cases
 
-- **Load Testing** - Simulate thousands of concurrent LLM requests
+- **Load Testing** - Simulate thousands of concurrent LLM requests, replaying realistic agent conversations with [scenarios](docs/scenarios.md)
 - **CI/CD Pipelines** - Fast, deterministic tests for LLM integrations
 - **Local Development** - Develop without API keys or costs
 - **Chaos Engineering** - Test behavior under failure scenarios
