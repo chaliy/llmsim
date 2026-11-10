@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Python and Node.js/TypeScript packages**: `pip install llmsim` and
+  `npm install llmsim` start the simulator inside the test process on a free
+  port (`Server`), with provider base URLs, config from TOML/dicts/options,
+  and live stats. Native wheels and addons for Linux, macOS and Windows.
+- `llmsim::cli::start_server` returns a `ServerHandle` (bound address, stats,
+  graceful shutdown) for embedding the server; `Config::merged_with_json`
+  deep-merges JSON overrides.
+
 ## [0.6.0] - 2026-10-10
 
 ### Highlights

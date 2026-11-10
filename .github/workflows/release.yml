@@ -106,6 +106,17 @@ jobs:
 
           echo "Created release v${{ steps.version.outputs.version }}"
 
+      # Release events created with GITHUB_TOKEN do not trigger workflows, but
+      # workflow_dispatch does. Build and publish the Python and npm packages
+      # from the new tag.
+      - name: Trigger Python and npm publish workflows
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          gh workflow run publish-python.yml --ref "$TAG"
+          gh workflow run publish-js.yml --ref "$TAG"
+
   # Publish to crates.io by calling the publish workflow directly.
   # GitHub Actions events created by GITHUB_TOKEN do not trigger other workflows,
   # so the release event from the job above won't trigger publish.yml on its own.

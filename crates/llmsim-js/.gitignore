@@ -1,0 +1,7 @@
+node_modules/
+*.node
+index.cjs
+index.d.cts
+wrapper.js
+wrapper.d.ts
+*.tgz

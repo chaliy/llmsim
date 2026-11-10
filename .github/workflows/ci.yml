@@ -72,7 +72,8 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Run clippy
-        run: cargo clippy --all-targets -- -D warnings
+        # --workspace also lints the Python and Node binding crates.
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   test:
     name: Test

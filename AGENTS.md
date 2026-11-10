@@ -135,6 +135,8 @@ See `knowledge/foundations/api-endpoints.md` for the full specification.
 - `src/typesafe/` - TypeSafe System One API types, validation, Jev models, and answer synthesis
 - `src/cli/` - CLI server, configuration, and HTTP handlers
 - `src/tui/` - Terminal UI components
+- `crates/llmsim-python/` - Python package (PyO3 + maturin), PyPI `llmsim`
+- `crates/llmsim-js/` - Node/TypeScript package (NAPI-RS), npm `llmsim`
 - `tests/` - Integration tests
 - `examples/` - Usage examples (Rust, Python, TypeScript, Go); `examples/scenarios/` holds the starter scenario library
 - `knowledge/` - OKF knowledge bundle (feature specifications and design intent)
@@ -147,6 +149,7 @@ See `knowledge/foundations/api-endpoints.md` for the full specification.
 - CI is implemented using GitHub Actions
 - Runs on push to main and pull requests
 - Jobs: check, fmt, clippy, test, audit, deny, doc, knowledge (OKF), build (multi-platform), examples
+- `bindings.yml`: Python (maturin build + pytest) and Node (napi build + `node --test`) packages, plus the package.json/Cargo version check
 - **Never merge a PR when CI is not green.** Wait for all checks to pass before merging.
 
 ### Pre-PR checklist
@@ -243,5 +246,5 @@ Use the [`/ship`](.claude/commands/ship.md) command to execute the full shipping
 
 ## Testing the system
 
-Run `cargo test` for unit and integration tests. For load testing, see the `benchmarks/` folder and the `/load-test` skill.
+Run `cargo test` for unit and integration tests. Bindings: `just test-python` and `just test-js` (see `knowledge/foundations/language-bindings.md`). The repo is a Cargo workspace whose default member is the core crate, so plain `cargo` commands ignore the binding crates; use `--workspace` for clippy. For load testing, see the `benchmarks/` folder and the `/load-test` skill.
 

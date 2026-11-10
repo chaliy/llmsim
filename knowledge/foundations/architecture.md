@@ -10,7 +10,9 @@ tags:
 
 ## Project Structure
 
-LLMSim is organized as a single Rust crate with both library and binary targets:
+LLMSim's core is a Rust crate with both library and binary targets. The repo is a
+Cargo workspace: the Python and Node packages live in `crates/` (see
+[Python and Node Bindings](language-bindings.md)).
 
 ```
 llmsim/
@@ -20,6 +22,7 @@ llmsim/
 │   ├── main.rs         # Binary entry point (CLI)
 │   ├── cli/            # CLI-specific modules
 │   │   ├── mod.rs      # Server runner
+│   │   ├── server.rs   # Embeddable start_server / ServerHandle
 │   │   ├── config.rs   # Configuration loading
 │   │   ├── handlers.rs # HTTP request handlers (OpenAI + OpenResponses)
 │   │   ├── anthropic_handlers.rs # Anthropic Messages + Models handlers

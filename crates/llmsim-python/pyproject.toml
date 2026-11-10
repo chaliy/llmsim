@@ -1,0 +1,56 @@
+[build-system]
+requires = ["maturin>=1.4,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "llmsim"
+dynamic = ["version"]
+description = "In-process LLM API simulator (OpenAI, Anthropic, OpenResponses) for tests and load testing"
+readme = "README.md"
+authors = [{ name = "Mykhailo Chalyi", email = "mike@chaliy.name" }]
+license = { text = "MIT" }
+requires-python = ">=3.9"
+keywords = ["llm", "openai", "anthropic", "simulator", "mock", "testing"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Rust",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Testing :: Mocking",
+]
+
+[project.urls]
+Homepage = "https://github.com/chaliy/llmsim"
+Repository = "https://github.com/chaliy/llmsim"
+Issues = "https://github.com/chaliy/llmsim/issues"
+Changelog = "https://github.com/chaliy/llmsim/blob/main/CHANGELOG.md"
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0", "pytest-timeout>=2.2", "openai>=1.0", "anthropic>=0.40"]
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+features = ["pyo3/extension-module"]
+python-source = "."
+module-name = "llmsim._llmsim"
+
+[tool.ruff]
+target-version = "py39"
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["llmsim"]
+
+[tool.pytest.ini_options]
+timeout = 60

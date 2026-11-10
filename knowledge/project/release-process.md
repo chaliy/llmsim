@@ -60,8 +60,11 @@ When asked to create a release, the agent:
    - End section with `**Full Changelog**` link
    - Update comparison links at bottom of file
 
-3. **Update Cargo.toml**
-   - Set `version = "X.Y.Z"`
+3. **Update versions**
+   - `Cargo.toml`: set `version = "X.Y.Z"` under `[workspace.package]`
+     (crates.io, PyPI and npm share it)
+   - `crates/llmsim-js/package.json`: set `"version": "X.Y.Z"` (CI fails if it
+     differs), then `npm install --package-lock-only` in that directory
 
 4. **Run verification**
    - `just release-check` (runs fmt, clippy, test, and dry-run publish)
@@ -83,11 +86,34 @@ When asked to create a release, the agent:
 - Creates GitHub Release with tag `vX.Y.Z`
 - Also supports `workflow_dispatch` for manual re-runs (reads version from Cargo.toml)
 
+**Python and npm packages** (dispatched by release.yml from the new tag;
+release events created with `GITHUB_TOKEN` do not trigger workflows, but
+`workflow_dispatch` does):
+- `publish-python.yml` builds abi3 wheels (Linux glibc/musl, macOS, Windows)
+  and an sdist, tests the wheels on Python 3.9 and 3.13, and publishes PyPI
+  `llmsim` via trusted publishing.
+- `publish-js.yml` builds the NAPI addon for five targets, tests them, and
+  publishes one npm package `llmsim` with all binaries, with provenance.
+- Both refuse to run from anything but a `vX.Y.Z` tag that matches the
+  versions in the repo. Re-run either manually from the tag if it fails.
+
 **On GitHub Release created** (publish.yml):
 - Verifies release tag matches Cargo.toml version
 - Runs verification (fmt, clippy, tests)
 - Runs `cargo publish --dry-run` before actual publish
 - Publishes to crates.io
+
+### Registry setup (one time)
+
+- **PyPI**: add a pending trusted publisher on pypi.org for project
+  `llmsim`: owner `chaliy`, repository `llmsim`, workflow
+  `publish-python.yml`, no environment.
+- **npm**: npm offers trusted publishing only for an existing package. For
+  the first release, set an `NPM_TOKEN` repository secret (granular token
+  with publish rights); `publish-js.yml` uses it when present. Then on
+  npmjs.com, `llmsim` > Settings > Trusted publisher: GitHub Actions, owner
+  `chaliy`, repository `llmsim`, workflow `publish-js.yml`, and delete the
+  secret.
 
 ## Pre-Release Checklist
 

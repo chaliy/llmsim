@@ -1,0 +1,145 @@
+# CI for the Python (PyO3/maturin) and Node (NAPI-RS) packages in crates/.
+# Release builds for every platform live in publish-python.yml / publish-js.yml.
+
+name: Bindings
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  versions:
+    name: Package versions match Cargo
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check package.json version
+        run: |
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          PKG_VERSION=$(node -p "require('./crates/llmsim-js/package.json').version")
+          if [ "$CARGO_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::crates/llmsim-js/package.json version ($PKG_VERSION) != Cargo.toml ($CARGO_VERSION)"
+            exit 1
+          fi
+          echo "Versions match: $CARGO_VERSION"
+
+  python:
+    name: Python ${{ matrix.python-version }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            python-version: "3.9"
+          - os: ubuntu-24.04
+            python-version: "3.13"
+          - os: macos-latest
+            python-version: "3.13"
+          - os: windows-latest
+            python-version: "3.13"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-bindings-py-${{ hashFiles('**/Cargo.toml') }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Lint
+        if: matrix.python-version == '3.13' && runner.os == 'Linux'
+        working-directory: crates/llmsim-python
+        run: |
+          pip install ruff
+          ruff check .
+          ruff format --check .
+
+      - name: Build and install wheel
+        shell: bash
+        working-directory: crates/llmsim-python
+        run: |
+          python -m venv .venv
+          if [ "$RUNNER_OS" = "Windows" ]; then . .venv/Scripts/activate; else . .venv/bin/activate; fi
+          pip install maturin
+          maturin build --out dist
+          pip install --find-links dist llmsim
+          pip install pytest pytest-timeout openai anthropic
+
+      - name: Test
+        shell: bash
+        working-directory: crates/llmsim-python
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then . .venv/Scripts/activate; else . .venv/bin/activate; fi
+          # Run from tests/ so `import llmsim` resolves to the installed wheel,
+          # not the source directory (which has no native module).
+          cd tests && pytest -v .
+
+  node:
+    name: Node ${{ matrix.node }} (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            node: "20"
+          - os: ubuntu-latest
+            node: "22"
+          - os: ubuntu-latest
+            node: "24"
+          - os: macos-latest
+            node: "22"
+          - os: windows-latest
+            node: "22"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-bindings-js-${{ hashFiles('**/Cargo.toml') }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install dependencies
+        working-directory: crates/llmsim-js
+        run: npm ci
+
+      - name: Build (debug)
+        working-directory: crates/llmsim-js
+        run: npm run build:debug
+
+      - name: Test
+        shell: bash
+        working-directory: crates/llmsim-js
+        run: node --test __test__/*.test.mjs
+
+      - name: Pack dry run
+        if: runner.os == 'Linux' && matrix.node == '22'
+        working-directory: crates/llmsim-js
+        run: npm pack --dry-run

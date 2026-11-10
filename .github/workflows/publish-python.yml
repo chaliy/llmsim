@@ -1,0 +1,130 @@
+# Build llmsim wheels for every major platform and publish to PyPI as `llmsim`.
+# Dispatched by release.yml for each release tag (release events created with
+# GITHUB_TOKEN do not trigger workflows), or run manually from a release tag.
+#
+# Auth: PyPI trusted publishing (OIDC), no token. One-time setup on pypi.org:
+#   Publishing > Add a new pending publisher: project `llmsim`, owner `chaliy`,
+#   repository `llmsim`, workflow `publish-python.yml`, environment (blank).
+#
+# abi3: one cp39-abi3 wheel per platform covers Python 3.9+.
+
+name: Publish Python
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  verify:
+    name: Verify release tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match Cargo.toml version
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::run this workflow from a release tag (vX.Y.Z); got $GITHUB_REF"
+            exit 1
+          fi
+          TAG_VERSION="${BASH_REMATCH[1]}"
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ]; then
+            echo "::error::tag $TAG_VERSION != Cargo.toml $CARGO_VERSION"
+            exit 1
+          fi
+
+  sdist:
+    name: Build sdist
+    needs: verify
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: PyO3/maturin-action@v1
+        with:
+          command: sdist
+          args: --out dist
+          working-directory: crates/llmsim-python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-sdist
+          path: crates/llmsim-python/dist
+
+  wheels:
+    name: Wheel ${{ matrix.os }} ${{ matrix.target }} ${{ matrix.manylinux || '' }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, target: x86_64, runs-on: ubuntu-latest }
+          - { os: linux, target: aarch64, runs-on: ubuntu-24.04-arm }
+          - { os: linux, target: x86_64, manylinux: musllinux_1_2, runs-on: ubuntu-latest }
+          - { os: linux, target: aarch64, manylinux: musllinux_1_2, runs-on: ubuntu-24.04-arm }
+          - { os: macos, target: x86_64, runs-on: macos-latest }
+          - { os: macos, target: aarch64, runs-on: macos-latest }
+          - { os: windows, target: x64, runs-on: windows-latest }
+    runs-on: ${{ matrix.runs-on }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: PyO3/maturin-action@v1
+        with:
+          target: ${{ matrix.target }}
+          manylinux: ${{ matrix.manylinux || 'auto' }}
+          args: --release --out dist -i 3.12
+          working-directory: crates/llmsim-python
+      - uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-${{ matrix.target }}-${{ matrix.manylinux || 'gnu' }}
+          path: crates/llmsim-python/dist
+
+  test-wheels:
+    name: Test wheel ${{ matrix.os }} py${{ matrix.python-version }}
+    needs: wheels
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, macos-latest, windows-latest]
+        python-version: ["3.9", "3.13"]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - name: Install wheel and run tests
+        shell: bash
+        run: |
+          pip install llmsim --no-index --find-links dist
+          pip install pytest pytest-timeout openai anthropic
+          cd crates/llmsim-python/tests && pytest -v .
+
+  publish:
+    name: Publish to PyPI
+    needs: [sdist, wheels, test-wheels]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          merge-multiple: true
+          path: dist
+      - run: ls -lh dist
+      - uses: astral-sh/setup-uv@v6
+      - run: uvx twine check dist/*
+      - name: Publish
+        run: uv publish --trusted-publishing always dist/*

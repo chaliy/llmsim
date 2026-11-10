@@ -1,0 +1,23 @@
+# llmsim Python package: PyO3 extension that embeds the llmsim HTTP server.
+# Built with maturin (see pyproject.toml); published to PyPI as `llmsim`.
+
+[package]
+name = "llmsim-python"
+description = "Python bindings for the llmsim LLM API simulator"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+name = "_llmsim"
+doc = false
+
+[dependencies]
+llmsim = { path = "../..", default-features = false, features = ["server"] }
+# abi3-py39: one cp39-abi3 wheel per platform covers Python 3.9+.
+pyo3 = { version = "0.30", features = ["extension-module", "abi3-py39", "generate-import-lib"] }
+serde_json = "1.0"
+tokio = { version = "1.52", features = ["rt-multi-thread", "time"] }

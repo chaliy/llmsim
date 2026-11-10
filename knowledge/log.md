@@ -1,5 +1,11 @@
 # LLMSim Knowledge Update Log
 
+## 2026-11-10
+
+* **Added Python and Node bindings.** New [Python and Node Bindings](foundations/language-bindings.md)
+  spec: PyPI and npm packages named `llmsim` embed the server in-process. The repo became a
+  Cargo workspace; [Release Process](project/release-process.md) now publishes PyPI and npm.
+
 ## 2026-10-10
 
 * **Added TypeSafe System One.** New [TypeSafe System One API Specification](apis/typesafe-api.md)
