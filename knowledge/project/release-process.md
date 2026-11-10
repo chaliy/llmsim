@@ -96,6 +96,9 @@ release events created with `GITHUB_TOKEN` do not trigger workflows, but
   publishes one npm package `llmsim` with all binaries, with provenance.
 - Both refuse to run from anything but a `vX.Y.Z` tag that matches the
   versions in the repo. Re-run either manually from the tag if it fails.
+  If the failure is in `publish-js.yml` itself, fix it on main and dispatch it
+  from main with the `tag` input (e.g. `v0.7.0`): the tag's source is built
+  with main's workflow, so no new version is needed.
 
 **On GitHub Release created** (publish.yml):
 - Verifies release tag matches Cargo.toml version

@@ -14,6 +14,11 @@ name: Publish JS
 
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Re-publish an existing release tag (e.g. v0.7.0) using this ref's workflow; empty uses the selected tag ref"
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -26,14 +31,32 @@ jobs:
   verify:
     name: Verify release tag
     runs-on: ubuntu-latest
+    outputs:
+      ref: ${{ steps.tag.outputs.ref }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Tag must match Cargo.toml and package.json versions
+      # A `tag` input re-publishes that tag's source with this ref's workflow,
+      # so a workflow bug found at release time can be fixed on main without
+      # cutting a new version. The source must still be a vX.Y.Z tag.
+      - name: Resolve tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
         run: |
-          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
-            echo "::error::run this workflow from a release tag (vX.Y.Z); got $GITHUB_REF"
+          REF="${INPUT_TAG:+refs/tags/$INPUT_TAG}"
+          REF="${REF:-$GITHUB_REF}"
+          if [[ ! "$REF" =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::publish needs a release tag (vX.Y.Z); got $REF"
             exit 1
           fi
+          echo "ref=$REF" >> "$GITHUB_OUTPUT"
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.tag.outputs.ref }}
+      - name: Tag must match Cargo.toml and package.json versions
+        env:
+          REF: ${{ steps.tag.outputs.ref }}
+        run: |
+          [[ "$REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]
           TAG_VERSION="${BASH_REMATCH[1]}"
           CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
           PKG_VERSION=$(node -p "require('./crates/llmsim-js/package.json').version")
@@ -57,13 +80,19 @@ jobs:
     runs-on: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
-        with:
-          targets: ${{ matrix.target }}
+      # rust-toolchain.toml pins channel "1.99", a different rustup toolchain
+      # name than the action's "1.99.0", so add the target from the repo root
+      # where the pin applies (cross targets such as x86_64-apple-darwin on
+      # arm64 runners otherwise fail with "can't find crate for core").
+      - name: Add Rust target for the pinned toolchain
+        run: rustup target add ${{ matrix.target }}
       - name: Install dependencies
         working-directory: crates/llmsim-js
         run: npm ci
@@ -92,7 +121,7 @@ jobs:
 
   test:
     name: Test ${{ matrix.target }} node@${{ matrix.node }}
-    needs: build
+    needs: [verify, build]
     strategy:
       fail-fast: false
       matrix:
@@ -105,6 +134,8 @@ jobs:
     runs-on: ${{ matrix.host }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node }}
@@ -133,6 +164,8 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.verify.outputs.ref }}
       - uses: actions/setup-node@v4
         with:
           node-version: "24"
