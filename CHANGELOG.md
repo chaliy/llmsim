@@ -7,15 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
+## [0.7.0] - 2026-11-10
 
-- **Python and Node.js/TypeScript packages**: `pip install llmsim` and
-  `npm install llmsim` start the simulator inside the test process on a free
-  port (`Server`), with provider base URLs, config from TOML/dicts/options,
-  and live stats. Native wheels and addons for Linux, macOS and Windows.
-- `llmsim::cli::start_server` returns a `ServerHandle` (bound address, stats,
-  graceful shutdown) for embedding the server; `Config::merged_with_json`
-  deep-merges JSON overrides.
+### Highlights
+
+- **Python package**: `pip install llmsim` starts the simulator inside the
+  test process on a free port. `Server` is a sync and async context manager
+  with OpenAI, Anthropic and OpenResponses base URLs, config from TOML,
+  dicts or keywords, and live stats. abi3 wheels for Python 3.9+ on Linux
+  (glibc, musl), macOS and Windows.
+- **Node.js / TypeScript package**: `npm install llmsim` gives the same
+  `Server` with Promise-based start/stop, `Symbol.asyncDispose`, and bundled
+  type definitions. Prebuilt addons for Linux, macOS and Windows.
+- **Embeddable server in Rust**: `llmsim::cli::start_server` returns a
+  `ServerHandle` (bound address, stats, graceful shutdown), and
+  `Config::merged_with_json` deep-merges JSON overrides.
+
+### What's Changed
+
+* feat(bindings): add Python and Node/TypeScript packages ([#86](https://github.com/chaliy/llmsim/pull/86)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.6.0...v0.7.0
 
 ## [0.6.0] - 2026-10-10
 
@@ -261,7 +273,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/chaliy/llmsim/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/chaliy/llmsim/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/chaliy/llmsim/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/chaliy/llmsim/compare/v0.4.0...v0.5.0
