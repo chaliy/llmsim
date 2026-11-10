@@ -1,5 +1,7 @@
 [![CI](https://github.com/chaliy/llmsim/actions/workflows/ci.yml/badge.svg)](https://github.com/chaliy/llmsim/actions/workflows/ci.yml)
 [![Crates.io](https://img.shields.io/crates/v/llmsim)](https://crates.io/crates/llmsim)
+[![PyPI](https://img.shields.io/pypi/v/llmsim)](https://pypi.org/project/llmsim/)
+[![npm](https://img.shields.io/npm/v/llmsim)](https://www.npmjs.com/package/llmsim)
 [![Repo: Agent Friendly](https://img.shields.io/badge/repo-agent%20friendly-blue)](AGENTS.md)
 
 # LLMSim
@@ -35,6 +37,10 @@ cargo install llmsim
 
 # Include the optional terminal dashboard
 cargo install llmsim --features tui
+
+# In-process server for Python or Node/TypeScript tests
+pip install llmsim
+npm install --save-dev llmsim
 ```
 
 ## Demo
@@ -76,6 +82,27 @@ The `--tui` flag launches an interactive terminal dashboard showing real-time me
 - **Charts**: RPS and token rate sparklines, model distribution
 
 Controls: `q` to quit, `r` to force refresh.
+
+### From Python and TypeScript tests
+
+The `llmsim` packages on PyPI and npm start the same server inside your test
+process on a free port. See [docs/bindings.md](docs/bindings.md).
+
+```python
+from openai import OpenAI
+from llmsim import Server
+
+with Server(generator="echo", latency="instant") as sim:
+    client = OpenAI(base_url=sim.openai_base_url, api_key="unused")
+```
+
+```ts
+import OpenAI from "openai";
+import { Server } from "llmsim";
+
+await using sim = await Server.start({ generator: "echo", latency: "instant" });
+const client = new OpenAI({ baseURL: sim.openaiBaseUrl, apiKey: "unused" });
+```
 
 ### As a Library
 
@@ -121,6 +148,20 @@ llmsim = { version = "0.4", default-features = false }
 
 Note that `count_tokens` and the `tokens` module are only available with the
 `tokens` feature enabled.
+
+To embed the HTTP server in a Rust program or test, `llmsim::cli::start_server`
+(feature `server`) binds and returns a handle with the real address, stats, and
+graceful `shutdown()`:
+
+```rust,ignore
+let config = llmsim::cli::Config::default().merged_with_json(&serde_json::json!({
+    "server": {"host": "127.0.0.1", "port": 0},
+    "latency": {"profile": "instant"}
+}))?;
+let mut server = llmsim::cli::start_server(config).await?;
+println!("{}/openai/v1", server.url());
+server.shutdown().await?;
+```
 
 ## API Endpoints
 

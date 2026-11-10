@@ -1,12 +1,30 @@
+# The workspace holds the core crate (this package) plus the Python (PyO3)
+# and Node (NAPI-RS) binding crates under `crates/`. Default members stay the
+# core crate so plain `cargo build/test/clippy` keep their pre-workspace
+# meaning; binding crates build through maturin / napi (see their CI jobs).
+# The single version below is the release version for crates.io, PyPI and npm.
+[workspace]
+members = [".", "crates/llmsim-python", "crates/llmsim-js"]
+default-members = ["."]
+resolver = "2"
+
+[workspace.package]
+version = "0.6.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/chaliy/llmsim"
+
 [package]
 name = "llmsim"
-version = "0.6.0"
+version.workspace = true
 edition = "2021"
 license = "MIT"
 authors = ["LLMSim Contributors"]
 repository = "https://github.com/chaliy/llmsim"
 description = "LLM Traffic Simulator - A lightweight, high-performance LLM API simulator"
 readme = "README.md"
+# Binding crates and their JS/Python sources are published to PyPI/npm, not crates.io.
+exclude = ["crates/"]
 keywords = ["llm", "openai", "simulator", "mock", "testing"]
 categories = ["development-tools::testing", "simulation", "web-programming::http-server"]
 
@@ -48,7 +66,7 @@ tui = ["cli", "dep:tuika", "tuika/async", "tuika/ratatui", "dep:ratatui", "tokio
 
 [dependencies]
 # Async runtime
-tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "time"] }
+tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 
 # HTTP framework (enabled by the `server` feature)
 axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"], optional = true }

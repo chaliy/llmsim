@@ -1,0 +1,182 @@
+# Build llmsim's NAPI-RS addon for every major platform and publish one npm
+# package, `llmsim`, that carries all platform binaries (llmsim.<platform>.node).
+# Dispatched by release.yml for each release tag (release events created with
+# GITHUB_TOKEN do not trigger workflows), or run manually from a release tag.
+#
+# Auth: npm trusted publishing (GitHub OIDC, npm >= 11.5.1) once configured on
+# npmjs.com: package `llmsim` > Settings > Trusted publisher > GitHub Actions,
+# owner `chaliy`, repository `llmsim`, workflow `publish-js.yml`.
+# npm only offers that setting for a package that already exists, so the very
+# first publish uses the NPM_TOKEN repository secret when it is set. Remove
+# the secret once the trusted publisher is configured.
+
+name: Publish JS
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  MACOSX_DEPLOYMENT_TARGET: "10.13"
+
+jobs:
+  verify:
+    name: Verify release tag
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tag must match Cargo.toml and package.json versions
+        run: |
+          if [[ ! "$GITHUB_REF" =~ ^refs/tags/v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "::error::run this workflow from a release tag (vX.Y.Z); got $GITHUB_REF"
+            exit 1
+          fi
+          TAG_VERSION="${BASH_REMATCH[1]}"
+          CARGO_VERSION=$(grep '^version = ' Cargo.toml | head -1 | sed 's/version = "\(.*\)"/\1/')
+          PKG_VERSION=$(node -p "require('./crates/llmsim-js/package.json').version")
+          if [ "$TAG_VERSION" != "$CARGO_VERSION" ] || [ "$TAG_VERSION" != "$PKG_VERSION" ]; then
+            echo "::error::tag $TAG_VERSION, Cargo.toml $CARGO_VERSION, package.json $PKG_VERSION must match"
+            exit 1
+          fi
+
+  build:
+    name: Build ${{ matrix.target }}
+    needs: verify
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: macos-latest, target: x86_64-apple-darwin }
+          - { host: macos-latest, target: aarch64-apple-darwin }
+          - { host: ubuntu-latest, target: x86_64-unknown-linux-gnu, flags: --use-napi-cross }
+          - { host: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu }
+          - { host: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          targets: ${{ matrix.target }}
+      - name: Install dependencies
+        working-directory: crates/llmsim-js
+        run: npm ci
+      - name: Build
+        shell: bash
+        working-directory: crates/llmsim-js
+        run: |
+          npx napi build --platform --release --target ${{ matrix.target }} ${{ matrix.flags }} --js index.cjs --dts index.d.cts
+          npx tsc
+      - uses: actions/upload-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: crates/llmsim-js/llmsim.*.node
+          if-no-files-found: error
+      # Generated JS is identical across targets; keep one copy.
+      - if: matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: js-stubs
+          path: |
+            crates/llmsim-js/index.cjs
+            crates/llmsim-js/index.d.cts
+            crates/llmsim-js/wrapper.js
+            crates/llmsim-js/wrapper.d.ts
+          if-no-files-found: error
+
+  test:
+    name: Test ${{ matrix.target }} node@${{ matrix.node }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { host: ubuntu-latest, target: x86_64-unknown-linux-gnu, node: "20" }
+          - { host: ubuntu-latest, target: x86_64-unknown-linux-gnu, node: "24" }
+          - { host: ubuntu-24.04-arm, target: aarch64-unknown-linux-gnu, node: "22" }
+          - { host: macos-latest, target: aarch64-apple-darwin, node: "22" }
+          - { host: windows-latest, target: x86_64-pc-windows-msvc, node: "22" }
+    runs-on: ${{ matrix.host }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Install dependencies
+        working-directory: crates/llmsim-js
+        run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: bindings-${{ matrix.target }}
+          path: crates/llmsim-js
+      - uses: actions/download-artifact@v4
+        with:
+          name: js-stubs
+          path: crates/llmsim-js
+      - name: Test
+        shell: bash
+        working-directory: crates/llmsim-js
+        run: node --test __test__/*.test.mjs
+
+  publish:
+    name: Publish to npm
+    needs: [verify, test]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Require npm with trusted publishing (>= 11.5.1)
+        run: |
+          npm_ok() {
+            node -e 'const [a,b,c]=process.argv[1].split(".").map(Number);process.exit(a>11||(a==11&&(b>5||(b==5&&c>=1)))?0:1)' "$(npm --version)"
+          }
+          npm_ok || npm install -g npm@11.6.2
+          npm_ok
+          npm --version
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: bindings-*
+          merge-multiple: true
+          path: crates/llmsim-js
+      - uses: actions/download-artifact@v4
+        with:
+          name: js-stubs
+          path: crates/llmsim-js
+      - name: Check package contents
+        working-directory: crates/llmsim-js
+        run: |
+          ls -lh llmsim.*.node
+          test "$(ls llmsim.*.node | wc -l)" -eq 5
+          npm pack --dry-run
+      - name: Publish
+        working-directory: crates/llmsim-js
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          # Bootstrap path only; trusted publishing needs no token.
+          if [ -n "$NPM_TOKEN" ]; then
+            echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > "$HOME/.npmrc"
+          fi
+          npm publish --provenance --access public
+      - name: Verify
+        working-directory: crates/llmsim-js
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          for i in $(seq 1 40); do
+            if [ "$(npm view "llmsim@$VERSION" version 2>/dev/null)" = "$VERSION" ]; then
+              echo "llmsim@$VERSION is on npm"; exit 0
+            fi
+            sleep 10
+          done
+          echo "::error::llmsim@$VERSION not visible on npm"; exit 1

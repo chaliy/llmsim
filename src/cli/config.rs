@@ -33,6 +33,24 @@ impl Config {
         toml::from_str(toml_str).map_err(|e| ConfigError::Parse(e.to_string()))
     }
 
+    /// Return a copy of this configuration with `overrides` deep-merged on top.
+    ///
+    /// `overrides` is a JSON object shaped like the TOML file (`{"server":
+    /// {"port": 0}, "response": {"generator": "echo"}}`). Objects merge key by
+    /// key; any other value (including arrays and `null`) replaces the base
+    /// value. Unknown keys are ignored, as in TOML files. Used by the Python
+    /// and Node bindings, which accept plain dicts/objects instead of TOML.
+    pub fn merged_with_json(&self, overrides: &serde_json::Value) -> Result<Self, ConfigError> {
+        if !overrides.is_object() {
+            return Err(ConfigError::Validation(
+                "config overrides must be an object".to_string(),
+            ));
+        }
+        let mut base = serde_json::to_value(self).map_err(|e| ConfigError::Parse(e.to_string()))?;
+        merge_json(&mut base, overrides);
+        serde_json::from_value(base).map_err(|e| ConfigError::Parse(e.to_string()))
+    }
+
     /// Create a latency profile from the configuration
     pub fn latency_profile(&self) -> LatencyProfile {
         if let Some(ref profile) = self.latency.profile {
@@ -84,6 +102,22 @@ impl Config {
             invalid_request_rate: 0.0,
             auth_error_rate: 0.0,
         }
+    }
+}
+
+fn merge_json(base: &mut serde_json::Value, overrides: &serde_json::Value) {
+    match (base, overrides) {
+        (serde_json::Value::Object(base), serde_json::Value::Object(overrides)) => {
+            for (key, value) in overrides {
+                match base.get_mut(key) {
+                    Some(slot) => merge_json(slot, value),
+                    None => {
+                        base.insert(key.clone(), value.clone());
+                    }
+                }
+            }
+        }
+        (slot, value) => *slot = value.clone(),
     }
 }
 
@@ -323,6 +357,47 @@ pub enum ConfigError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_merged_with_json_overrides_nested_fields() {
+        let base =
+            Config::from_toml("[response]\ngenerator = \"lorem\"\ntarget_tokens = 7\n").unwrap();
+        let merged = base
+            .merged_with_json(&serde_json::json!({
+                "server": {"port": 0, "host": "127.0.0.1"},
+                "response": {"generator": "echo"},
+                "latency": {"profile": "instant"}
+            }))
+            .unwrap();
+        assert_eq!(merged.server.port, 0);
+        assert_eq!(merged.server.host, "127.0.0.1");
+        assert_eq!(merged.response.generator, "echo");
+        // Untouched sibling keys survive the merge.
+        assert_eq!(merged.response.target_tokens, 7);
+        assert_eq!(merged.latency.profile.as_deref(), Some("instant"));
+        assert_eq!(merged.models.available, default_models());
+    }
+
+    #[test]
+    fn test_merged_with_json_replaces_arrays() {
+        let merged = Config::default()
+            .merged_with_json(&serde_json::json!({"models": {"available": ["gpt-5"]}}))
+            .unwrap();
+        assert_eq!(merged.models.available, vec!["gpt-5".to_string()]);
+    }
+
+    #[test]
+    fn test_merged_with_json_rejects_non_object_and_bad_types() {
+        let base = Config::default();
+        assert!(matches!(
+            base.merged_with_json(&serde_json::json!([1, 2])),
+            Err(ConfigError::Validation(_))
+        ));
+        assert!(matches!(
+            base.merged_with_json(&serde_json::json!({"server": {"port": "nope"}})),
+            Err(ConfigError::Parse(_))
+        ));
+    }
 
     #[test]
     fn test_default_models_all_have_profiles() {

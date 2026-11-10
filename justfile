@@ -7,7 +7,7 @@ default:
 # Run all pre-PR checks (fmt, clippy, test)
 check:
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets -- -D warnings
     cargo test
 
 # Format all code
@@ -53,7 +53,7 @@ release-prepare version:
 # Run release verification checks (fmt, clippy, test, dry-run publish)
 release-check:
     cargo fmt --all -- --check
-    cargo clippy --all-targets -- -D warnings
+    cargo clippy --workspace --all-targets -- -D warnings
     cargo test
     cargo publish --dry-run
     @echo ""
@@ -80,3 +80,11 @@ release-tag:
     echo "Pushing tag $TAG..."
     git push origin "$TAG"
     echo "Tag $TAG created and pushed."
+
+# Build the Python package into a local venv and run its tests
+test-python:
+    cd crates/llmsim-python && python3 -m venv .venv && . .venv/bin/activate && pip install -q maturin pytest pytest-timeout openai anthropic && maturin develop && pytest tests -v
+
+# Build the Node package (debug) and run its tests
+test-js:
+    cd crates/llmsim-js && npm ci && npm run build:debug && npm test
