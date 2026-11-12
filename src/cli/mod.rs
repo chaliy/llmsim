@@ -6,9 +6,11 @@ mod anthropic_handlers;
 mod config;
 mod decisions_handlers;
 mod handlers;
+pub mod limits;
 mod server;
 mod state;
 mod typesafe_handlers;
+pub mod validation;
 mod ws_handler;
 
 pub use config::{Config, ConfigError};
@@ -81,6 +83,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/foundry/providers/microsoft/v1/systemone",
             post(typesafe_handlers::systemone),
         )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            limits::middleware,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)

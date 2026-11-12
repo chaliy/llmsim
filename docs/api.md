@@ -841,3 +841,47 @@ Errors follow OpenAI/OpenResponses format:
 | 500 | `server_error` | Internal server error |
 | 503 | `server_error` | Service unavailable |
 | 504 | `timeout_error` | Gateway timeout |
+| 529 | `overloaded_error` | Overload burst (Anthropic and TypeSafe shapes) |
+
+### Rate Limits
+
+Set per-key limits to get real RPM/TPM behaviour (keys come from
+`Authorization`, `x-api-key` or `x-goog-api-key`):
+
+```toml
+[rate_limits]
+requests_per_minute = 500
+tokens_per_minute = 200000
+```
+
+Tokens are charged on arrival as an estimate of the prompt plus the
+requested output cap (`max_tokens`, `max_completion_tokens` or
+`max_output_tokens`; 1000 when absent), and refill continuously over a
+minute. Every generation response then carries the provider's headers:
+
+- OpenAI-shaped endpoints: `x-ratelimit-limit-requests`,
+  `x-ratelimit-remaining-requests`, `x-ratelimit-reset-requests` (`6m0s`
+  style) and the same three for `tokens`.
+- Anthropic: `anthropic-ratelimit-requests-*`, `anthropic-ratelimit-tokens-*`
+  and `anthropic-ratelimit-input-tokens-*` with RFC 3339 reset times.
+
+An exhausted key gets 429 with `retry-after` (seconds) and `retry-after-ms`.
+
+### Overload Bursts
+
+`[errors] overload_burst_rate` is the chance per request that a burst
+starts; for `overload_burst_ms` every generation request then fails, 529
+`overloaded_error` on Anthropic and TypeSafe, 503 elsewhere, with
+`retry-after` set to the time left. Incidents arrive in clusters, so this
+tests circuit breakers and fallbacks better than independent random errors.
+
+### Request Limits
+
+Requests a provider would reject are rejected here too (`[validation]
+enforce_limits = true`, the default), for models llmsim has a profile for:
+
+| Case | OpenAI-shaped | Anthropic |
+|------|---------------|-----------|
+| Prompt plus output cap over the context window | 400 `context_length_exceeded` | 400 "prompt is too long: N tokens > M maximum" |
+| Output cap over the model's max output | 400 `invalid_value` on the cap's param | 400 "max_tokens: N > M, ..." |
+| Unknown model (`strict_models = true` only) | 404 `model_not_found` | 404 `not_found_error` |

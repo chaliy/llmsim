@@ -491,7 +491,7 @@ impl AnthropicModelsResponse {
 /// Format a Unix timestamp (seconds) as an ISO 8601 UTC string
 /// (`YYYY-MM-DDThh:mm:ssZ`) without pulling in a date library. Uses Howard
 /// Hinnant's `civil_from_days` algorithm.
-fn iso8601_utc(unix_secs: i64) -> String {
+pub(crate) fn iso8601_utc(unix_secs: i64) -> String {
     let days = unix_secs.div_euclid(86_400);
     let secs_of_day = unix_secs.rem_euclid(86_400);
     let (hour, minute, second) = (

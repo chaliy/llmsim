@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Added rate limits, overload bursts and request limits.** New
+  [Rate Limits, Overload Bursts and Request Limits](simulation/limits.md) concept.
+
 * **Added Decisions APIs.** New [Decisions APIs Specification](apis/decisions-api.md):
   OpenAI `/v1/decisions`, Gemini `/v1beta/decisions` and Microsoft Foundry System One,
   all on the System One answer engine. Jev aliases now resolve to Jev 1.14.

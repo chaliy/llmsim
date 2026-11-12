@@ -1,6 +1,7 @@
 // Application State Module
 
 use super::config::Config;
+use super::limits::RateLimiter;
 use crate::scenario::{AttemptTracker, ScenarioSet};
 use crate::script::Script;
 use crate::stats::SharedStats;
@@ -18,11 +19,18 @@ pub struct AppState {
     pub scenarios: Option<Arc<ScenarioSet>>,
     /// Attempt counts per scenario step, for `fail_first` and stream cuts.
     pub attempts: Arc<AttemptTracker>,
+    /// Per-key RPM/TPM buckets and the overload-burst clock.
+    pub limiter: Arc<RateLimiter>,
 }
 
 impl AppState {
     pub fn new(config: Config, stats: SharedStats) -> Self {
+        let limiter = Arc::new(RateLimiter::new(
+            config.rate_limits.requests_per_minute,
+            config.rate_limits.tokens_per_minute,
+        ));
         Self {
+            limiter,
             config,
             stats,
             script: None,

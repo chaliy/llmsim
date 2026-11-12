@@ -95,6 +95,19 @@ pub async fn create_message(
         return anthropic_error(400, message);
     }
 
+    // Reject requests over the model's context window or output cap.
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::anthropic_limits(&request.model),
+        count_input_tokens(&request),
+        Some(request.max_tokens),
+    ) {
+        let (status, message) = super::validation::anthropic_parts(&v);
+        state.stats.record_error(status);
+        return anthropic_error(status, message);
+    }
+
     // Model-specific latency (unless overridden in config).
     let latency = state.config.latency_for_model(&request.model);
 

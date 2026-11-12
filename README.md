@@ -274,6 +274,16 @@ rate_limit_rate = 0.01
 server_error_rate = 0.001
 timeout_rate = 0.0
 timeout_after_ms = 30000
+# overload_burst_rate = 0.001  # chance a burst starts; every request then fails
+# overload_burst_ms = 10000    # (529 on Anthropic, 503 on OpenAI) for this long
+
+[rate_limits]                  # per API key; 0 = unlimited
+# requests_per_minute = 500
+# tokens_per_minute = 200000
+
+[validation]
+# enforce_limits = true        # 400 over context window / max output tokens
+# strict_models = false        # 404 for model ids llmsim has no profile for
 
 [models]
 available = [

@@ -219,6 +219,22 @@ pub async fn chat_completions(
         return Ok(err.into_response());
     }
 
+    // Reject requests over the model's context window or output cap.
+    let (max_param, max_tokens) = match (request.max_completion_tokens, request.max_tokens) {
+        (Some(n), _) => ("max_completion_tokens", Some(n)),
+        (None, n) => ("max_tokens", n),
+    };
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::openai_limits(&request.model),
+        count_request_tokens(&request),
+        max_tokens,
+    ) {
+        state.stats.record_error(v_status(&v));
+        return Ok(super::validation::openai_response(&v, max_param));
+    }
+
     // Get latency profile (use model-specific if not configured)
     let latency = state.config.latency_for_model(&request.model);
 
@@ -1028,6 +1044,25 @@ pub async fn create_response(
         return Ok(response);
     }
 
+    // Reject requests over the model's context window or output cap.
+    let input_estimate = serde_json::to_string(&request.input).unwrap_or_default();
+    let input_estimate = crate::count_tokens_default(&input_estimate)
+        .unwrap_or(input_estimate.len() / 4)
+        + request
+            .instructions
+            .as_deref()
+            .map_or(0, |i| crate::count_tokens_default(i).unwrap_or(i.len() / 4));
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::openai_limits(&request.model),
+        input_estimate,
+        request.max_output_tokens,
+    ) {
+        state.stats.record_error(v_status(&v));
+        return Ok(super::validation::openai_response(&v, "max_output_tokens"));
+    }
+
     // Scripted mode: handle non-streaming with full tool-call support;
     // streaming falls through to the text-based scripted result built
     // by generate_responses_result (text + error turns only).
@@ -1512,6 +1547,13 @@ fn validate_input_modalities(request: &ChatCompletionRequest) -> Result<(), AppE
     }
 
     Ok(())
+}
+
+fn v_status(v: &super::validation::LimitViolation) -> u16 {
+    match v {
+        super::validation::LimitViolation::UnknownModel { .. } => 404,
+        _ => 400,
+    }
 }
 
 /// Count tokens in a chat request

@@ -18,6 +18,44 @@ pub struct Config {
     pub errors: ErrorsConfig,
     #[serde(default)]
     pub models: ModelsConfig,
+    #[serde(default)]
+    pub rate_limits: RateLimitsConfig,
+    #[serde(default)]
+    pub validation: ValidationConfig,
+}
+
+/// Request limits the real APIs enforce.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationConfig {
+    /// Reject prompts over the model's context window and output caps over
+    /// its max output tokens (models without a profile are never checked)
+    #[serde(default = "default_true")]
+    pub enforce_limits: bool,
+    /// Reject model ids llmsim has no profile for (404), like the real APIs
+    #[serde(default)]
+    pub strict_models: bool,
+}
+
+impl Default for ValidationConfig {
+    fn default() -> Self {
+        Self {
+            enforce_limits: true,
+            strict_models: false,
+        }
+    }
+}
+
+/// Provider-style rate limits per API key (0 = unlimited). When set,
+/// responses carry `x-ratelimit-*` / `anthropic-ratelimit-*` headers and an
+/// exhausted key gets 429 with Retry-After.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RateLimitsConfig {
+    /// Requests per minute per key
+    #[serde(default)]
+    pub requests_per_minute: u64,
+    /// Estimated tokens (prompt + output cap) per minute per key
+    #[serde(default)]
+    pub tokens_per_minute: u64,
 }
 
 impl Config {
@@ -262,6 +300,18 @@ pub struct ErrorsConfig {
     /// Milliseconds before timeout (default 30000)
     #[serde(default = "default_timeout")]
     pub timeout_after_ms: u64,
+    /// Chance per request (0.0-1.0) that an overload burst starts: every
+    /// generation request then fails (529 on Anthropic/TypeSafe, 503
+    /// elsewhere) until `overload_burst_ms` passes
+    #[serde(default)]
+    pub overload_burst_rate: f64,
+    /// Length of an overload burst in milliseconds (default 10000)
+    #[serde(default = "default_burst_ms")]
+    pub overload_burst_ms: u64,
+}
+
+fn default_burst_ms() -> u64 {
+    10_000
 }
 
 fn default_timeout() -> u64 {
