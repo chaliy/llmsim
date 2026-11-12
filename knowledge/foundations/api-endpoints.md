@@ -32,6 +32,9 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | OpenResponses | `/openresponses` | `/v1/responses` | `/openresponses/v1/responses` |
 | Anthropic | `/anthropic` | `/v1/messages` | `/anthropic/v1/messages` |
 | TypeSafe | `/typesafe` | `/v1/systemone` | `/typesafe/v1/systemone` |
+| OpenAI | `/openai` | `/v1/decisions` | `/openai/v1/decisions` |
+| Gemini | `/gemini` | `/v1beta/decisions` | `/gemini/v1beta/decisions` |
+| Microsoft Foundry | `/foundry` | `/providers/microsoft/v1/systemone` | `/foundry/providers/microsoft/v1/systemone` |
 
 ### R2: OpenAI Endpoints
 
@@ -131,6 +134,13 @@ official `typesafe-sdk` clients work when configured with `{base_url}/typesafe`.
 **R4a.2**: Validation errors return `422` with the FastAPI `{"detail": [...]}`
 body; other errors use `{"detail": {"error_type": "...", "message": "..."}}`.
 See [TypeSafe System One API Specification](../apis/typesafe-api.md) for the full specification.
+
+### R4b: Decisions Endpoints
+
+**R4b.1**: Typed-judgment endpoints of other providers follow the same
+pattern: `POST /openai/v1/decisions`, `POST /gemini/v1beta/decisions`, and
+`POST /foundry/providers/microsoft/v1/systemone`. See
+[Decisions APIs Specification](../apis/decisions-api.md).
 
 ### R5: System Endpoints
 

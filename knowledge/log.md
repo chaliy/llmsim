@@ -2,6 +2,10 @@
 
 ## 2026-11-12
 
+* **Added Decisions APIs.** New [Decisions APIs Specification](apis/decisions-api.md):
+  OpenAI `/v1/decisions`, Gemini `/v1beta/decisions` and Microsoft Foundry System One,
+  all on the System One answer engine. Jev aliases now resolve to Jev 1.14.
+
 * **Added the Latency Model.** New [Latency Model](simulation/latency.md) spec: measured
   GPT-6 tier profiles (Luna, Sol) and Muse Spark, log-normal TTFT, prompt-size prefill.
 * **Built-in scenarios.** [Scenarios](simulation/scenarios.md) are compiled in and on by

@@ -289,7 +289,7 @@ SYSTEMONE=$(curl -s -X POST "$BASE_URL/typesafe/v1/systemone" \
             "severity": {"type": "score", "criteria": ["low", "medium", "high"]}
         }
     }')
-if echo "$SYSTEMONE" | grep -q '"model":"jev-1.13.0"' \
+if echo "$SYSTEMONE" | grep -q '"model":"jev-1.14.0"' \
     && echo "$SYSTEMONE" | grep -q '"type":"noul"' \
     && echo "$SYSTEMONE" | grep -q '"type":"choice"' \
     && echo "$SYSTEMONE" | grep -q '"type":"score"'; then

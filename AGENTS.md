@@ -116,6 +116,11 @@ Examples:
 - `POST /typesafe/v1/systemone` - System One evaluation (Jev model; noul, choice, score)
 - `GET /typesafe/v1/models` - List available Jev models and aliases
 
+**Decisions endpoints:**
+- `POST /openai/v1/decisions` - OpenAI Decisions API (predicate, choice, score)
+- `POST /gemini/v1beta/decisions` - Gemini Decisions API
+- `POST /foundry/providers/microsoft/v1/systemone` - Microsoft Foundry System One
+
 **System endpoints:**
 - `GET /health` - Health check
 - `GET /llmsim/stats` - Server statistics (requests, tokens, latency)

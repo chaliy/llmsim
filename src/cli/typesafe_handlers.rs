@@ -8,7 +8,7 @@
 
 use super::state::AppState;
 use crate::typesafe::{
-    answer_all, resolve_typesafe_model, typesafe_models, QuestionKind, SystemOneRequest,
+    answer_all, resolve_typesafe_model, typesafe_models, Answer, QuestionKind, SystemOneRequest,
     SystemOneResponse, SystemOneUsage, TypeSafeErrorResponse,
 };
 use crate::{EndpointType, ErrorInjector};
@@ -20,6 +20,7 @@ use axum::{
     Json,
 };
 use serde_json::Value;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -30,7 +31,7 @@ const OUTPUT_TOKENS_PER_QUESTION: usize = 20;
 const REQUEST_OVERHEAD_TOKENS: usize = 8;
 const QUESTION_OVERHEAD_TOKENS: usize = 6;
 
-fn typesafe_error(status: u16, message: impl Into<String>) -> Response {
+fn typesafe_error(status: u16, message: String) -> Response {
     let body = TypeSafeErrorResponse::new(TypeSafeErrorResponse::type_for_status(status), message);
     let mut response = Json(body).into_response();
     *response.status_mut() =
@@ -84,6 +85,31 @@ pub async fn systemone(State(state): State<Arc<AppState>>, body: Bytes) -> Respo
         questions = request.questions.len(),
         "TypeSafe systemone request"
     );
+    let (answers, usage) = match evaluate(&state, &request, request_start, typesafe_error).await {
+        Ok(result) => result,
+        Err(response) => return response,
+    };
+
+    Json(SystemOneResponse {
+        model: resolve_typesafe_model(&request.model).to_string(),
+        answers,
+        usage,
+    })
+    .into_response()
+}
+
+/// Answer a parsed System One request the way every decision endpoint does:
+/// count it, maybe inject an error (rendered by `render_error` in the
+/// provider's own shape), wait one TTFT, and synthesize the answers.
+// A ready-to-send error `Response` is the natural error here; it is built
+// once per failed request, so its size does not matter.
+#[allow(clippy::result_large_err)]
+pub(super) async fn evaluate(
+    state: &AppState,
+    request: &SystemOneRequest,
+    request_start: Instant,
+    render_error: fn(u16, String) -> Response,
+) -> Result<(BTreeMap<String, Answer>, SystemOneUsage), Response> {
     state
         .stats
         .record_request_start(&request.model, false, EndpointType::SystemOne);
@@ -94,24 +120,25 @@ pub async fn systemone(State(state): State<Arc<AppState>>, body: Bytes) -> Respo
         let status_code = error.status_code();
         state.stats.record_error(status_code);
         let message = error.to_error_response().error.message;
-        let mut response = typesafe_error(status_code, message);
+        let mut response = render_error(status_code, message);
         if let Some(retry_after) = error.retry_after() {
             response.headers_mut().insert(
                 header::RETRY_AFTER,
                 retry_after.to_string().parse().unwrap(),
             );
         }
-        return response;
+        return Err(response);
     }
 
-    let latency = state.config.latency_for_model(&request.model);
-
-    let answers = answer_all(&request);
+    let answers = answer_all(request);
     let usage = SystemOneUsage {
-        input_tokens: count_input_tokens(&request) as u32,
+        input_tokens: count_input_tokens(request) as u32,
         output_tokens: (request.questions.len() * OUTPUT_TOKENS_PER_QUESTION) as u32,
     };
-
+    let latency = state
+        .config
+        .latency_for_model(&request.model)
+        .with_input_tokens(usage.input_tokens as usize);
     let delay = latency.sample_ttft();
     if !delay.is_zero() {
         tokio::time::sleep(delay).await;
@@ -121,13 +148,7 @@ pub async fn systemone(State(state): State<Arc<AppState>>, body: Bytes) -> Respo
         usage.input_tokens,
         usage.output_tokens,
     );
-
-    Json(SystemOneResponse {
-        model: resolve_typesafe_model(&request.model).to_string(),
-        answers,
-        usage,
-    })
-    .into_response()
+    Ok((answers, usage))
 }
 
 /// Render free-form content (string, object, array) as the text it bills as.

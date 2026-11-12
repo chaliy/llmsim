@@ -76,7 +76,7 @@ async fn answers_every_question_with_the_wire_shape() {
     let (status, body) = post(&router, ticket_request("jev-latest")).await;
     assert_eq!(status, StatusCode::OK, "{body}");
 
-    assert_eq!(body["model"], "jev-1.13.0");
+    assert_eq!(body["model"], "jev-1.14.0");
     let answers = body["answers"].as_object().unwrap();
     assert_eq!(answers.len(), 3);
 
@@ -120,7 +120,7 @@ async fn versioned_and_unknown_models_are_echoed() {
     let (_, body) = post(&router, ticket_request("jev-1.13.0")).await;
     assert_eq!(body["model"], "jev-1.13.0");
     let (_, body) = post(&router, ticket_request("jev-preview")).await;
-    assert_eq!(body["model"], "jev-1.13.0");
+    assert_eq!(body["model"], "jev-1.14.0");
     let (status, body) = post(&router, ticket_request("jev-2.0.0")).await;
     assert_eq!(status, StatusCode::OK);
     assert_eq!(body["model"], "jev-2.0.0");

@@ -52,6 +52,21 @@ fn build_registry() -> HashMap<String, ModelProfile> {
     let mut registry = HashMap::new();
 
     // --- Claude Fable 5.x (most capable widely released tier) ---
+    // Fable 5.2 and Mythos 5.2 are the same model; Mythos is served to
+    // organizations in Anthropic's verification programs. No published
+    // release date; dated by first availability.
+    for (id, name) in [
+        ("claude-fable-5-2", "Claude Fable 5.2"),
+        ("claude-mythos-5-2", "Claude Mythos 5.2"),
+    ] {
+        insert_with_aliases(
+            &mut registry,
+            ModelProfile::new(id, name, "anthropic", 1_000_000, 128_000)
+                .with_created(1794268800) // 2026-11-10
+                .with_capabilities(reasoning_caps()),
+            &[],
+        );
+    }
     insert_with_aliases(
         &mut registry,
         ModelProfile::new(
@@ -391,6 +406,8 @@ pub fn get_anthropic_model_profile(model_id: &str) -> Option<&'static ModelProfi
 /// stable, human-friendly order (newest/most-capable first).
 pub fn default_anthropic_model_ids() -> Vec<&'static str> {
     vec![
+        "claude-fable-5-2",
+        "claude-mythos-5-2",
         "claude-fable-5-1",
         "claude-fable-5",
         "claude-opus-5-5",
@@ -530,7 +547,7 @@ mod tests {
                 "{id} not advertised"
             );
         }
-        assert_eq!(default_anthropic_model_ids()[0], "claude-fable-5-1");
+        assert_eq!(default_anthropic_model_ids()[0], "claude-fable-5-2");
     }
 
     #[test]
@@ -596,7 +613,7 @@ mod tests {
             .map(|id| AnthropicModel::from_profile(get_anthropic_model_profile(id).unwrap()))
             .collect();
         let resp = AnthropicModelsResponse::new(models);
-        assert_eq!(resp.first_id.as_deref(), Some("claude-fable-5-1"));
+        assert_eq!(resp.first_id.as_deref(), Some("claude-fable-5-2"));
         assert_eq!(resp.last_id.as_deref(), Some("claude-3-haiku"));
         assert!(!resp.has_more);
     }

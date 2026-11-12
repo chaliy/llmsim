@@ -10,6 +10,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 | **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
 | **TypeSafe** | `/typesafe/v1/` | [TypeSafe System One API](https://docs.typesafe.ai/api) (Jev) |
+| **Decisions** | `/openai/v1/decisions`, `/gemini/v1beta/decisions`, `/foundry/providers/microsoft/v1/systemone` | OpenAI, Gemini and Microsoft Foundry typed-judgment APIs |
 
 ## OpenAI API (`/openai/v1/...`)
 
@@ -640,7 +641,7 @@ curl -X POST http://localhost:8080/typesafe/v1/systemone \
 
 ```json
 {
-  "model": "jev-1.13.0",
+  "model": "jev-1.14.0",
   "answers": {
     "is_urgent": {"type": "noul", "noul": 0.95},
     "team": {"type": "choice", "choice": "billing", "confidence": 0.62,
@@ -656,7 +657,7 @@ curl -X POST http://localhost:8080/typesafe/v1/systemone \
 Answers are deterministic: the same state and question always get the same
 answer, so tests can assert on thresholds and routing. Probabilities always sum
 to 1, and `choice` is always the most likely option. Aliases (`jev-latest`,
-`jev-preview`) resolve to `jev-1.13.0` in `model`; other model names are echoed.
+`jev-preview`) resolve to `jev-1.14.0` in `model`; other model names are echoed.
 
 ### List Models
 
@@ -678,6 +679,53 @@ Other errors (including injected ones) use TypeSafe's envelope:
 ```json
 {"detail": {"error_type": "rate_limit_error", "message": "..."}}
 ```
+
+## Decisions APIs
+
+Typed judgments from other providers, answered by the same engine as System
+One: the same input and question always get the same answer.
+
+| Endpoint | Provider shape | Default model |
+|----------|----------------|---------------|
+| `POST /openai/v1/decisions` | OpenAI Decisions API | `gpt-6-luna` |
+| `POST /gemini/v1beta/decisions` | Gemini Decisions API | `gemini-decision-1` |
+| `POST /foundry/providers/microsoft/v1/systemone` | System One at a Foundry resource root (base URL `{llmsim}/foundry`) | echoes the deployment |
+
+### OpenAI
+
+```bash
+curl http://localhost:8080/openai/v1/decisions -H 'content-type: application/json' -d '{
+  "model": "gpt-6-luna",
+  "input": "My payment failed twice today.",
+  "questions": [
+    {"type": "predicate", "name": "urgent", "instructions": "Is it urgent?"},
+    {"type": "choice", "name": "team", "instructions": "Which team?",
+     "choices": [{"value": "billing"}, {"value": "technical"}]},
+    {"type": "score", "name": "priority", "instructions": "Priority?",
+     "levels": [{"label": "Routine"}, {"label": "Important"}, {"label": "Urgent"}]}
+  ]
+}'
+# {"model": "gpt-6-luna", "answers": [
+#   {"type": "predicate", "name": "urgent", "probability": 0.81},
+#   {"type": "choice", "name": "team", "choice": "billing", "confidence": 0.4,
+#    "probabilities": [{"value": "billing", "probability": 0.83}, ...]},
+#   {"type": "score", "name": "priority", "score": 1.4, "confidence": 0.3,
+#    "probabilities": [{"value": 0, "probability": 0.2}, ...]}],
+#  "usage": {"input_tokens": 61, "output_tokens": 60}}
+```
+
+Limits match the live API: up to 24 questions, unique names, at least two
+choices, 2 to 10 score levels. Put `[[llmsim:refuse]]` in `input` to get a
+`refusal` answer for every question.
+
+### Gemini
+
+Questions are keyed (`[A-Za-z0-9_-]{1,64}`) and use System One's primitives
+with Google's criteria: `noul` takes `true_description`/`false_description`,
+`choice` maps options to descriptions, `score` lists levels. `input` may be a
+string or Content parts (`text`, `image`, `audio`, `video`, `document`). The
+response has `answers` under the same keys and `usage.total_input_tokens`.
+Errors use Google's `{"error": {"code", "message", "status"}}` envelope.
 
 ## LLMSim Endpoints
 
@@ -730,14 +778,15 @@ curl http://localhost:8080/llmsim/stats
 | Family | Models |
 |--------|--------|
 | GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.3-codex-spark, gpt-5.3-chat-latest, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.5, gpt-5.5-pro, gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna |
-| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol |
+| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol, gpt-6.1-terra |
 | O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano |
-| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5, claude-opus-5, claude-opus-5.5, claude-sonnet-5, claude-sonnet-5.5, claude-haiku-5.5, claude-fable-5, claude-fable-5.1 |
-| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash |
+| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5, claude-opus-5, claude-opus-5.5, claude-sonnet-5, claude-sonnet-5.5, claude-haiku-5.5, claude-fable-5, claude-fable-5.1, claude-fable-5.2, claude-mythos-5.2 |
+| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash, gemini-4-argon |
 | DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
-| Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2 |
-| TypeSafe | jev-latest, jev-preview, jev-1.13.0 |
+| Other | grok-4.7, kimi-k3, qwen3.8-max, mistral-large-4, muse-spark-1.3 |
+| Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2, gpt-image-2.5, gpt-image-2.6 |
+| TypeSafe | jev-latest, jev-preview, jev-1.14.0, jev-1.13.0 |
 
 ## Scripted Mode
 

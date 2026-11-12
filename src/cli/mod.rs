@@ -4,6 +4,7 @@
 
 mod anthropic_handlers;
 mod config;
+mod decisions_handlers;
 mod handlers;
 mod server;
 mod state;
@@ -67,6 +68,19 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // TypeSafe API routes (System One)
         .route("/typesafe/v1/systemone", post(typesafe_handlers::systemone))
         .route("/typesafe/v1/models", get(typesafe_handlers::list_models))
+        // Decisions APIs (typed judgments)
+        .route(
+            "/openai/v1/decisions",
+            post(decisions_handlers::openai_decisions),
+        )
+        .route(
+            "/gemini/v1beta/decisions",
+            post(decisions_handlers::gemini_decisions),
+        )
+        .route(
+            "/foundry/providers/microsoft/v1/systemone",
+            post(typesafe_handlers::systemone),
+        )
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)
@@ -104,6 +118,9 @@ pub async fn run_server_with_stats(
     );
     tracing::info!("Anthropic endpoints: /anthropic/v1/messages, /anthropic/v1/messages/count_tokens, /anthropic/v1/models");
     tracing::info!("TypeSafe endpoints: /typesafe/v1/systemone, /typesafe/v1/models");
+    tracing::info!(
+        "Decisions endpoints: /openai/v1/decisions, /gemini/v1beta/decisions, /foundry/providers/microsoft/v1/systemone"
+    );
     tracing::info!("Stats endpoint: /llmsim/stats");
 
     let state = build_state(config, stats)?;

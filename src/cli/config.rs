@@ -311,6 +311,7 @@ fn default_models() -> Vec<String> {
         "gpt-6-sol".to_string(),
         "gpt-6-luna".to_string(),
         "gpt-6.1-sol".to_string(),
+        "gpt-6.1-terra".to_string(),
         // O-series reasoning models
         "o1".to_string(),
         "o1-mini".to_string(),
@@ -350,6 +351,8 @@ fn default_models() -> Vec<String> {
         "claude-haiku-5.5".to_string(),
         "claude-fable-5".to_string(),
         "claude-fable-5.1".to_string(),
+        "claude-fable-5.2".to_string(),
+        "claude-mythos-5.2".to_string(),
         // Gemini family
         "gemini-2.0-flash".to_string(),
         "gemini-2.5-flash".to_string(),
@@ -363,11 +366,18 @@ fn default_models() -> Vec<String> {
         "gemini-3.6-flash".to_string(),
         "gemini-3.7-flash".to_string(),
         "gemini-3.8-flash".to_string(),
+        "gemini-4-argon".to_string(),
         // DeepSeek family
         "deepseek-chat".to_string(),
         "deepseek-reasoner".to_string(),
         "deepseek-v4-pro".to_string(),
         "deepseek-flash".to_string(),
+        // Other providers
+        "grok-4.7".to_string(),
+        "kimi-k3".to_string(),
+        "qwen3.8-max".to_string(),
+        "mistral-large-4".to_string(),
+        "muse-spark-1.3".to_string(),
     ]
 }
 

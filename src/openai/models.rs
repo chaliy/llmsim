@@ -360,6 +360,16 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_created(1790640000) // 2026-09-29
             .with_capabilities(gpt5_capabilities())
             .with_knowledge_cutoff("2026-04-30"),
+        ModelProfile::new(
+            "gpt-6.1-terra",
+            "GPT-6.1 Terra",
+            "openai",
+            1_050_000,
+            128_000,
+        )
+        .with_created(1792972800) // 2026-10-26
+        .with_capabilities(gpt5_capabilities())
+        .with_knowledge_cutoff("2026-06-01"),
     ];
 
     // O-series reasoning models
@@ -626,6 +636,27 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_created(1788220800) // 2026-09-01
         .with_capabilities(claude_reasoning_capabilities())
         .with_knowledge_cutoff("2026-06"),
+        // Claude Fable 5.2 and Claude Mythos 5.2 (same model, Mythos served
+        // to verification-program organizations). No published release date;
+        // dated by first availability.
+        ModelProfile::new(
+            "claude-fable-5.2",
+            "Claude Fable 5.2",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1794268800) // 2026-11-10
+        .with_capabilities(claude_reasoning_capabilities()),
+        ModelProfile::new(
+            "claude-mythos-5.2",
+            "Claude Mythos 5.2",
+            "anthropic",
+            1_000_000,
+            128_000,
+        )
+        .with_created(1794268800) // 2026-11-10
+        .with_capabilities(claude_reasoning_capabilities()),
         // Claude Haiku 4.5
         ModelProfile::new(
             "claude-haiku-4.5",
@@ -757,6 +788,48 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         )
         .with_created(1788307200) // 2026-09-02
         .with_capabilities(gemini_reasoning_capabilities()),
+        ModelProfile::new(
+            "gemini-4-argon",
+            "Gemini 4 Argon",
+            "google",
+            1_048_576,
+            1_048_576,
+        )
+        .with_created(1791849600) // 2026-10-13
+        .with_capabilities(gemini_reasoning_capabilities()),
+    ];
+
+    // Other providers commonly reached through OpenAI-compatible endpoints
+    // (xAI, Moonshot, Alibaba, Mistral, Meta). Limits from provider pages.
+    let other_models = vec![
+        ModelProfile::new("grok-4.7", "Grok 4.7", "xai", 500_000, 500_000)
+            .with_created(1789948800) // 2026-09-21
+            .with_capabilities(gpt5_capabilities())
+            .with_knowledge_cutoff("2026-05"),
+        ModelProfile::new("kimi-k3", "Kimi K3", "moonshotai", 1_048_576, 131_072)
+            .with_created(1784160000) // 2026-07-16
+            .with_capabilities(gpt5_capabilities()),
+        ModelProfile::new("qwen3.8-max", "Qwen3.8 Max", "alibaba", 1_000_000, 131_072)
+            .with_created(1785715200) // 2026-08-03
+            .with_capabilities(gpt5_capabilities()),
+        ModelProfile::new(
+            "mistral-large-4",
+            "Mistral Large 4",
+            "mistral",
+            524_288,
+            262_144,
+        )
+        .with_created(1791244800) // 2026-10-06
+        .with_capabilities(gpt5_capabilities()),
+        ModelProfile::new(
+            "muse-spark-1.3",
+            "Muse Spark 1.3",
+            "meta",
+            1_048_576,
+            1_048_576,
+        )
+        .with_created(1788307200) // 2026-09-02
+        .with_capabilities(gpt5_capabilities()),
     ];
 
     // DeepSeek family
@@ -831,6 +904,12 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         ModelProfile::new("gpt-image-2", "GPT Image 2", "openai", 32_000, 4_160)
             .with_created(1776729600) // 2026-04-21
             .with_capabilities(image_capabilities()),
+        ModelProfile::new("gpt-image-2.5", "GPT Image 2.5", "openai", 32_000, 4_160)
+            .with_created(1788825600) // 2026-09-08
+            .with_capabilities(image_capabilities()),
+        ModelProfile::new("gpt-image-2.6", "GPT Image 2.6", "openai", 32_000, 4_160)
+            .with_created(1793750400) // 2026-11-04
+            .with_capabilities(image_capabilities()),
     ];
 
     // Add all models to registry
@@ -841,6 +920,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .chain(claude_models)
         .chain(gemini_models)
         .chain(deepseek_models)
+        .chain(other_models)
         .chain(image_models)
     {
         registry.insert(model.id.clone(), model);
@@ -907,6 +987,26 @@ pub fn infer_model_owner(model_id: &str) -> &'static str {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_late_2026_catalog() {
+        for (id, owner) in [
+            ("gpt-6.1-terra", "openai"),
+            ("claude-fable-5.2", "anthropic"),
+            ("claude-mythos-5.2", "anthropic"),
+            ("gemini-4-argon", "google"),
+            ("grok-4.7", "xai"),
+            ("kimi-k3", "moonshotai"),
+            ("qwen3.8-max", "alibaba"),
+            ("mistral-large-4", "mistral"),
+            ("muse-spark-1.3", "meta"),
+            ("gpt-image-2.5", "openai"),
+            ("gpt-image-2.6", "openai"),
+        ] {
+            let profile = get_model_profile(id).unwrap_or_else(|| panic!("{id} missing"));
+            assert_eq!(profile.owned_by, owner, "{id}");
+        }
+    }
 
     #[test]
     fn test_model_registry_populated() {
