@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Added batch and background APIs.** New [Batch and Background APIs](apis/batch-and-background.md):
+  background Responses, OpenAI Files and Batches, Anthropic Message Batches.
+
 * **Added the Embeddings API.** New [OpenAI Embeddings API Specification](apis/embeddings-api.md):
   `/openai/v1/embeddings` with similarity-preserving vectors.
 

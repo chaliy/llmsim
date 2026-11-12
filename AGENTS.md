@@ -99,6 +99,9 @@ Examples:
 **Current OpenAI endpoints:**
 - `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
 - `POST /openai/v1/responses` - Responses API (streaming supported)
+- `GET|DELETE /openai/v1/responses/:id`, `POST /openai/v1/responses/:id/cancel` - Background responses
+- `POST /openai/v1/files`, `GET /openai/v1/files/:id[/content]` - Files (batch input/output)
+- `POST|GET /openai/v1/batches`, `GET /openai/v1/batches/:id`, `POST .../cancel` - Batch API
 - `POST /openai/v1/embeddings` - Embeddings (deterministic, similarity-preserving vectors)
 - `POST /openai/v1/images/generations` - Image generation (gpt-image, streaming supported)
 - `GET /openai/v1/models` - List available models
@@ -110,6 +113,7 @@ Examples:
 **Anthropic endpoints:**
 - `POST /anthropic/v1/messages` - Messages API (streaming supported)
 - `POST /anthropic/v1/messages/count_tokens` - Count input tokens
+- `POST|GET /anthropic/v1/messages/batches`, `.../:id`, `.../:id/cancel`, `.../:id/results` - Message Batches
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:id` - Get model details
 

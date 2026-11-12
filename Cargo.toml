@@ -51,7 +51,7 @@ tokens = ["dep:tiktoken-rs"]
 
 # HTTP server: the `cli` module (axum router, handlers, websockets, CORS).
 # Handlers account for usage via token counting, so this implies `tokens`.
-server = ["tokens", "dep:axum", "dep:tower-http"]
+server = ["tokens", "dep:axum", "dep:tower", "dep:tower-http"]
 
 # The `llmsim` binary: clap argument parsing plus a tracing subscriber.
 # Implies `server` since the binary's job is to run the server.
@@ -69,7 +69,9 @@ tui = ["cli", "dep:tuika", "tuika/async", "tuika/ratatui", "dep:ratatui", "tokio
 tokio = { version = "1.52", default-features = false, features = ["macros", "rt-multi-thread", "net", "signal", "sync", "time"] }
 
 # HTTP framework (enabled by the `server` feature)
-axum = { version = "0.8", default-features = false, features = ["http1", "json", "tokio", "ws"], optional = true }
+axum = { version = "0.8", default-features = false, features = ["http1", "json", "multipart", "query", "tokio", "ws"], optional = true }
+# Already in the tree through axum; `util` gives `oneshot` for internal requests.
+tower = { version = "0.5", default-features = false, features = ["util"], optional = true }
 tower-http = { version = "0.7", default-features = false, features = ["cors", "trace"], optional = true }
 
 # Serialization

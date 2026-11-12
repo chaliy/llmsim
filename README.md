@@ -175,6 +175,8 @@ server.shutdown().await?;
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/embeddings` | POST | Embeddings (deterministic, similarity-preserving) |
+| `/openai/v1/responses/{id}` (`/cancel`) | GET, DELETE, POST | Background responses |
+| `/openai/v1/files`, `/openai/v1/batches` | POST, GET | Files and Batch API |
 | `/openai/v1/images/generations` | POST | Image generation (gpt-image, streaming & non-streaming) |
 
 When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
@@ -195,6 +197,7 @@ Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/message
 |----------|--------|-------------|
 | `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming, extended thinking) |
 | `/anthropic/v1/messages/count_tokens` | POST | Count input tokens for a Messages request |
+| `/anthropic/v1/messages/batches` | POST, GET | Message Batches (retrieve, cancel, results, delete) |
 | `/anthropic/v1/models` | GET | List available Claude models |
 | `/anthropic/v1/models/{model_id}` | GET | Get specific model details |
 
@@ -283,6 +286,9 @@ timeout_after_ms = 30000
 [rate_limits]                  # per API key; 0 = unlimited
 # requests_per_minute = 500
 # tokens_per_minute = 200000
+
+[batch]
+# completion_ms = 2000         # batches report completed after this long
 
 [validation]
 # enforce_limits = true        # 400 over context window / max output tokens

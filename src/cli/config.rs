@@ -22,6 +22,29 @@ pub struct Config {
     pub rate_limits: RateLimitsConfig,
     #[serde(default)]
     pub validation: ValidationConfig,
+    #[serde(default)]
+    pub batch: BatchConfig,
+}
+
+/// Batch APIs (OpenAI `/v1/batches`, Anthropic message batches).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchConfig {
+    /// Time from creation until a batch reports completed (real batches take
+    /// minutes to hours; tests want it short)
+    #[serde(default = "default_batch_completion_ms")]
+    pub completion_ms: u64,
+}
+
+fn default_batch_completion_ms() -> u64 {
+    2000
+}
+
+impl Default for BatchConfig {
+    fn default() -> Self {
+        Self {
+            completion_ms: default_batch_completion_ms(),
+        }
+    }
 }
 
 /// Request limits the real APIs enforce.

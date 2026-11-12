@@ -44,6 +44,7 @@ async fn main() {
         tool_choice: None,
         reasoning: None,
         background: false,
+        store: None,
         include: None,
         text: None,
     };
@@ -80,6 +81,7 @@ async fn main() {
         tool_choice: None,
         reasoning: None,
         background: false,
+        store: None,
         include: None,
         text: None,
     };
@@ -102,6 +104,7 @@ async fn main() {
             summary: None,
         }),
         background: false,
+        store: None,
         include: None,
         text: None,
     };

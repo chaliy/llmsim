@@ -21,6 +21,12 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/responses` | WS | WebSocket mode for Responses API |
+| `/openai/v1/responses/{id}` | GET, DELETE | Retrieve or delete a background response |
+| `/openai/v1/responses/{id}/cancel` | POST | Cancel a background response |
+| `/openai/v1/files` | POST | Upload a file (multipart) |
+| `/openai/v1/files/{id}`, `/openai/v1/files/{id}/content` | GET | File metadata, file content |
+| `/openai/v1/batches` | POST, GET | Create or list batches |
+| `/openai/v1/batches/{id}`, `/openai/v1/batches/{id}/cancel` | GET, POST | Retrieve or cancel a batch |
 | `/openai/v1/embeddings` | POST | Embeddings |
 | `/openai/v1/images/generations` | POST | Image generation (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
@@ -258,6 +264,36 @@ curl http://localhost:8080/openai/v1/models
 ```bash
 curl http://localhost:8080/openai/v1/models/gpt-5
 ```
+
+### Background Responses
+
+`"background": true` on `POST /openai/v1/responses` returns at once with
+`status: "queued"`. Poll `GET /openai/v1/responses/{id}`: it reports
+`in_progress` until the model would have finished (its latency profile over
+the output), then the full response. `POST .../cancel` before then gives
+`cancelled`; `DELETE` removes it. `store: false` with `background` is a 400.
+
+### Batches
+
+Upload a JSONL file (`purpose=batch`), create a batch, poll it, download the
+output file:
+
+```bash
+curl http://localhost:8080/openai/v1/files -F purpose=batch -F file=@requests.jsonl
+curl http://localhost:8080/openai/v1/batches -H "Content-Type: application/json" \
+  -d '{"input_file_id": "file-...", "endpoint": "/v1/chat/completions", "completion_window": "24h"}'
+curl http://localhost:8080/openai/v1/batches/batch_...
+curl http://localhost:8080/openai/v1/files/file-.../content   # output_file_id
+```
+
+- Endpoints: `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`. Each
+  line runs exactly as the synchronous endpoint would (scenarios and forced
+  tools included).
+- Status: `validating`, `in_progress`, then `completed` after `[batch]
+  completion_ms` (default 2000). Lines that fail (non-200) go to
+  `error_file_id`; invalid JSON or a mismatched `url` fails the whole batch
+  with `errors`.
+- `POST /openai/v1/batches/{id}/cancel` before completion gives `cancelled`.
 
 ### Embeddings
 
@@ -627,6 +663,21 @@ curl http://localhost:8080/anthropic/v1/messages/count_tokens \
 
 The count equals the `usage.input_tokens` a Messages request with the same
 `system` and `messages` would report.
+
+### Message Batches
+
+```bash
+curl http://localhost:8080/anthropic/v1/messages/batches -H "content-type: application/json" \
+  -d '{"requests": [{"custom_id": "a", "params": {"model": "claude-opus-5-5",
+       "max_tokens": 256, "messages": [{"role": "user", "content": "hi"}]}}]}'
+```
+
+`processing_status` is `in_progress` until `[batch] completion_ms` passes, then
+`ended` with `request_counts` and a `results_url`
+(`/anthropic/v1/messages/batches/{id}/results`, JSONL of `succeeded` /
+`errored` results by `custom_id`). Cancel before then and every request is
+`canceled`. `custom_id` must match `^[a-zA-Z0-9_-]{1,64}$` and be unique.
+List, retrieve and delete (ended batches only) work as on the real API.
 
 ### List Models
 

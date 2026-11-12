@@ -1160,6 +1160,12 @@ pub async fn create_response(
         return Ok(super::validation::openai_response(&v, "max_output_tokens"));
     }
 
+    // Background mode: the response is computed now and reported as
+    // queued / in_progress until the model would have finished.
+    if request.background && !request.stream {
+        return Ok(super::jobs::start_background_response(&state, &request).await);
+    }
+
     // Scenario mode, as on chat completions.
     let latency = state.config.latency_for_model(&request.model);
     if let Some(response) =

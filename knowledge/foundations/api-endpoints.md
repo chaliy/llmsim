@@ -46,6 +46,13 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `POST` | `/openai/v1/responses` | Responses API |
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
 | `POST` | `/openai/v1/embeddings` | Embeddings API |
+| `GET/DELETE` | `/openai/v1/responses/:id` | Retrieve or delete a background response |
+| `POST` | `/openai/v1/responses/:id/cancel` | Cancel a background response |
+| `POST` | `/openai/v1/files` | Upload a file (multipart) |
+| `GET` | `/openai/v1/files/:id`, `/openai/v1/files/:id/content` | File metadata and content |
+| `POST/GET` | `/openai/v1/batches` | Create or list batches |
+| `GET` | `/openai/v1/batches/:id` | Retrieve a batch |
+| `POST` | `/openai/v1/batches/:id/cancel` | Cancel a batch |
 | `POST` | `/openai/v1/images/generations` | Image generation API (streaming supported) |
 | `GET` | `/openai/v1/models` | List available models |
 | `GET` | `/openai/v1/models/:model_id` | Get model details |
@@ -69,6 +76,9 @@ specification.
 
 **R2.7**: The `/openai/v1/embeddings` endpoint returns deterministic,
 similarity-preserving vectors. See [embeddings-api](../apis/embeddings-api.md).
+
+**R2.8**: Background responses, Files and Batches simulate asynchronous work.
+See [batch-and-background](../apis/batch-and-background.md).
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 
@@ -103,6 +113,10 @@ the official Anthropic SDKs work when configured with `{base_url}/anthropic`.
 |--------|------|-------------|
 | `POST` | `/anthropic/v1/messages` | Messages API (streaming and non-streaming) |
 | `POST` | `/anthropic/v1/messages/count_tokens` | Count input tokens |
+| `POST/GET` | `/anthropic/v1/messages/batches` | Create or list message batches |
+| `GET/DELETE` | `/anthropic/v1/messages/batches/:id` | Retrieve or delete a batch |
+| `POST` | `/anthropic/v1/messages/batches/:id/cancel` | Cancel a batch |
+| `GET` | `/anthropic/v1/messages/batches/:id/results` | Batch results (JSONL) |
 | `GET` | `/anthropic/v1/models` | List available Claude models |
 | `GET` | `/anthropic/v1/models/:model_id` | Get model details |
 

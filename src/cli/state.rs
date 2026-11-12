@@ -6,7 +6,7 @@ use super::prompt_cache::PromptCache;
 use crate::scenario::{AttemptTracker, ScenarioSet};
 use crate::script::Script;
 use crate::stats::SharedStats;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 /// Shared application state
 pub struct AppState {
@@ -24,6 +24,11 @@ pub struct AppState {
     pub limiter: Arc<RateLimiter>,
     /// Recently seen prompt prefixes, for cached-token usage.
     pub prompt_cache: Arc<PromptCache>,
+    /// Background responses, files and batches.
+    pub jobs: Arc<super::jobs::JobStore>,
+    /// Router with instant timing and no injected errors, for work done on
+    /// the server's behalf (batch lines, background responses).
+    internal: OnceLock<axum::Router>,
 }
 
 impl AppState {
@@ -40,7 +45,25 @@ impl AppState {
             script: None,
             scenarios: None,
             attempts: Arc::new(AttemptTracker::default()),
+            jobs: Arc::default(),
+            internal: OnceLock::new(),
         }
+    }
+
+    /// The internal router (see `internal`), built on first use.
+    pub fn internal_router(&self) -> axum::Router {
+        self.internal
+            .get_or_init(|| {
+                let mut config = self.config.clone();
+                config.latency.profile = Some("instant".to_string());
+                config.latency.prefill_us_per_token = Some(0);
+                config.errors = Default::default();
+                config.rate_limits = Default::default();
+                let mut inner = AppState::new(config, crate::stats::new_shared_stats());
+                inner.scenarios = self.scenarios.clone();
+                super::build_router(Arc::new(inner))
+            })
+            .clone()
     }
 
     pub fn with_script(mut self, script: Arc<Script>) -> Self {

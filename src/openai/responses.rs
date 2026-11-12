@@ -203,6 +203,9 @@ pub struct ResponsesRequest {
     /// Enable background/async processing for long-running tasks
     #[serde(default)]
     pub background: bool,
+    /// Whether to keep the response for later retrieval (default true).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store: Option<bool>,
     /// Include additional data in response (e.g., "reasoning.encrypted_content")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,

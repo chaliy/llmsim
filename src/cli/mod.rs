@@ -7,6 +7,7 @@ mod config;
 mod decisions_handlers;
 mod embeddings_handlers;
 mod handlers;
+mod jobs;
 pub mod limits;
 pub mod prompt_cache;
 mod scenario_handlers;
@@ -48,6 +49,32 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(handlers::create_response).get(ws_handler::ws_responses),
         )
         .route(
+            "/openai/v1/responses/{response_id}",
+            get(jobs::get_response).delete(jobs::delete_response),
+        )
+        .route(
+            "/openai/v1/responses/{response_id}/cancel",
+            post(jobs::cancel_response),
+        )
+        .route("/openai/v1/files", post(jobs::upload_file))
+        .route(
+            "/openai/v1/files/{file_id}",
+            get(jobs::get_file).delete(jobs::delete_file),
+        )
+        .route(
+            "/openai/v1/files/{file_id}/content",
+            get(jobs::get_file_content),
+        )
+        .route(
+            "/openai/v1/batches",
+            post(jobs::create_openai_batch).get(jobs::list_openai_batches),
+        )
+        .route("/openai/v1/batches/{batch_id}", get(jobs::get_openai_batch))
+        .route(
+            "/openai/v1/batches/{batch_id}/cancel",
+            post(jobs::cancel_openai_batch),
+        )
+        .route(
             "/openai/v1/embeddings",
             post(embeddings_handlers::create_embeddings),
         )
@@ -68,6 +95,22 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/anthropic/v1/messages/count_tokens",
             post(anthropic_handlers::count_tokens),
+        )
+        .route(
+            "/anthropic/v1/messages/batches",
+            post(jobs::create_anthropic_batch).get(jobs::list_anthropic_batches),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}",
+            get(jobs::get_anthropic_batch).delete(jobs::delete_anthropic_batch),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}/cancel",
+            post(jobs::cancel_anthropic_batch),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}/results",
+            get(jobs::anthropic_batch_results),
         )
         .route("/anthropic/v1/models", get(anthropic_handlers::list_models))
         .route(
