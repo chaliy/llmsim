@@ -102,6 +102,7 @@ Examples:
 - `GET|DELETE /openai/v1/responses/:id`, `POST /openai/v1/responses/:id/cancel` - Background responses
 - `POST /openai/v1/files`, `GET /openai/v1/files/:id[/content]` - Files (batch input/output)
 - `POST|GET /openai/v1/batches`, `GET /openai/v1/batches/:id`, `POST .../cancel` - Batch API
+- `GET /openai/v1/realtime?model=...` (WebSocket) - Realtime voice sessions
 - `POST /openai/v1/embeddings` - Embeddings (deterministic, similarity-preserving vectors)
 - `POST /openai/v1/images/generations` - Image generation (gpt-image, streaming supported)
 - `GET /openai/v1/models` - List available models

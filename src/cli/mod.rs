@@ -11,6 +11,7 @@ mod handlers;
 mod jobs;
 pub mod limits;
 pub mod prompt_cache;
+mod realtime;
 mod scenario_handlers;
 mod server;
 mod state;
@@ -57,6 +58,7 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/openai/v1/responses/{response_id}/cancel",
             post(jobs::cancel_response),
         )
+        .route("/openai/v1/realtime", get(realtime::ws_realtime))
         .route("/openai/v1/files", post(jobs::upload_file))
         .route(
             "/openai/v1/files/{file_id}",

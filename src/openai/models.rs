@@ -949,6 +949,22 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .with_capabilities(embedding_capabilities),
     ];
 
+    // Realtime speech-to-speech models.
+    let realtime_models = vec![
+        ModelProfile::new("gpt-realtime", "gpt-realtime", "openai", 32_000, 4_096)
+            .with_created(1756339200) // 2025-08-28
+            .with_capabilities(gpt4o_capabilities()),
+        ModelProfile::new(
+            "gpt-realtime-mini",
+            "gpt-realtime-mini",
+            "openai",
+            32_000,
+            4_096,
+        )
+        .with_created(1759708800) // 2025-10-06
+        .with_capabilities(gpt4o_capabilities()),
+    ];
+
     // Add all models to registry
     for model in gpt5_models
         .into_iter()
@@ -960,6 +976,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .chain(other_models)
         .chain(image_models)
         .chain(embedding_models)
+        .chain(realtime_models)
     {
         registry.insert(model.id.clone(), model);
     }

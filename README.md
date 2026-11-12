@@ -175,6 +175,7 @@ server.shutdown().await?;
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/embeddings` | POST | Embeddings (deterministic, similarity-preserving) |
+| `/openai/v1/realtime` | WebSocket | Realtime voice sessions (server VAD, audio + transcript) |
 | `/openai/v1/responses/{id}` (`/cancel`) | GET, DELETE, POST | Background responses |
 | `/openai/v1/files`, `/openai/v1/batches` | POST, GET | Files and Batch API |
 | `/openai/v1/images/generations` | POST | Image generation (gpt-image, streaming & non-streaming) |

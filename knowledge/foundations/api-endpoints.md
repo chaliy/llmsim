@@ -46,6 +46,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `POST` | `/openai/v1/responses` | Responses API |
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
 | `POST` | `/openai/v1/embeddings` | Embeddings API |
+| `WS` | `/openai/v1/realtime` | Realtime API (voice sessions) |
 | `GET/DELETE` | `/openai/v1/responses/:id` | Retrieve or delete a background response |
 | `POST` | `/openai/v1/responses/:id/cancel` | Cancel a background response |
 | `POST` | `/openai/v1/files` | Upload a file (multipart) |
@@ -76,6 +77,9 @@ specification.
 
 **R2.7**: The `/openai/v1/embeddings` endpoint returns deterministic,
 similarity-preserving vectors. See [embeddings-api](../apis/embeddings-api.md).
+
+**R2.9**: The `/openai/v1/realtime` WebSocket simulates voice sessions. See
+[realtime-api](../apis/realtime-api.md).
 
 **R2.8**: Background responses, Files and Batches simulate asynchronous work.
 See [batch-and-background](../apis/batch-and-background.md).

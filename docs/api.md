@@ -29,6 +29,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/batches` | POST, GET | Create or list batches |
 | `/openai/v1/batches/{id}`, `/openai/v1/batches/{id}/cancel` | GET, POST | Retrieve or cancel a batch |
 | `/openai/v1/embeddings` | POST | Embeddings |
+| `/openai/v1/realtime?model=...` | GET (WebSocket) | Realtime voice sessions |
 | `/openai/v1/images/generations` | POST | Image generation (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
@@ -265,6 +266,32 @@ curl http://localhost:8080/openai/v1/models
 ```bash
 curl http://localhost:8080/openai/v1/models/gpt-5
 ```
+
+### Realtime
+
+`ws://localhost:8080/openai/v1/realtime?model=gpt-realtime` simulates the
+Realtime API: the client streams PCM16 audio (24 kHz mono, base64) and gets
+spoken answers back as events.
+
+- Events follow the GA API (`session.update`, `input_audio_buffer.append` /
+  `commit` / `clear`, `conversation.item.create`, `response.create` /
+  `cancel`; `response.output_audio.delta`,
+  `response.output_audio_transcript.delta`, `response.done`, ...). Send
+  `OpenAI-Beta: realtime=v1` for the beta names (`response.audio.delta`,
+  `conversation.item.created`) and session shape.
+- Server VAD runs on the audio you send: speech starts when 20 ms frames get
+  loud (scaled by `threshold`), and `silence_duration_ms` of quiet ends the
+  turn, commits it and answers (`create_response`). Speaking during an
+  answer cancels it (`interrupt_response`). Set `turn_detection` to `null`
+  for manual `commit` + `response.create`.
+- Answers are lorem words with a quiet tone, 400 ms of audio per word, or
+  text with `output_modalities: ["text"]`. `tool_choice: "required"` (or a
+  named function) returns a `function_call` item.
+- `input_audio_transcription` / `audio.input.transcription` adds
+  `conversation.item.input_audio_transcription.completed`.
+- Usage: input audio 10 tokens/s, output audio 20 tokens/s, text through the
+  tokenizer. Errors match the API (`input_audio_buffer_commit_empty`,
+  `conversation_already_has_active_response`, `response_cancel_not_active`).
 
 ### Background Responses
 

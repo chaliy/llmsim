@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Added the Realtime API.** New [OpenAI Realtime API Specification](apis/realtime-api.md):
+  voice sessions over WebSocket with server VAD on the audio and barge-in.
+
 * **Added the Gemini API.** New [Gemini API Specification](apis/gemini-api.md): native
   `generateContent` with thinking, tools, JSON, streaming, caching and embeddings.
 

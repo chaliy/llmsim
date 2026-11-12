@@ -8,3 +8,4 @@
 * [OpenAI Embeddings API Specification](embeddings-api.md) - Deterministic, similarity-preserving embedding vectors with OpenAI's limits.
 * [Batch and Background APIs](batch-and-background.md) - Background Responses, OpenAI Files and Batches, and Anthropic Message Batches.
 * [Gemini API Specification](gemini-api.md) - Google Gemini v1beta generateContent, streaming, token counting, embeddings and models.
+* [OpenAI Realtime API Specification](realtime-api.md) - Voice sessions over WebSocket with server VAD, barge-in and audio of realistic size.

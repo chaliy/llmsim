@@ -237,6 +237,12 @@ impl LatencyProfile {
         Self::new(2400, 600, 14, 4)
     }
 
+    /// Realtime speech models: first audio in about half a second, words
+    /// sent faster than they play.
+    pub fn realtime() -> Self {
+        Self::new(450, 120, 20, 5)
+    }
+
     /// Embedding models (text-embedding-3 family).
     pub fn embedding() -> Self {
         // Embedding calls return in roughly 100-300 ms; prefill dominates
@@ -302,6 +308,9 @@ impl LatencyProfile {
         let gpt = model_lower.starts_with("gpt-");
         if model_lower.contains("embedding") {
             return Self::embedding();
+        }
+        if model_lower.contains("realtime") {
+            return Self::realtime();
         }
         // GPT-5.6+/GPT-6 tiers (check before the generic GPT-5 family)
         if gpt && model_lower.contains("luna") {

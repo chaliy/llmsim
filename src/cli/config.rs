@@ -418,6 +418,9 @@ fn default_models() -> Vec<String> {
         "gpt-image-2".to_string(),
         "gpt-image-2.5".to_string(),
         "gpt-image-2.6".to_string(),
+        // OpenAI realtime models
+        "gpt-realtime".to_string(),
+        "gpt-realtime-mini".to_string(),
         // OpenAI embedding models
         "text-embedding-3-small".to_string(),
         "text-embedding-3-large".to_string(),

@@ -581,7 +581,10 @@ mod tests {
             Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash:generateContent"),
             Some(Provider::Gemini)
         );
-        assert_eq!(Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash"), None);
+        assert_eq!(
+            Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash"),
+            None
+        );
         assert_eq!(
             Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash:countTokens"),
             None
