@@ -393,6 +393,12 @@ fn default_models() -> Vec<String> {
         "gpt-image-1-mini".to_string(),
         "gpt-image-1.5".to_string(),
         "gpt-image-2".to_string(),
+        "gpt-image-2.5".to_string(),
+        "gpt-image-2.6".to_string(),
+        // OpenAI embedding models
+        "text-embedding-3-small".to_string(),
+        "text-embedding-3-large".to_string(),
+        "text-embedding-ada-002".to_string(),
         // Claude family
         "claude-3.5-sonnet".to_string(),
         "claude-3.7-sonnet".to_string(),

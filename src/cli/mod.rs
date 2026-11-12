@@ -5,6 +5,7 @@
 mod anthropic_handlers;
 mod config;
 mod decisions_handlers;
+mod embeddings_handlers;
 mod handlers;
 pub mod limits;
 pub mod prompt_cache;
@@ -45,6 +46,10 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/openai/v1/responses",
             post(handlers::create_response).get(ws_handler::ws_responses),
+        )
+        .route(
+            "/openai/v1/embeddings",
+            post(embeddings_handlers::create_embeddings),
         )
         .route(
             "/openai/v1/images/generations",

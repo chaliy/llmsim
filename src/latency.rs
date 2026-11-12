@@ -237,6 +237,13 @@ impl LatencyProfile {
         Self::new(2400, 600, 14, 4)
     }
 
+    /// Embedding models (text-embedding-3 family).
+    pub fn embedding() -> Self {
+        // Embedding calls return in roughly 100-300 ms; prefill dominates
+        // for large batches. No streaming, so no token gap.
+        Self::new(120, 40, 0, 0).with_prefill_us_per_token(2)
+    }
+
     /// GPT-5.6+/GPT-6 Luna (cost-efficient tier). Measured: TTFT about 2.9 s
     /// (2-4.5 s), 108 tokens/s. Luna thinks before it answers, so its first
     /// token is later than Sol's even though it streams faster.
@@ -293,6 +300,9 @@ impl LatencyProfile {
         let model_lower = model.to_lowercase();
 
         let gpt = model_lower.starts_with("gpt-");
+        if model_lower.contains("embedding") {
+            return Self::embedding();
+        }
         // GPT-5.6+/GPT-6 tiers (check before the generic GPT-5 family)
         if gpt && model_lower.contains("luna") {
             Self::gpt_luna()

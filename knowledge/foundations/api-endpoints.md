@@ -45,6 +45,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `POST` | `/openai/v1/chat/completions` | Chat Completions API |
 | `POST` | `/openai/v1/responses` | Responses API |
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
+| `POST` | `/openai/v1/embeddings` | Embeddings API |
 | `POST` | `/openai/v1/images/generations` | Image generation API (streaming supported) |
 | `GET` | `/openai/v1/models` | List available models |
 | `GET` | `/openai/v1/models/:model_id` | Get model details |
@@ -65,6 +66,9 @@ family ("ChatGPT Images"), returning a synthetic watermarked PNG of the
 requested size. It supports both non-streaming JSON and SSE streaming with
 progressive partial images. See [image-generation](../apis/image-generation.md) for the full
 specification.
+
+**R2.7**: The `/openai/v1/embeddings` endpoint returns deterministic,
+similarity-preserving vectors. See [embeddings-api](../apis/embeddings-api.md).
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 

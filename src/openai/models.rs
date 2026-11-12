@@ -912,6 +912,43 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
             .with_capabilities(image_capabilities()),
     ];
 
+    // Embedding models: 8192-token inputs, no generated output.
+    let embedding_capabilities = ModelCapabilities {
+        function_calling: false,
+        vision: false,
+        json_mode: false,
+        reasoning: false,
+    };
+    let embedding_models = vec![
+        ModelProfile::new(
+            "text-embedding-3-small",
+            "text-embedding-3-small",
+            "openai",
+            8_192,
+            0,
+        )
+        .with_created(1705953180) // 2024-01-22
+        .with_capabilities(embedding_capabilities.clone()),
+        ModelProfile::new(
+            "text-embedding-3-large",
+            "text-embedding-3-large",
+            "openai",
+            8_192,
+            0,
+        )
+        .with_created(1705953180)
+        .with_capabilities(embedding_capabilities.clone()),
+        ModelProfile::new(
+            "text-embedding-ada-002",
+            "text-embedding-ada-002",
+            "openai",
+            8_192,
+            0,
+        )
+        .with_created(1671217299) // 2022-12-16
+        .with_capabilities(embedding_capabilities),
+    ];
+
     // Add all models to registry
     for model in gpt5_models
         .into_iter()
@@ -922,6 +959,7 @@ fn build_model_registry() -> HashMap<String, ModelProfile> {
         .chain(deepseek_models)
         .chain(other_models)
         .chain(image_models)
+        .chain(embedding_models)
     {
         registry.insert(model.id.clone(), model);
     }

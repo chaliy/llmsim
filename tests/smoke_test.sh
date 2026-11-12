@@ -178,6 +178,19 @@ else
     exit 1
 fi
 
+# Test 8b2: OpenAI Embeddings
+echo_info "Testing /openai/v1/embeddings..."
+EMBED_API=$(curl -s -X POST "$BASE_URL/openai/v1/embeddings" \
+    -H "Content-Type: application/json" \
+    -d '{"model": "text-embedding-3-small", "input": ["hello world", "goodbye"], "dimensions": 8}')
+if echo "$EMBED_API" | grep -q '"object":"list"' \
+    && [ "$(echo "$EMBED_API" | grep -o '"object":"embedding"' | wc -l)" -eq 2 ]; then
+    echo_pass "OpenAI Embeddings passed"
+else
+    echo_fail "OpenAI Embeddings failed: ${EMBED_API:0:200}"
+    exit 1
+fi
+
 # Test 8c: OpenAI Image Generation (streaming partial images)
 echo_info "Testing /openai/v1/images/generations (streaming)..."
 IMAGE_STREAM=$(curl -s -X POST "$BASE_URL/openai/v1/images/generations" \

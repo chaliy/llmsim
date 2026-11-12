@@ -21,6 +21,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/responses` | WS | WebSocket mode for Responses API |
+| `/openai/v1/embeddings` | POST | Embeddings |
 | `/openai/v1/images/generations` | POST | Image generation (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
@@ -257,6 +258,34 @@ curl http://localhost:8080/openai/v1/models
 ```bash
 curl http://localhost:8080/openai/v1/models/gpt-5
 ```
+
+### Embeddings
+
+Deterministic vectors for `text-embedding-3-small` (1536 dims),
+`text-embedding-3-large` (3072) and `text-embedding-ada-002` (1536). Texts that
+share words get similar vectors (each word has a fixed direction), so
+retrieval, ranking and dedup code sees meaningful cosine similarity; the same
+text always returns the same vector.
+
+```bash
+curl http://localhost:8080/openai/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{"model": "text-embedding-3-small", "input": ["refund policy", "kubernetes"]}'
+# {"object": "list", "model": "text-embedding-3-small",
+#  "data": [{"object": "embedding", "index": 0, "embedding": [0.012, ...]}, ...],
+#  "usage": {"prompt_tokens": 4, "total_tokens": 4}}
+```
+
+- `input`: a string, an array of strings, a token array, or an array of token
+  arrays.
+- `dimensions` (v3 models): a shorter vector that is the renormalized prefix of
+  the full one, as on OpenAI. `text-embedding-ada-002` rejects it.
+- `encoding_format: "base64"`: little-endian float32 bytes, base64-encoded.
+- Limits as on OpenAI: 8192 tokens per input, 2048 inputs and 300,000 tokens
+  per request; empty inputs are rejected.
+- Latency: about 120 ms plus 2 µs per input token (the `instant` profile makes
+  it immediate). Unknown model ids get the `text-embedding-3-small` shape
+  unless `[validation] strict_models` is on.
 
 ### Image Generation
 

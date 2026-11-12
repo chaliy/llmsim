@@ -99,6 +99,7 @@ Examples:
 **Current OpenAI endpoints:**
 - `POST /openai/v1/chat/completions` - Chat completions (streaming supported)
 - `POST /openai/v1/responses` - Responses API (streaming supported)
+- `POST /openai/v1/embeddings` - Embeddings (deterministic, similarity-preserving vectors)
 - `POST /openai/v1/images/generations` - Image generation (gpt-image, streaming supported)
 - `GET /openai/v1/models` - List available models
 - `GET /openai/v1/models/:id` - Get model details

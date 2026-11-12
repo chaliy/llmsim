@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Added the Embeddings API.** New [OpenAI Embeddings API Specification](apis/embeddings-api.md):
+  `/openai/v1/embeddings` with similarity-preserving vectors.
+
 * **Scenarios on the Responses API and Anthropic Messages.** [Scenarios](simulation/scenarios.md)
   now play on both, in each API's wire shape.
 

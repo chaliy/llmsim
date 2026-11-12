@@ -42,6 +42,7 @@
 
 // Core library modules
 pub mod anthropic;
+pub mod embeddings;
 pub mod errors;
 pub mod forced;
 pub mod generator;
