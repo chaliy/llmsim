@@ -8,6 +8,7 @@ mod decisions_handlers;
 mod handlers;
 pub mod limits;
 pub mod prompt_cache;
+mod scenario_handlers;
 mod server;
 mod state;
 mod typesafe_handlers;

@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Scenarios on the Responses API and Anthropic Messages.** [Scenarios](simulation/scenarios.md)
+  now play on both, in each API's wire shape.
+
 * **Added prompt caching and thinking realism.** New
   [Prompt Caching and Thinking Realism](simulation/prompt-caching-and-thinking.md) concept:
   cached-token usage for OpenAI and Anthropic, effort-scaled reasoning latency, redacted thinking.

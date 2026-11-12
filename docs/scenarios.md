@@ -5,8 +5,19 @@ long answers, reasoning, slow first tokens, mid-stream stalls, a 429 halfway,
 or a dropped stream. Many sessions can share one llmsim server, because the
 step to play is worked out from each request's own message history.
 
-Scenarios currently play on `POST /openai/v1/chat/completions` (streaming and
-non-streaming).
+Scenarios play on these endpoints, streaming and non-streaming, each in its
+own wire shape:
+
+| Endpoint | Reasoning | Tool calls |
+|----------|-----------|------------|
+| `POST /openai/v1/chat/completions` | `reasoning_content` deltas | `tool_calls` |
+| `POST /openai/v1/responses` | `reasoning` item with a summary | `function_call` items |
+| `POST /anthropic/v1/messages` | `thinking` block | `tool_use` blocks |
+
+Send history back the way each API expects (Responses `function_call` and
+`function_call_output` items, Anthropic `tool_use` and `tool_result` blocks).
+Keep the tool call ids llmsim issued (`call_llmsim_...`): they are how a step
+is counted when history is compacted.
 
 ## Enable
 

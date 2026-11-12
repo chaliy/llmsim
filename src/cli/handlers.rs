@@ -653,7 +653,7 @@ async fn handle_scenario_chat_completions(
 
 /// Render a scenario step error, with `Retry-After` / `retry-after-ms` when
 /// the step sets `retry_after_ms`.
-fn step_error_response(err: &StepError) -> Response {
+pub(super) fn step_error_response(err: &StepError) -> Response {
     let mut response = sim_error_to_response(&err.error);
     if let (Some(secs), Some(ms)) = (err.retry_after_secs(), err.retry_after_ms) {
         let headers = response.headers_mut();
@@ -774,7 +774,7 @@ async fn handle_scripted_responses_api(
 }
 
 /// Build an OpenAI Responses-API-shaped error response for a SimError.
-fn sim_error_to_responses_api_response(err: &SimError) -> Response {
+pub(super) fn sim_error_to_responses_api_response(err: &SimError) -> Response {
     let status = match err.status_code() {
         429 => StatusCode::TOO_MANY_REQUESTS,
         500 => StatusCode::INTERNAL_SERVER_ERROR,
@@ -1160,6 +1160,14 @@ pub async fn create_response(
         return Ok(super::validation::openai_response(&v, "max_output_tokens"));
     }
 
+    // Scenario mode, as on chat completions.
+    let latency = state.config.latency_for_model(&request.model);
+    if let Some(response) =
+        super::scenario_handlers::responses(&state, &request, request_start, latency).await
+    {
+        return Ok(response);
+    }
+
     // Scripted mode: handle non-streaming with full tool-call support;
     // streaming falls through to the text-based scripted result built
     // by generate_responses_result (text + error turns only).
@@ -1390,7 +1398,7 @@ pub async fn create_image(
 }
 
 /// Extract text content from ResponsesInput for processing
-fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> String {
+pub(super) fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> String {
     let mut parts = Vec::new();
 
     // Add instructions if present
@@ -1439,7 +1447,7 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
 /// Approximate the image-input token cost for a Responses API request.
 /// The Responses `input_image` part carries no `detail`, so each image is
 /// charged at the high-detail default (see `estimate_image_tokens`).
-fn count_responses_input_image_tokens(input: &ResponsesInput) -> usize {
+pub(super) fn count_responses_input_image_tokens(input: &ResponsesInput) -> usize {
     let ResponsesInput::Items(items) = input else {
         return 0;
     };

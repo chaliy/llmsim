@@ -53,6 +53,7 @@ pub mod openai;
 pub mod openresponses;
 pub mod responses_stream;
 pub mod scenario;
+pub mod scenario_frames;
 pub mod scenario_stream;
 pub mod schema_fake;
 pub mod script;

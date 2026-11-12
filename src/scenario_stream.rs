@@ -22,11 +22,15 @@ use std::pin::Pin;
 use std::time::Duration;
 use tokio::time::sleep;
 
-type Callback = Box<dyn FnOnce() + Send + 'static>;
+/// Completion or cut callback.
+pub type Callback = Box<dyn FnOnce() + Send + 'static>;
 
 /// Item type of a scenario stream: an SSE frame, or an error that aborts the
 /// HTTP body mid-flight (the client sees a dropped connection).
 pub type StreamItem = Result<String, std::io::Error>;
+
+/// A boxed stream of scenario frames.
+pub type StreamItemStream = Pin<Box<dyn Stream<Item = StreamItem> + Send>>;
 
 /// Per-token pacing for one step: resolved timing, falling back to the
 /// latency profile (scaled by `speed`) for anything the scenario leaves unset.
@@ -246,6 +250,82 @@ impl ScenarioChatStream {
             }
         })
     }
+}
+
+/// Renders a scenario step in one provider's streaming wire format. The
+/// paced engine (`paced_frames`) decides when each piece goes out.
+pub trait StepFrames: Send + 'static {
+    /// Frames sent after the first-token delay.
+    fn open(&mut self) -> Vec<String>;
+    /// Frames for one reasoning or answer token.
+    fn token(&mut self, reasoning: bool, token: &str) -> Vec<String>;
+    /// Frames that close open blocks, send tool calls and finish.
+    fn close(&mut self) -> Vec<String>;
+}
+
+/// Pace a step through `frames`: TTFT, reasoning then text tokens with the
+/// step's gaps and stall, an optional cut (the body aborts before `close`),
+/// then the closing frames.
+pub fn paced_frames<F: StepFrames>(
+    mut frames: F,
+    reasoning: Option<&str>,
+    text: &str,
+    pacing: Pacing,
+    cut: Option<usize>,
+    on_complete: Option<Callback>,
+    on_cut: Option<Callback>,
+) -> StreamItemStream {
+    let tokens: Vec<(bool, String)> = reasoning
+        .map(word_tokens)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|t| (true, t))
+        .chain(word_tokens(text).into_iter().map(|t| (false, t)))
+        .collect();
+    Box::pin(stream! {
+        let ttft = pacing.ttft();
+        if !ttft.is_zero() {
+            sleep(ttft).await;
+        }
+        for f in frames.open() {
+            yield Ok(f);
+        }
+        let mut emitted = 0usize;
+        for (is_reasoning, token) in tokens {
+            if cut == Some(emitted) {
+                break;
+            }
+            let delay = pacing.before_token(emitted);
+            if !delay.is_zero() {
+                sleep(delay).await;
+            }
+            for f in frames.token(is_reasoning, &token) {
+                yield Ok(f);
+            }
+            emitted += 1;
+        }
+        if let Some(limit) = cut {
+            if emitted <= limit {
+                if let Some(cb) = on_cut {
+                    cb();
+                }
+                yield Err(std::io::Error::other(format!(
+                    "llmsim scenario: stream cut after {emitted} tokens"
+                )));
+                return;
+            }
+        }
+        let delay = pacing.inter_token();
+        if !delay.is_zero() {
+            sleep(delay).await;
+        }
+        for f in frames.close() {
+            yield Ok(f);
+        }
+        if let Some(cb) = on_complete {
+            cb();
+        }
+    })
 }
 
 fn reasoning_frame(id: &str, model: &str, created: i64, token: &str) -> String {

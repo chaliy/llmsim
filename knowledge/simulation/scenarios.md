@@ -25,7 +25,8 @@ stays as it is for single-agent tests.
 
 The engine is a library module (`llmsim::scenario`) so embedders (Everruns'
 llmsim driver, yolop) can call the pure `resolve` function directly; the
-server wires it into the chat completions endpoint.
+server wires it into chat completions, the Responses API and Anthropic
+Messages.
 
 ## Requirements
 
@@ -167,8 +168,21 @@ again: an extra error, never a wrong answer.
   - Responses carry `x-llmsim-scenario`, `x-llmsim-step` and
     `x-llmsim-attempt` headers for debugging.
 - Error injection from `[errors]` still applies first.
-- Other endpoints (Responses, OpenResponses, Anthropic Messages) do not play
-  scenarios yet; they keep their current behaviour.
+- The Responses API and Anthropic Messages play scenarios with the same
+  resolution, attempts, failures, timing and cuts, in their own wire shapes
+  ([`src/cli/scenario_handlers.rs`](../../src/cli/scenario_handlers.rs),
+  [`src/scenario_frames.rs`](../../src/scenario_frames.rs)):
+  - Responses: a `reasoning` item (summary), a `message`, then one
+    `function_call` item per call, streamed with `response.*` events and
+    gap-free `sequence_number`s. History items of one model turn (`reasoning`,
+    assistant `message`, `function_call`) count as one step.
+  - Anthropic: a `thinking` block, a `text` block, then `tool_use` blocks
+    (arguments as one `input_json_delta`); `stop_reason` is `tool_use` or
+    `end_turn`. A user message holding only `tool_result` blocks is tool
+    output, not a new user message.
+  - Tool call ids stay `call_llmsim_...` on both, since resolution reads them
+    back to count steps. Errors use each API's error envelope.
+- OpenResponses does not play scenarios yet.
 
 ### Starter library
 
@@ -213,5 +227,5 @@ The pacing and SSE engine is `llmsim::scenario_stream`.
 
 ## Future work
 
-- Scenarios on the Responses, OpenResponses and Anthropic endpoints.
+- Scenarios on the OpenResponses endpoint.
 - Custom scenarios supplied per request or via an admin endpoint.

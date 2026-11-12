@@ -44,7 +44,7 @@ fn anthropic_error(status: u16, message: impl Into<String>) -> Response {
 }
 
 /// Render a scripted `SimError` as an Anthropic error response.
-fn sim_error_to_anthropic_response(err: &SimError) -> Response {
+pub(super) fn sim_error_to_anthropic_response(err: &SimError) -> Response {
     anthropic_error(err.status_code(), err.message())
 }
 
@@ -110,6 +110,13 @@ pub async fn create_message(
 
     // Model-specific latency (unless overridden in config).
     let latency = state.config.latency_for_model(&request.model);
+
+    // Scenario mode, as on chat completions.
+    if let Some(response) =
+        super::scenario_handlers::anthropic(&state, &request, request_start, latency.clone()).await
+    {
+        return response;
+    }
 
     // Scripted non-streaming requests get full tool-call support.
     if let Some(script) = state.script.clone() {
@@ -491,7 +498,7 @@ fn generate_content(state: &AppState, request: &MessagesRequest) -> String {
 }
 
 /// Count input tokens for a Messages request (prompt text + small overhead).
-fn count_input_tokens(request: &MessagesRequest) -> usize {
+pub(super) fn count_input_tokens(request: &MessagesRequest) -> usize {
     count_prompt_tokens(&request.prompt_text(), request.messages.len())
 }
 

@@ -30,6 +30,17 @@ pub enum InputItem {
     },
     /// A function call result (tool output)
     FunctionCallOutput { call_id: String, output: String },
+    /// A function call the model made earlier, sent back as history.
+    FunctionCall {
+        call_id: String,
+        name: String,
+        arguments: String,
+    },
+    /// A reasoning item sent back as history. Its content is not read.
+    Reasoning {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
 }
 
 impl<'de> serde::Deserialize<'de> for InputItem {
@@ -72,9 +83,30 @@ impl<'de> serde::Deserialize<'de> for InputItem {
                     .to_string();
                 Ok(InputItem::FunctionCallOutput { call_id, output })
             }
+            Some("function_call") => {
+                let field = |name: &'static str| {
+                    obj.get(name)
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string)
+                        .ok_or_else(|| serde::de::Error::missing_field(name))
+                };
+                Ok(InputItem::FunctionCall {
+                    call_id: field("call_id")?,
+                    name: field("name")?,
+                    arguments: field("arguments")?,
+                })
+            }
+            Some("reasoning") => Ok(InputItem::Reasoning {
+                id: obj.get("id").and_then(|v| v.as_str()).map(str::to_string),
+            }),
             Some(other) => Err(serde::de::Error::unknown_variant(
                 other,
-                &["message", "function_call_output"],
+                &[
+                    "message",
+                    "function_call_output",
+                    "function_call",
+                    "reasoning",
+                ],
             )),
             None => Err(serde::de::Error::custom(
                 "missing 'type' or 'role' field in input item",
