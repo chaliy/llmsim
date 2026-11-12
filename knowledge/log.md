@@ -2,6 +2,9 @@
 
 ## 2026-11-12
 
+* **Added the Gemini API.** New [Gemini API Specification](apis/gemini-api.md): native
+  `generateContent` with thinking, tools, JSON, streaming, caching and embeddings.
+
 * **Added batch and background APIs.** New [Batch and Background APIs](apis/batch-and-background.md):
   background Responses, OpenAI Files and Batches, Anthropic Message Batches.
 

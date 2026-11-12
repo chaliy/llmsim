@@ -6,6 +6,7 @@ mod anthropic_handlers;
 mod config;
 mod decisions_handlers;
 mod embeddings_handlers;
+mod gemini_handlers;
 mod handlers;
 mod jobs;
 pub mod limits;
@@ -124,6 +125,11 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         .route(
             "/openai/v1/decisions",
             post(decisions_handlers::openai_decisions),
+        )
+        .route("/gemini/v1beta/models", get(gemini_handlers::list_models))
+        .route(
+            "/gemini/v1beta/models/{model}",
+            get(gemini_handlers::get_model).post(gemini_handlers::model_action),
         )
         .route(
             "/gemini/v1beta/decisions",

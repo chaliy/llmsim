@@ -9,6 +9,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 | **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
+| **Gemini** | `/gemini/v1beta/` | [Gemini API](https://ai.google.dev/api) (`generateContent`, streaming, embeddings) |
 | **TypeSafe** | `/typesafe/v1/` | [TypeSafe System One API](https://docs.typesafe.ai/api) (Jev) |
 | **Decisions** | `/openai/v1/decisions`, `/gemini/v1beta/decisions`, `/foundry/providers/microsoft/v1/systemone` | OpenAI, Gemini and Microsoft Foundry typed-judgment APIs |
 
@@ -698,6 +699,52 @@ Errors use the Anthropic error envelope:
 ```json
 {"type": "error", "error": {"type": "rate_limit_error", "message": "..."}}
 ```
+
+## Gemini API (`/gemini/v1beta/...`)
+
+Simulates Google's Gemini API. Point the Google Gen AI SDK at
+`http://localhost:8080/gemini` (`http_options={"base_url": ...}`).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/gemini/v1beta/models/{model}:generateContent` | POST | Generate content |
+| `/gemini/v1beta/models/{model}:streamGenerateContent` | POST | Stream (`?alt=sse` for SSE, otherwise a JSON array) |
+| `/gemini/v1beta/models/{model}:countTokens` | POST | Count tokens (`contents` or `generateContentRequest`) |
+| `/gemini/v1beta/models/{model}:embedContent` | POST | Embed one content |
+| `/gemini/v1beta/models/{model}:batchEmbedContents` | POST | Embed several |
+| `/gemini/v1beta/models`, `/gemini/v1beta/models/{model}` | GET | Models in Google's shape |
+
+```bash
+curl "http://localhost:8080/gemini/v1beta/models/gemini-2.5-flash:generateContent" \
+  -H "Content-Type: application/json" \
+  -d '{"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]}'
+# {"candidates": [{"content": {"role": "model", "parts": [{"text": "..."}]},
+#   "finishReason": "STOP", "index": 0}],
+#  "usageMetadata": {"promptTokenCount": 3, "candidatesTokenCount": 100,
+#   "thoughtsTokenCount": 200, "totalTokenCount": 303, ...},
+#  "modelVersion": "gemini-2.5-flash", "responseId": "..."}
+```
+
+- Field names in camelCase or snake_case.
+- Thinking: 2.5 (not Flash-Lite), 3.x and 4.x models think by default and
+  bill `thoughtsTokenCount`. `thinkingConfig.thinkingBudget: 0` turns it off
+  (a 400 on Pro), `thinkingLevel` scales it, `includeThoughts` adds a
+  `thought: true` part. Thinking counts against `maxOutputTokens`: a small cap
+  gives `finishReason: MAX_TOKENS` and no parts, as on the real API.
+- Tools: `toolConfig.functionCallingConfig.mode: ANY` (optionally with
+  `allowedFunctionNames`) returns a `functionCall` with schema-valid `args`;
+  thinking models add a `thoughtSignature`.
+- `responseMimeType: application/json` with `responseSchema` (upper-case
+  OpenAPI types) or `responseJsonSchema` returns schema-valid JSON.
+- Implicit caching: a repeated prefix of 1024+ tokens (4096 on Pro) reports
+  `cachedContentTokenCount`.
+- Scenarios play here too: `functionCall` parts carry the `call_llmsim_...`
+  `id`; send it back in `functionResponse.id`.
+- Embeddings: `gemini-embedding-001` (3072, `outputDimensionality` 128-3072,
+  shortened vectors not renormalized, as Google documents) and
+  `text-embedding-004` (768).
+- Errors use Google's envelope:
+  `{"error": {"code": 400, "message": "...", "status": "INVALID_ARGUMENT"}}`.
 
 ## TypeSafe API (`/typesafe/v1/...`)
 

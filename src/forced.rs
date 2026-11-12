@@ -73,6 +73,32 @@ pub fn json_for_schema(schema: &Value, seed: u64) -> String {
     serde_json::to_string(&fake_from_schema(schema, seed)).unwrap_or_else(|_| "{}".into())
 }
 
+/// A forced function call for a Gemini request. `mode` is
+/// `toolConfig.functionCallingConfig.mode` (`AUTO`, `ANY`, `NONE`,
+/// `VALIDATED`); `allowed` narrows the tools under `ANY`.
+pub fn gemini(
+    tools: &[(String, Option<Value>)],
+    mode: &str,
+    allowed: &[String],
+    may_auto: bool,
+    seed: u64,
+) -> Option<SimToolCall> {
+    let offered: Vec<Offered<'_>> = tools
+        .iter()
+        .filter(|(name, _)| mode != "ANY" || allowed.is_empty() || allowed.contains(name))
+        .map(|(name, schema)| Offered {
+            name,
+            schema: schema.as_ref(),
+        })
+        .collect();
+    let choice = match mode {
+        "NONE" => Choice::None,
+        "ANY" => Choice::Any,
+        _ => Choice::Auto,
+    };
+    call_for(&offered, choice, may_auto, seed)
+}
+
 /// Forced output for a chat completions request.
 pub fn openai_chat(request: &ChatCompletionRequest, auto_tool_calls: bool) -> Option<Forced> {
     let last = request.messages.last();

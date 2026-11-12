@@ -57,7 +57,13 @@ impl Provider {
     /// The provider for a generation endpoint path, `None` for anything that
     /// is never limited.
     pub fn for_path(path: &str) -> Option<Self> {
-        if path.ends_with("/models") || path.contains("/models/") || path.ends_with("/count_tokens")
+        // Model listings and token counting are free; Gemini generation
+        // lives under `/models/{model}:{method}`.
+        let gemini_call = path.contains(':') && !path.ends_with(":countTokens");
+        if path.ends_with("/models")
+            || (path.contains("/models/") && !gemini_call)
+            || path.ends_with("/count_tokens")
+            || path.ends_with(":countTokens")
         {
             return None;
         }
@@ -571,5 +577,14 @@ mod tests {
             None
         );
         assert_eq!(Provider::for_path("/health"), None);
+        assert_eq!(
+            Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash:generateContent"),
+            Some(Provider::Gemini)
+        );
+        assert_eq!(Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash"), None);
+        assert_eq!(
+            Provider::for_path("/gemini/v1beta/models/gemini-2.5-flash:countTokens"),
+            None
+        );
     }
 }

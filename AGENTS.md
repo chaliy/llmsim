@@ -117,6 +117,10 @@ Examples:
 - `GET /anthropic/v1/models` - List available Claude models
 - `GET /anthropic/v1/models/:id` - Get model details
 
+**Gemini endpoints:**
+- `POST /gemini/v1beta/models/:model:generateContent` (`:streamGenerateContent`, `:countTokens`, `:embedContent`, `:batchEmbedContents`) - Gemini API
+- `GET /gemini/v1beta/models`, `GET /gemini/v1beta/models/:model` - Gemini models
+
 **TypeSafe endpoints:**
 - `POST /typesafe/v1/systemone` - System One evaluation (Jev model; noul, choice, score)
 - `GET /typesafe/v1/models` - List available Jev models and aliases

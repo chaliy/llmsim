@@ -287,7 +287,7 @@ pub async fn openai_decisions(State(state): State<Arc<AppState>>, body: Bytes) -
 // Gemini
 // ---------------------------------------------------------------------------
 
-fn gemini_status(status: u16) -> &'static str {
+pub(super) fn gemini_status(status: u16) -> &'static str {
     match status {
         400 | 422 => "INVALID_ARGUMENT",
         401 => "UNAUTHENTICATED",
@@ -300,7 +300,7 @@ fn gemini_status(status: u16) -> &'static str {
     }
 }
 
-fn gemini_error(status: u16, message: String) -> Response {
+pub(super) fn gemini_error(status: u16, message: String) -> Response {
     let body =
         json!({"error": {"code": status, "message": message, "status": gemini_status(status)}});
     let code = StatusCode::from_u16(status).unwrap_or(StatusCode::INTERNAL_SERVER_ERROR);

@@ -7,3 +7,4 @@
 * [Decisions APIs Specification](decisions-api.md) - OpenAI Decisions, Gemini Decisions and Microsoft Foundry System One on the shared answer engine.
 * [OpenAI Embeddings API Specification](embeddings-api.md) - Deterministic, similarity-preserving embedding vectors with OpenAI's limits.
 * [Batch and Background APIs](batch-and-background.md) - Background Responses, OpenAI Files and Batches, and Anthropic Message Batches.
+* [Gemini API Specification](gemini-api.md) - Google Gemini v1beta generateContent, streaming, token counting, embeddings and models.

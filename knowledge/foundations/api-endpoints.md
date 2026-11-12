@@ -138,6 +138,23 @@ and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
 e.g. `claude-opus-4-8`) plus dated snapshot and `-latest` aliases. See
 [anthropic-api](../apis/anthropic-api.md) for the full specification.
 
+### R4c: Gemini Endpoints
+
+**R4c.1**: Gemini endpoints mirror Google's `v1beta` paths under `/gemini`, so
+the Google Gen AI SDK works with `{base_url}/gemini`. The model and method
+share one path segment (`models/{model}:{method}`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/gemini/v1beta/models/:model:generateContent` | Generate content |
+| `POST` | `/gemini/v1beta/models/:model:streamGenerateContent` | Stream (`alt=sse` or JSON array) |
+| `POST` | `/gemini/v1beta/models/:model:countTokens` | Count tokens |
+| `POST` | `/gemini/v1beta/models/:model:embedContent` | Embed content |
+| `POST` | `/gemini/v1beta/models/:model:batchEmbedContents` | Embed contents |
+| `GET` | `/gemini/v1beta/models`, `/gemini/v1beta/models/:model` | Models |
+
+See [gemini-api](../apis/gemini-api.md).
+
 ### R4a: TypeSafe Endpoints
 
 **R4a.1**: TypeSafe endpoints follow the provider-prefixed pattern and accept

@@ -218,6 +218,21 @@ print(msg.content[0].text)
 Runnable examples for Python, TypeScript, Go, curl, and LangChain live in
 [`examples/`](examples/) (see [`examples/README.md`](examples/README.md)).
 
+### Gemini API (`/gemini/v1beta/...`)
+
+Simulates Google's [Gemini API](https://ai.google.dev/api): thinking with
+`thoughtsTokenCount`, function calling, JSON schema output, SSE and JSON-array
+streaming, implicit caching and embeddings. Set the Google Gen AI SDK base URL
+to `http://localhost:8080/gemini`.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/gemini/v1beta/models/{model}:generateContent` | POST | Generate content |
+| `/gemini/v1beta/models/{model}:streamGenerateContent` | POST | Streaming (`?alt=sse`) |
+| `/gemini/v1beta/models/{model}:countTokens` | POST | Count tokens |
+| `/gemini/v1beta/models/{model}:embedContent` / `:batchEmbedContents` | POST | Embeddings |
+| `/gemini/v1beta/models` | GET | List models |
+
 ### TypeSafe API (`/typesafe/v1/...`)
 
 Simulates TypeSafe's [System One API](https://docs.typesafe.ai/api) with the

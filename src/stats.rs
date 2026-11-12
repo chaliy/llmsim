@@ -45,6 +45,8 @@ pub enum EndpointType {
     SystemOne,
     /// Embeddings API (/openai/v1/embeddings)
     Embeddings,
+    /// Gemini generateContent API (/gemini/v1beta/models/...)
+    Gemini,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -76,6 +78,8 @@ pub struct Stats {
     pub systemone_requests: AtomicU64,
     /// Embeddings API requests
     pub embeddings_requests: AtomicU64,
+    /// Gemini generateContent requests
+    pub gemini_requests: AtomicU64,
     /// Currently active WebSocket connections
     pub active_websocket_connections: AtomicU64,
 
@@ -138,6 +142,7 @@ impl Stats {
             image_requests: AtomicU64::new(0),
             systemone_requests: AtomicU64::new(0),
             embeddings_requests: AtomicU64::new(0),
+            gemini_requests: AtomicU64::new(0),
             active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
@@ -187,6 +192,9 @@ impl Stats {
             }
             EndpointType::Embeddings => {
                 self.embeddings_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Gemini => {
+                self.gemini_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -415,6 +423,7 @@ impl Stats {
             image_requests: self.image_requests.load(ORDERING),
             systemone_requests: self.systemone_requests.load(ORDERING),
             embeddings_requests: self.embeddings_requests.load(ORDERING),
+            gemini_requests: self.gemini_requests.load(ORDERING),
             active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
@@ -451,6 +460,8 @@ pub struct StatsSnapshot {
     pub systemone_requests: u64,
     #[serde(default)]
     pub embeddings_requests: u64,
+    #[serde(default)]
+    pub gemini_requests: u64,
     pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,

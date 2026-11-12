@@ -498,3 +498,219 @@ pub(super) async fn anthropic(
     .await;
     Some(trace(response, &resolution, attempt))
 }
+
+// ---------------------------------------------------------------------------
+// Gemini
+// ---------------------------------------------------------------------------
+
+/// The conversation and tools of a Gemini generateContent request.
+pub(super) fn gemini_conversation(
+    req: &super::gemini_handlers::GeminiRequest,
+) -> (Vec<ConversationMessage>, Vec<ToolSpec>) {
+    let mut out = Vec::new();
+    if !req.system.is_empty() {
+        out.push(ConversationMessage::new(
+            MessageRole::System,
+            req.system.clone(),
+        ));
+    }
+    for c in &req.contents {
+        let parts = c["parts"].as_array().cloned().unwrap_or_default();
+        let text = parts
+            .iter()
+            .filter_map(|p| p["text"].as_str())
+            .collect::<Vec<_>>()
+            .join(" ");
+        let call_id = |p: &serde_json::Value, key: &str| {
+            p.get(key)
+                .and_then(|f| f["id"].as_str().or(f["name"].as_str()))
+                .map(str::to_string)
+        };
+        if c["role"].as_str() == Some("model") {
+            let ids = parts
+                .iter()
+                .filter_map(|p| call_id(p, "functionCall"))
+                .collect::<Vec<_>>();
+            push_assistant(&mut out, text, ids);
+            continue;
+        }
+        let mut results = false;
+        for p in &parts {
+            if let Some(id) = call_id(p, "functionResponse") {
+                results = true;
+                out.push(
+                    ConversationMessage::new(MessageRole::Tool, String::new())
+                        .with_tool_call_ids([id]),
+                );
+            }
+        }
+        if !results || !text.is_empty() {
+            out.push(ConversationMessage::new(MessageRole::User, text));
+        }
+    }
+    let tools = req
+        .tools
+        .iter()
+        .map(|(name, schema)| ToolSpec {
+            name: name.clone(),
+            parameters: schema.clone(),
+        })
+        .collect();
+    (out, tools)
+}
+
+fn gemini_call_parts(calls: &[SimToolCall]) -> Vec<serde_json::Value> {
+    calls
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let id =
+                c.id.clone()
+                    .unwrap_or_else(|| crate::script::auto_tool_call_id(0, i));
+            serde_json::json!({"functionCall": {"id": id, "name": c.name, "args": c.arguments}})
+        })
+        .collect()
+}
+
+/// Gemini stream chunks for a scenario step, as SSE or one JSON array.
+struct GeminiFrames {
+    model: String,
+    id: String,
+    sse: bool,
+    started: bool,
+    include_thoughts: bool,
+    calls: Vec<SimToolCall>,
+    usage: serde_json::Value,
+}
+
+impl GeminiFrames {
+    fn frame(&mut self, chunk: serde_json::Value, last: bool) -> String {
+        if self.sse {
+            return format!("data: {chunk}\r\n\r\n");
+        }
+        let open = if self.started { ",\r\n" } else { "[" };
+        self.started = true;
+        format!("{open}{chunk}{}", if last { "]" } else { "" })
+    }
+}
+
+impl StepFrames for GeminiFrames {
+    fn open(&mut self) -> Vec<String> {
+        Vec::new()
+    }
+
+    fn token(&mut self, reasoning: bool, token: &str) -> Vec<String> {
+        if reasoning && !self.include_thoughts {
+            return Vec::new();
+        }
+        let mut part = serde_json::json!({"text": token});
+        if reasoning {
+            part["thought"] = serde_json::json!(true);
+        }
+        let c = super::gemini_handlers::chunk(&self.model, &self.id, vec![part], None, None);
+        vec![self.frame(c, false)]
+    }
+
+    fn close(&mut self) -> Vec<String> {
+        let parts = gemini_call_parts(&self.calls);
+        let c = super::gemini_handlers::chunk(
+            &self.model,
+            &self.id,
+            parts,
+            Some("STOP"),
+            Some(self.usage.clone()),
+        );
+        vec![self.frame(c, true)]
+    }
+}
+
+/// Play a scenario on Gemini generateContent, if the request selects one.
+/// `stream` is `None` for generateContent, `Some(sse)` for streaming.
+pub(super) async fn gemini(
+    state: &Arc<AppState>,
+    model: &str,
+    req: &super::gemini_handlers::GeminiRequest,
+    stream: Option<bool>,
+    request_start: Instant,
+    latency: LatencyProfile,
+) -> Option<Response> {
+    use super::decisions_handlers::gemini_error;
+    let (messages, tools) = gemini_conversation(req);
+    let resolution = match resolve(state, &messages, &tools, model) {
+        Ok(Some(r)) => r,
+        Ok(None) => return None,
+        Err(e) => return Some(gemini_error(e.status_code(), e.message())),
+    };
+    let attempt = state.attempts.next_attempt(resolution.fingerprint);
+    let play = match prepare(
+        &resolution,
+        attempt,
+        latency.with_input_tokens(req.input_tokens),
+    ) {
+        Outcome::Fail(err) => {
+            state.stats.record_error(err.error.status_code());
+            let r = with_retry(
+                gemini_error(err.error.status_code(), err.error.message()),
+                &err,
+            );
+            return Some(trace(r, &resolution, attempt));
+        }
+        Outcome::Play(p) => p,
+    };
+    let usage = super::gemini_handlers::usage_metadata(
+        req.input_tokens,
+        play.text_tokens + play.tool_tokens,
+        play.reasoning_tokens,
+        0,
+    );
+    let id = crate::ids::prefixed_compact_id("")
+        .chars()
+        .take(22)
+        .collect::<String>();
+    let frames = GeminiFrames {
+        model: model.to_string(),
+        id: id.clone(),
+        sse: stream.unwrap_or(true),
+        started: false,
+        include_thoughts: req.include_thoughts,
+        calls: play.calls.clone(),
+        usage: usage.clone(),
+    };
+    let model = model.to_string();
+    let include_thoughts = req.include_thoughts;
+    let response = deliver(
+        state,
+        stream.is_some(),
+        play,
+        frames,
+        req.input_tokens as u32,
+        request_start,
+        move |play| {
+            let mut parts = Vec::new();
+            if let (Some(r), true) = (&play.reasoning, include_thoughts) {
+                parts.push(serde_json::json!({"text": r, "thought": true}));
+            }
+            if let Some(t) = play.text.as_deref().filter(|t| !t.is_empty()) {
+                parts.push(serde_json::json!({"text": t}));
+            }
+            parts.extend(gemini_call_parts(&play.calls));
+            Json(super::gemini_handlers::chunk(
+                &model,
+                &id,
+                parts,
+                Some("STOP"),
+                Some(usage),
+            ))
+            .into_response()
+        },
+    )
+    .await;
+    // Array streams are JSON, not SSE.
+    let mut response = response;
+    if stream == Some(false) && response.status() == StatusCode::OK {
+        response
+            .headers_mut()
+            .insert(header::CONTENT_TYPE, "application/json".parse().unwrap());
+    }
+    Some(trace(response, &resolution, attempt))
+}
