@@ -73,6 +73,24 @@ impl LatencyProfile {
         self
     }
 
+    /// This profile with TTFT scaled for a reasoning effort. Hidden reasoning
+    /// happens before the first visible token, so more effort means a later
+    /// start. Profiles are calibrated at the default (`medium`) effort.
+    pub fn with_reasoning_effort(mut self, effort: &str) -> Self {
+        let factor = match effort {
+            "none" => 0.35,
+            "minimal" => 0.5,
+            "low" => 0.7,
+            "high" => 1.8,
+            "xhigh" => 3.0,
+            "max" => 4.5,
+            _ => 1.0, // medium / unknown
+        };
+        self.ttft_mean_ms = (self.ttft_mean_ms as f64 * factor) as u64;
+        self.ttft_stddev_ms = (self.ttft_stddev_ms as f64 * factor) as u64;
+        self
+    }
+
     /// GPT-4 profile - slower, higher quality model
     /// Based on typical GPT-4 latency characteristics
     pub fn gpt4() -> Self {
@@ -594,6 +612,23 @@ mod tests {
                 .with_input_tokens(1_000_000)
                 .ttft_mean_ms,
             LatencyProfile::fast().ttft_mean_ms
+        );
+    }
+
+    #[test]
+    fn reasoning_effort_scales_ttft() {
+        let base = LatencyProfile::gpt_sol();
+        assert_eq!(
+            base.clone().with_reasoning_effort("medium").ttft_mean_ms,
+            base.ttft_mean_ms
+        );
+        assert!(base.clone().with_reasoning_effort("xhigh").ttft_mean_ms > base.ttft_mean_ms * 2);
+        assert!(base.clone().with_reasoning_effort("none").ttft_mean_ms < base.ttft_mean_ms / 2);
+        assert_eq!(
+            LatencyProfile::instant()
+                .with_reasoning_effort("max")
+                .ttft_mean_ms,
+            0
         );
     }
 }

@@ -264,6 +264,15 @@ pub struct Usage {
     pub total_tokens: u32,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub completion_tokens_details: Option<CompletionTokensDetails>,
+    /// Breakdown of prompt tokens (`cached_tokens` from prompt caching).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prompt_tokens_details: Option<PromptTokensDetails>,
+}
+
+/// Breakdown of prompt tokens.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct PromptTokensDetails {
+    pub cached_tokens: u32,
 }
 
 /// Breakdown of completion tokens (reasoning models only).
@@ -641,6 +650,7 @@ mod tests {
     #[test]
     fn test_chat_response_serialization() {
         let usage = Usage {
+            prompt_tokens_details: None,
             prompt_tokens: 10,
             completion_tokens: 20,
             total_tokens: 30,

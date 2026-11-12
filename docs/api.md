@@ -908,3 +908,28 @@ enforce_limits = true`, the default), for models llmsim has a profile for:
 | Prompt plus output cap over the context window | 400 `context_length_exceeded` | 400 "prompt is too long: N tokens > M maximum" |
 | Output cap over the model's max output | 400 `invalid_value` on the cap's param | 400 "max_tokens: N > M, ..." |
 | Unknown model (`strict_models = true` only) | 404 `model_not_found` | 404 `not_found_error` |
+
+## Prompt Caching
+
+Repeated prompt prefixes report cached tokens the way each provider does
+(`[response] prompt_caching = true`, the default). Prefixes are message,
+system block and tool boundaries, so an agent loop that appends messages
+keeps hitting. Entries live 5 minutes, and cached tokens skip prefill latency.
+
+| API | When it caches | Where it shows |
+|-----|----------------|----------------|
+| OpenAI chat | Prompts of 1024+ tokens, automatically; 1024 + n·128 tokens | `usage.prompt_tokens_details.cached_tokens` |
+| OpenAI Responses | Same | `usage.input_tokens_details.cached_tokens` |
+| Anthropic Messages | Up to `cache_control` breakpoints of 1024+ tokens | `usage.cache_read_input_tokens`, `usage.cache_creation_input_tokens` (also in `message_start`) |
+
+Anthropic's `input_tokens` excludes cached and newly cached tokens, as on the
+real API.
+
+## Thinking
+
+- Reasoning effort scales time to first token for reasoning models
+  (`reasoning_effort` / `reasoning.effort`): `none` 0.35×, `minimal` 0.5×,
+  `low` 0.7×, `medium` 1×, `high` 1.8×, `xhigh` 3×, `max` 4.5×.
+- Anthropic streams wait for hidden (omitted) thinking before the text starts.
+- Put `[[llmsim:redacted-thinking]]` in the last user message to get a
+  `redacted_thinking` block instead of `thinking`.

@@ -2,6 +2,7 @@
 
 use super::config::Config;
 use super::limits::RateLimiter;
+use super::prompt_cache::PromptCache;
 use crate::scenario::{AttemptTracker, ScenarioSet};
 use crate::script::Script;
 use crate::stats::SharedStats;
@@ -21,6 +22,8 @@ pub struct AppState {
     pub attempts: Arc<AttemptTracker>,
     /// Per-key RPM/TPM buckets and the overload-burst clock.
     pub limiter: Arc<RateLimiter>,
+    /// Recently seen prompt prefixes, for cached-token usage.
+    pub prompt_cache: Arc<PromptCache>,
 }
 
 impl AppState {
@@ -31,6 +34,7 @@ impl AppState {
         ));
         Self {
             limiter,
+            prompt_cache: Arc::new(PromptCache::default()),
             config,
             stats,
             script: None,

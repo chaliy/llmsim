@@ -25,6 +25,7 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 - **Image Generation** - Simulated gpt-image ("ChatGPT Images") endpoint returning watermarked PNGs, with streaming partial images
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
+- **Prompt Caching** - Cached-token usage for repeated prefixes, in OpenAI and Anthropic (`cache_control`) shapes
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
 - **Model-Specific Profiles** - GPT-6 tiers (Sol, Terra, Luna, Astra), GPT-5, GPT-4, Claude, Gemini, Muse latency profiles
 - **Real-time Stats Dashboard** - TUI dashboard with live metrics (requests, tokens, latency, errors)

@@ -2,6 +2,10 @@
 
 ## 2026-11-12
 
+* **Added prompt caching and thinking realism.** New
+  [Prompt Caching and Thinking Realism](simulation/prompt-caching-and-thinking.md) concept:
+  cached-token usage for OpenAI and Anthropic, effort-scaled reasoning latency, redacted thinking.
+
 * **Added structured outputs and forced tool calls.** New
   [Structured Outputs and Forced Tool Calls](simulation/structured-outputs.md) concept;
   Anthropic streams now carry `tool_use` blocks with `input_json_delta`.

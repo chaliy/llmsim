@@ -14,8 +14,9 @@ use crate::{
         },
         ChatCompletionRequest, ChatCompletionResponse, CompletionTokensDetails, ErrorResponse,
         InputItem, InputRole, MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem,
-        OutputRole, OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
-        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
+        OutputRole, OutputTokensDetails, PromptTokensDetails, ReasoningConfig, ResponseStatus,
+        ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
+        ResponsesUsage, Usage,
     },
     openresponses::{
         self, OpenResponsesStreamBuilder, Response as OpenResponsesResponse, ResponseRequest,
@@ -143,11 +144,39 @@ pub(crate) fn generate_responses_result(
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
+    // Prompt caching over instructions and input items.
+    let cached_tokens = if state.config.response.prompt_caching {
+        let mut prefixes = super::prompt_cache::PrefixBuilder::new(params.model);
+        let mut push = |piece: String| {
+            let tokens = crate::count_tokens_default(&piece).unwrap_or(piece.len() / 4);
+            prefixes.push(&piece, tokens);
+        };
+        if let Some(instructions) = params.instructions {
+            push(instructions.clone());
+        }
+        match params.input {
+            crate::openai::ResponsesInput::Text(t) => push(t.clone()),
+            crate::openai::ResponsesInput::Items(items) => {
+                for item in items {
+                    push(serde_json::to_string(item).unwrap_or_default());
+                }
+            }
+        }
+        state
+            .prompt_cache
+            .openai(&prefixes.prefixes, input_tokens, Instant::now())
+    } else {
+        0
+    };
+
     // Reasoning tokens
     let reasoning_tokens =
         calculate_reasoning_tokens(params.model, params.reasoning, output_tokens);
 
     let usage = ResponsesUsage {
+        input_tokens_details: Some(crate::openai::ResponsesInputTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
         total_tokens: (input_tokens + output_tokens + reasoning_tokens) as u32,
@@ -164,7 +193,15 @@ pub(crate) fn generate_responses_result(
         usage,
         reasoning_tokens,
         reasoning_summary,
-        latency: latency.with_input_tokens(input_tokens),
+        latency: {
+            let latency = latency.with_input_tokens(input_tokens - cached_tokens.min(input_tokens));
+            match params.reasoning.as_ref().and_then(|r| r.effort.as_deref()) {
+                Some(effort) if is_reasoning_model(params.model) => {
+                    latency.with_reasoning_effort(effort)
+                }
+                _ => latency,
+            }
+        },
     }
 }
 
@@ -306,7 +343,8 @@ pub async fn chat_completions(
     // Count tokens. Reasoning models bill hidden reasoning tokens inside
     // completion_tokens and break them out in completion_tokens_details.
     let prompt_tokens = count_request_tokens(&request);
-    let latency = latency.with_input_tokens(prompt_tokens);
+    let cached_tokens = chat_cached_tokens(&state, &request, prompt_tokens);
+    let latency = latency.with_input_tokens(prompt_tokens - cached_tokens);
     let visible_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let reasoning = request
@@ -317,8 +355,15 @@ pub async fn chat_completions(
             summary: None,
         });
     let reasoning_tokens = calculate_reasoning_tokens(&request.model, &reasoning, visible_tokens);
+    let latency = match request.reasoning_effort.as_deref() {
+        Some(effort) if is_reasoning_model(&request.model) => latency.with_reasoning_effort(effort),
+        _ => latency,
+    };
     let completion_tokens = visible_tokens + reasoning_tokens;
     let usage = Usage {
+        prompt_tokens_details: Some(PromptTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -417,7 +462,8 @@ async fn play_chat_turn(
     };
 
     let prompt_tokens = count_request_tokens(&request);
-    let latency = latency.with_input_tokens(prompt_tokens);
+    let cached_tokens = chat_cached_tokens(&state, &request, prompt_tokens);
+    let latency = latency.with_input_tokens(prompt_tokens - cached_tokens);
     let text_for_usage = text.clone().unwrap_or_default();
     let completion_tokens = crate::count_tokens_default(&text_for_usage)
         .unwrap_or(text_for_usage.split_whitespace().count())
@@ -429,6 +475,9 @@ async fn play_chat_turn(
             })
             .sum::<usize>();
     let usage = Usage {
+        prompt_tokens_details: Some(PromptTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -540,6 +589,7 @@ async fn handle_scenario_chat_completions(
     let latency = latency.with_input_tokens(prompt_tokens);
     let completion_tokens = text_tokens + reasoning_tokens + tool_call_tokens;
     let usage = Usage {
+        prompt_tokens_details: None,
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -664,6 +714,7 @@ async fn handle_scripted_responses_api(
     let output_tokens = output_text_tokens + tool_call_tokens;
 
     let usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
         total_tokens: (input_tokens + output_tokens) as u32,
@@ -1594,6 +1645,31 @@ fn validate_input_modalities(request: &ChatCompletionRequest) -> Result<(), AppE
     }
 
     Ok(())
+}
+
+/// Cached prompt tokens for a chat request (OpenAI automatic caching).
+fn chat_cached_tokens(
+    state: &AppState,
+    request: &ChatCompletionRequest,
+    prompt_tokens: usize,
+) -> usize {
+    if !state.config.response.prompt_caching {
+        return 0;
+    }
+    let mut prefixes = super::prompt_cache::PrefixBuilder::new(&request.model);
+    for message in &request.messages {
+        let piece = serde_json::to_string(message).unwrap_or_default();
+        let text = message
+            .content
+            .as_ref()
+            .map(|c| c.text())
+            .unwrap_or_default();
+        let tokens = crate::count_tokens_default(&text).unwrap_or(text.len() / 4) + 4;
+        prefixes.push(&piece, tokens);
+    }
+    state
+        .prompt_cache
+        .openai(&prefixes.prefixes, prompt_tokens, Instant::now())
 }
 
 fn v_status(v: &super::validation::LimitViolation) -> u16 {

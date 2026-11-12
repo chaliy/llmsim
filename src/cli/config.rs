@@ -264,6 +264,11 @@ pub struct ResponseConfig {
     /// text once the tool result comes back. Default `false`: text only.
     #[serde(default)]
     pub auto_tool_calls: bool,
+    /// Report cached prompt tokens when a prompt prefix repeats within five
+    /// minutes (OpenAI automatic caching, Anthropic `cache_control`).
+    /// Default `true`.
+    #[serde(default = "default_true")]
+    pub prompt_caching: bool,
 }
 
 fn default_true() -> bool {
@@ -287,6 +292,7 @@ impl Default for ResponseConfig {
             scenarios_path: None,
             builtin_scenarios: true,
             auto_tool_calls: false,
+            prompt_caching: true,
         }
     }
 }

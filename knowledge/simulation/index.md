@@ -5,3 +5,4 @@
 * [Latency Model](latency.md) - Per-model timing profiles, log-normal first-token tail, and prompt-size prefill.
 * [Rate Limits, Overload Bursts and Request Limits](limits.md) - Per-key RPM/TPM with provider headers, clustered overloads, and context/output/model validation.
 * [Structured Outputs and Forced Tool Calls](structured-outputs.md) - Schema-valid JSON for response formats and forced tool arguments without a script.
+* [Prompt Caching and Thinking Realism](prompt-caching-and-thinking.md) - Cached-token usage per provider, effort-scaled reasoning latency, and redacted thinking.

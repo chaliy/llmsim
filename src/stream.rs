@@ -300,6 +300,7 @@ mod tests {
     #[tokio::test]
     async fn test_stream_with_usage() {
         let usage = Usage {
+            prompt_tokens_details: None,
             prompt_tokens: 10,
             completion_tokens: 5,
             total_tokens: 15,

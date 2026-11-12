@@ -36,11 +36,16 @@ pub struct MessagesTokenStream {
     latency: LatencyProfile,
     content: String,
     input_tokens: u32,
+    cache_usage: Option<(u32, u32)>,
     output_tokens: u32,
     /// Optional thinking block: (visible text, signature).
     thinking: Option<(String, String)>,
     /// Tool calls after the text: (id, name, input).
     tool_uses: Vec<(String, String, serde_json::Value)>,
+    /// Stream the thinking block as `redacted_thinking` with this data.
+    redacted_thinking: Option<String>,
+    /// Total time the thinking block takes, however much of it is visible.
+    thinking_time: std::time::Duration,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -69,11 +74,27 @@ impl MessagesTokenStream {
             latency,
             content,
             input_tokens: 0,
+            cache_usage: None,
             output_tokens: 0,
             thinking: None,
             tool_uses: Vec::new(),
+            redacted_thinking: None,
+            thinking_time: std::time::Duration::ZERO,
             on_complete: None,
         }
+    }
+
+    /// Stream the thinking block as `redacted_thinking` carrying `data`.
+    pub fn with_redacted_thinking(mut self, data: impl Into<String>) -> Self {
+        self.redacted_thinking = Some(data.into());
+        self
+    }
+
+    /// How long the thinking block takes in total. Hidden (omitted or
+    /// summarized) thinking still takes the time of every thinking token.
+    pub fn with_thinking_time(mut self, time: std::time::Duration) -> Self {
+        self.thinking_time = time;
+        self
     }
 
     /// Stream `tool_use` blocks after the text: (id, name, input).
@@ -91,6 +112,9 @@ impl MessagesTokenStream {
     pub fn with_usage(mut self, usage: Usage) -> Self {
         self.input_tokens = usage.input_tokens;
         self.output_tokens = usage.output_tokens;
+        self.cache_usage = usage
+            .cache_read_input_tokens
+            .zip(usage.cache_creation_input_tokens);
         self
     }
 
@@ -115,8 +139,15 @@ impl MessagesTokenStream {
         let model = self.model.clone();
         let latency = self.latency.clone();
         let input_tokens = self.input_tokens;
+        let mut start_usage = json!({"input_tokens": input_tokens, "output_tokens": 1});
+        if let Some((read, creation)) = self.cache_usage {
+            start_usage["cache_read_input_tokens"] = json!(read);
+            start_usage["cache_creation_input_tokens"] = json!(creation);
+        }
         let output_tokens = self.output_tokens;
         let thinking = self.thinking;
+        let redacted = self.redacted_thinking;
+        let thinking_time = self.thinking_time;
         let tool_uses = self.tool_uses;
         let skip_text = self.content.is_empty() && !tool_uses.is_empty();
         let on_complete = self.on_complete;
@@ -139,14 +170,30 @@ impl MessagesTokenStream {
                     "content": [],
                     "stop_reason": null,
                     "stop_sequence": null,
-                    "usage": {"input_tokens": input_tokens, "output_tokens": 1}
+                    "usage": start_usage
                 }
             });
             yield format_event("message_start", &message_start);
 
             // Optional thinking block at index 0.
             let mut text_index = 0;
-            if let Some((thinking_text, signature)) = thinking {
+            if let Some(data) = redacted {
+                let block_start = json!({
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "redacted_thinking", "data": data}
+                });
+                yield format_event("content_block_start", &block_start);
+                yield format_event("ping", &json!({"type": "ping"}));
+                if !thinking_time.is_zero() {
+                    sleep(thinking_time).await;
+                }
+                yield format_event(
+                    "content_block_stop",
+                    &json!({"type": "content_block_stop", "index": 0}),
+                );
+                text_index = 1;
+            } else if let Some((thinking_text, signature)) = thinking {
                 let block_start = json!({
                     "type": "content_block_start",
                     "index": 0,
@@ -155,10 +202,12 @@ impl MessagesTokenStream {
                 yield format_event("content_block_start", &block_start);
                 yield format_event("ping", &json!({"type": "ping"}));
 
+                let mut spent = std::time::Duration::ZERO;
                 for token in tokenize_words(&thinking_text) {
                     let tbt = latency.sample_tbt();
                     if !tbt.is_zero() {
                         sleep(tbt).await;
+                        spent += tbt;
                     }
                     let delta = json!({
                         "type": "content_block_delta",
@@ -166,6 +215,10 @@ impl MessagesTokenStream {
                         "delta": {"type": "thinking_delta", "thinking": token}
                     });
                     yield format_event("content_block_delta", &delta);
+                }
+                // The rest of the thinking happens out of sight.
+                if thinking_time > spent {
+                    sleep(thinking_time - spent).await;
                 }
 
                 let delta = json!({
@@ -305,6 +358,8 @@ pub struct MessagesStreamBuilder {
     usage: Option<Usage>,
     thinking: Option<(String, String)>,
     tool_uses: Vec<(String, String, serde_json::Value)>,
+    redacted_thinking: Option<String>,
+    thinking_time: std::time::Duration,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -318,8 +373,22 @@ impl MessagesStreamBuilder {
             usage: None,
             thinking: None,
             tool_uses: Vec::new(),
+            redacted_thinking: None,
+            thinking_time: std::time::Duration::ZERO,
             on_complete: None,
         }
+    }
+
+    /// Emit the thinking block as `redacted_thinking` carrying `data`.
+    pub fn redacted_thinking(mut self, data: impl Into<String>) -> Self {
+        self.redacted_thinking = Some(data.into());
+        self
+    }
+
+    /// Total thinking time (hidden thinking still takes time).
+    pub fn thinking_time(mut self, time: std::time::Duration) -> Self {
+        self.thinking_time = time;
+        self
     }
 
     /// Emit `tool_use` blocks after the text: (id, name, input).
@@ -369,6 +438,10 @@ impl MessagesStreamBuilder {
         if !self.tool_uses.is_empty() {
             stream = stream.with_tool_uses(self.tool_uses);
         }
+        if let Some(data) = self.redacted_thinking {
+            stream = stream.with_redacted_thinking(data);
+        }
+        stream = stream.with_thinking_time(self.thinking_time);
         if let Some(on_complete) = self.on_complete {
             stream = stream.with_on_complete(on_complete);
         }

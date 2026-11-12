@@ -343,6 +343,7 @@ impl ResponsesTokenStreamBuilder {
             content: content.into(),
             latency: LatencyProfile::default(),
             usage: ResponsesUsage {
+                input_tokens_details: None,
                 input_tokens: 0,
                 output_tokens: 0,
                 total_tokens: 0,
@@ -408,6 +409,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_basic() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 5,
             total_tokens: 15,
@@ -434,6 +436,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_deltas() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 3,
             total_tokens: 8,
@@ -461,6 +464,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_event_order() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 2,
             total_tokens: 7,
@@ -510,6 +514,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_with_reasoning_and_summary() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 3,
             total_tokens: 17,
@@ -592,6 +597,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_with_reasoning_no_summary() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 3,
             total_tokens: 17,
@@ -635,6 +641,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_no_reasoning() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 3,
             total_tokens: 8,
@@ -669,6 +676,7 @@ mod tests {
     #[tokio::test]
     async fn test_responses_stream_reasoning_sequence_numbers_continuous() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 5,
             output_tokens: 3,
             total_tokens: 20,

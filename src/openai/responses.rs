@@ -422,6 +422,15 @@ pub struct ResponsesUsage {
     pub total_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens_details: Option<OutputTokensDetails>,
+    /// Breakdown of input tokens (`cached_tokens` from prompt caching).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens_details: Option<ResponsesInputTokensDetails>,
+}
+
+/// Details about input token usage
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct ResponsesInputTokensDetails {
+    pub cached_tokens: u32,
 }
 
 /// Details about output token usage
@@ -861,6 +870,7 @@ mod tests {
     #[test]
     fn test_responses_response_new() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 30,
@@ -878,6 +888,7 @@ mod tests {
     #[test]
     fn test_responses_response_serialization() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 30,
@@ -924,6 +935,7 @@ mod tests {
     #[test]
     fn test_responses_response_with_reasoning() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 90,
@@ -971,6 +983,7 @@ mod tests {
     #[test]
     fn test_responses_response_with_reasoning_no_summary() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 90,

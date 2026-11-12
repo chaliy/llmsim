@@ -173,7 +173,8 @@ pub async fn create_message(
     };
 
     let input_tokens = count_input_tokens(&request);
-    let latency = latency.with_input_tokens(input_tokens);
+    let (cache_read, cache_creation) = anthropic_cache(&state, &request, input_tokens);
+    let latency = latency.with_input_tokens(input_tokens - cache_read);
     let text_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
@@ -189,6 +190,12 @@ pub async fn create_message(
     } else {
         None
     };
+    // `[[llmsim:redacted-thinking]]` in the last message redacts the thinking
+    // block, the way the safety system occasionally does.
+    let redact = request
+        .messages
+        .last()
+        .is_some_and(|m| m.content.extract_text().contains(REDACTED_THINKING_MARKER));
     let tool_tokens: usize = tool_uses
         .iter()
         .map(|(_, _, input)| {
@@ -197,18 +204,33 @@ pub async fn create_message(
         })
         .sum();
     let output_tokens = text_tokens + tool_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
-    let usage = Usage::new(input_tokens as u32, output_tokens as u32);
+    // Anthropic bills cached and newly cached tokens apart from `input_tokens`.
+    let mut usage = Usage::new(
+        (input_tokens - cache_read - cache_creation) as u32,
+        output_tokens as u32,
+    );
+    if state.config.response.prompt_caching {
+        usage.cache_read_input_tokens = Some(cache_read as u32);
+        usage.cache_creation_input_tokens = Some(cache_creation as u32);
+    }
 
     if request.stream {
         let stats = state.stats.clone();
         let input_tok = usage.input_tokens;
         let output_tok = usage.output_tokens;
 
+        let thinking_time = std::time::Duration::from_millis(
+            thinking_plan.as_ref().map_or(0, |p| p.tokens as u64) * latency.tbt_mean_ms,
+        );
         let mut builder = MessagesStreamBuilder::new(&request.model, content)
             .latency(latency)
             .usage(usage)
-            .tool_uses(tool_uses);
+            .tool_uses(tool_uses)
+            .thinking_time(thinking_time);
         if let Some(plan) = thinking_plan {
+            if redact {
+                builder = builder.redacted_thinking(redacted_data(&plan.signature));
+            }
             builder = builder.thinking(plan.text, plan.signature);
         }
         let stream = builder
@@ -237,10 +259,16 @@ pub async fn create_message(
         );
         let mut blocks = Vec::with_capacity(2);
         if let Some(plan) = thinking_plan {
-            blocks.push(ContentBlock::Thinking {
-                thinking: plan.text,
-                signature: plan.signature,
-            });
+            if redact {
+                blocks.push(ContentBlock::RedactedThinking {
+                    data: redacted_data(&plan.signature),
+                });
+            } else {
+                blocks.push(ContentBlock::Thinking {
+                    thinking: plan.text,
+                    signature: plan.signature,
+                });
+            }
         }
         if !content.is_empty() || tool_uses.is_empty() {
             blocks.push(ContentBlock::text(content));
@@ -355,6 +383,80 @@ async fn handle_scripted_message(
 
     let response = MessagesResponse::with_content(request.model, content, stop_reason, usage);
     Json(response).into_response()
+}
+
+/// Message marker that turns the thinking block into `redacted_thinking`.
+pub const REDACTED_THINKING_MARKER: &str = "[[llmsim:redacted-thinking]]";
+
+/// Opaque `redacted_thinking` data derived from the block's signature.
+fn redacted_data(signature: &str) -> String {
+    format!("EmwK{}", signature.chars().rev().collect::<String>())
+}
+
+/// Prompt caching for a Messages request: (cache_read, cache_creation)
+/// tokens, both within `input_tokens`. Breakpoints are blocks carrying
+/// `cache_control` (tools, then system, then messages), plus the last block
+/// when the request has top-level `cache_control`.
+fn anthropic_cache(
+    state: &AppState,
+    request: &MessagesRequest,
+    input_tokens: usize,
+) -> (usize, usize) {
+    if !state.config.response.prompt_caching {
+        return (0, 0);
+    }
+    let mut prefixes = super::prompt_cache::PrefixBuilder::new(&request.model);
+    let mut breakpoints = Vec::new();
+    let mut push = |piece: String, marked: bool| {
+        let tokens = crate::count_tokens_default(&piece).unwrap_or(piece.len() / 4);
+        let p = prefixes.push(&piece, tokens);
+        if marked {
+            breakpoints.push(p);
+        }
+    };
+    for tool in request.tools.iter().flatten() {
+        push(
+            serde_json::to_string(tool).unwrap_or_default(),
+            tool.cache_control.is_some(),
+        );
+    }
+    match &request.system {
+        Some(crate::anthropic::SystemPrompt::Text(t)) => push(t.clone(), false),
+        Some(crate::anthropic::SystemPrompt::Blocks(blocks)) => {
+            for b in blocks {
+                push(b.text.clone(), b.cache_control.is_some());
+            }
+        }
+        None => {}
+    }
+    for message in &request.messages {
+        match &message.content {
+            crate::anthropic::MessageContent::Text(t) => push(t.clone(), false),
+            crate::anthropic::MessageContent::Blocks(blocks) => {
+                for b in blocks {
+                    let marked = matches!(
+                        b,
+                        crate::anthropic::RequestContentBlock::Text {
+                            cache_control: Some(_),
+                            ..
+                        } | crate::anthropic::RequestContentBlock::ToolResult {
+                            cache_control: Some(_),
+                            ..
+                        }
+                    ) || matches!(b, crate::anthropic::RequestContentBlock::Other(v) if v.get("cache_control").is_some());
+                    push(serde_json::to_string(b).unwrap_or_default(), marked);
+                }
+            }
+        }
+    }
+    if request.cache_control.is_some() {
+        if let Some(last) = prefixes.prefixes.last() {
+            breakpoints.push(*last);
+        }
+    }
+    let (read, creation) = state.prompt_cache.anthropic(&breakpoints, Instant::now());
+    let read = read.min(input_tokens);
+    (read, creation.min(input_tokens - read))
 }
 
 /// Generate response content for non-scripted requests via the configured

@@ -368,6 +368,7 @@ mod tests {
             }],
         );
         let usage = Usage {
+            prompt_tokens_details: None,
             prompt_tokens: 1,
             completion_tokens: 1,
             total_tokens: 2,
