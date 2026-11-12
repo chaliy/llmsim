@@ -118,12 +118,31 @@ pub async fn create_message(
         }
     }
 
-    // Resolve the response content (scripted text turn, or generated).
+    // Resolve the response: a scripted turn, a forced tool call or JSON
+    // (tool_choice / output_config.format), or generated text.
+    let mut tool_uses: Vec<(String, String, serde_json::Value)> = Vec::new();
+    let to_uses = |turn_index: usize, calls: Vec<crate::script::SimToolCall>| {
+        calls
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let id = c.id.unwrap_or_else(|| anthropic_tool_use_id(turn_index, i));
+                (id, c.name, c.arguments)
+            })
+            .collect::<Vec<_>>()
+    };
     let content = if let Some(script) = state.script.as_ref() {
+        let turn_index = script.cursor();
         match script.next_turn() {
             ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,
-            ScriptedResponse::Turn(SimTurn::Mixed { text, .. }) => text,
-            ScriptedResponse::Turn(SimTurn::ToolCalls { .. }) => String::new(),
+            ScriptedResponse::Turn(SimTurn::Mixed { text, calls }) => {
+                tool_uses = to_uses(turn_index, calls);
+                text
+            }
+            ScriptedResponse::Turn(SimTurn::ToolCalls { calls }) => {
+                tool_uses = to_uses(turn_index, calls);
+                String::new()
+            }
             ScriptedResponse::Turn(SimTurn::Error(err)) => {
                 state.stats.record_error(err.status_code());
                 return sim_error_to_anthropic_response(&err);
@@ -135,6 +154,19 @@ pub async fn create_message(
                     status_code: Some(500),
                 });
             }
+        }
+    } else if let Some(forced) =
+        crate::forced::anthropic(&request, state.config.response.auto_tool_calls)
+    {
+        match forced {
+            crate::forced::Forced::ToolCalls(calls) => {
+                tool_uses = to_uses(0, calls)
+                    .into_iter()
+                    .map(|(id, name, input)| (id.replacen("call_", "toolu_", 1), name, input))
+                    .collect();
+                String::new()
+            }
+            crate::forced::Forced::Json(text) => text,
         }
     } else {
         generate_content(&state, &request)
@@ -157,7 +189,14 @@ pub async fn create_message(
     } else {
         None
     };
-    let output_tokens = text_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
+    let tool_tokens: usize = tool_uses
+        .iter()
+        .map(|(_, _, input)| {
+            let text = input.to_string();
+            crate::count_tokens_default(&text).unwrap_or(text.len() / 4) + 1
+        })
+        .sum();
+    let output_tokens = text_tokens + tool_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
     let usage = Usage::new(input_tokens as u32, output_tokens as u32);
 
     if request.stream {
@@ -167,7 +206,8 @@ pub async fn create_message(
 
         let mut builder = MessagesStreamBuilder::new(&request.model, content)
             .latency(latency)
-            .usage(usage);
+            .usage(usage)
+            .tool_uses(tool_uses);
         if let Some(plan) = thinking_plan {
             builder = builder.thinking(plan.text, plan.signature);
         }
@@ -202,13 +242,19 @@ pub async fn create_message(
                 signature: plan.signature,
             });
         }
-        blocks.push(ContentBlock::text(content));
-        let response = MessagesResponse::with_content(
-            request.model.clone(),
-            blocks,
-            StopReason::EndTurn,
-            usage,
-        );
+        if !content.is_empty() || tool_uses.is_empty() {
+            blocks.push(ContentBlock::text(content));
+        }
+        let stop_reason = if tool_uses.is_empty() {
+            StopReason::EndTurn
+        } else {
+            StopReason::ToolUse
+        };
+        for (id, name, input) in tool_uses {
+            blocks.push(ContentBlock::ToolUse { id, name, input });
+        }
+        let response =
+            MessagesResponse::with_content(request.model.clone(), blocks, stop_reason, usage);
         Json(response).into_response()
     }
 }

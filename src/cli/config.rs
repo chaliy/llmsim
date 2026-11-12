@@ -259,6 +259,11 @@ pub struct ResponseConfig {
     /// name. Default `true`; a scenario only plays when a request names it.
     #[serde(default = "default_true")]
     pub builtin_scenarios: bool,
+    /// With `tool_choice` auto (or unset), answer a user message with a call
+    /// to one of the offered tools (schema-valid arguments), then answer in
+    /// text once the tool result comes back. Default `false`: text only.
+    #[serde(default)]
+    pub auto_tool_calls: bool,
 }
 
 fn default_true() -> bool {
@@ -281,6 +286,7 @@ impl Default for ResponseConfig {
             script_path: None,
             scenarios_path: None,
             builtin_scenarios: true,
+            auto_tool_calls: false,
         }
     }
 }

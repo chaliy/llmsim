@@ -174,6 +174,10 @@ pub struct ResponsesRequest {
     /// Include additional data in response (e.g., "reasoning.encrypted_content")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
+    /// Output text configuration; `format: {"type": "json_schema", "schema"}`
+    /// makes the answer schema-valid JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<serde_json::Value>,
 }
 
 /// A tool definition for the Responses API

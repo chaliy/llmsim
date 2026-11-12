@@ -58,6 +58,7 @@ pub(crate) struct ResponseGenerationParams<'a> {
     pub top_p: Option<f32>,
     pub max_output_tokens: Option<u32>,
     pub reasoning: &'a Option<ReasoningConfig>,
+    pub text: &'a Option<serde_json::Value>,
 }
 
 /// Generate a response for the Responses API.
@@ -90,6 +91,21 @@ pub(crate) fn generate_responses_result(
             }
             ScriptedResponse::Exhausted => "[llmsim script exhausted]".to_string(),
         }
+    } else if let Some(schema) = params
+        .text
+        .as_ref()
+        .and_then(|t| t.get("format"))
+        .filter(|f| f.get("type").and_then(|t| t.as_str()) == Some("json_schema"))
+    {
+        // Structured output: schema-valid JSON seeded by the input.
+        let schema = schema
+            .get("schema")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"type": "object"}));
+        crate::forced::json_for_schema(
+            &schema,
+            crate::schema_fake::seed_from(input_text.as_bytes()),
+        )
     } else {
         // Create a minimal ChatCompletionRequest for the generator
         let chat_request = crate::openai::ChatCompletionRequest {
@@ -269,6 +285,17 @@ pub async fn chat_completions(
             .await;
     }
 
+    // tool_choice / response_format force a tool call or schema-valid JSON.
+    if let Some(forced) =
+        crate::forced::openai_chat(&request, state.config.response.auto_tool_calls)
+    {
+        let turn = match forced {
+            crate::forced::Forced::ToolCalls(calls) => SimTurn::ToolCalls { calls },
+            crate::forced::Forced::Json(text) => SimTurn::Assistant { text },
+        };
+        return play_chat_turn(state, request, request_start, latency, 0, turn).await;
+    }
+
     // Generate response
     let generator = create_generator(
         &state.config.response.generator,
@@ -366,7 +393,19 @@ async fn handle_scripted_chat_completions(
             }));
         }
     };
+    play_chat_turn(state, request, request_start, latency, turn_index, turn).await
+}
 
+/// Answer a chat completions request with one turn (text, tool calls, or an
+/// error), streaming or not. Shared by scripted mode and forced outputs.
+async fn play_chat_turn(
+    state: Arc<AppState>,
+    request: ChatCompletionRequest,
+    request_start: Instant,
+    latency: LatencyProfile,
+    turn_index: usize,
+    turn: SimTurn,
+) -> Result<Response, AppError> {
     let (text, tool_calls) = match turn {
         SimTurn::Assistant { text } => (Some(text), Vec::new()),
         SimTurn::ToolCalls { calls } => (None, calls),
@@ -381,7 +420,14 @@ async fn handle_scripted_chat_completions(
     let latency = latency.with_input_tokens(prompt_tokens);
     let text_for_usage = text.clone().unwrap_or_default();
     let completion_tokens = crate::count_tokens_default(&text_for_usage)
-        .unwrap_or(text_for_usage.split_whitespace().count());
+        .unwrap_or(text_for_usage.split_whitespace().count())
+        + tool_calls
+            .iter()
+            .map(|c| {
+                let args = c.arguments.to_string();
+                crate::count_tokens_default(&args).unwrap_or(args.len() / 4) + 1
+            })
+            .sum::<usize>();
     let usage = Usage {
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
@@ -1083,6 +1129,7 @@ pub async fn create_response(
             top_p: request.top_p,
             max_output_tokens: request.max_output_tokens,
             reasoning: &request.reasoning,
+            text: &request.text,
         },
     );
 

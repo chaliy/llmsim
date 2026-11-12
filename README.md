@@ -265,6 +265,7 @@ profile = "gpt5"
 [response]
 generator = "lorem"
 target_tokens = 100
+# auto_tool_calls = false   # call an offered tool even with tool_choice auto
 # Named load-test scenarios, picked per message with [[llmsim:<name>]]
 # (see docs/scenarios.md):
 # scenarios_path = "examples/scenarios"

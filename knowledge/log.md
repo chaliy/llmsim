@@ -2,6 +2,10 @@
 
 ## 2026-11-12
 
+* **Added structured outputs and forced tool calls.** New
+  [Structured Outputs and Forced Tool Calls](simulation/structured-outputs.md) concept;
+  Anthropic streams now carry `tool_use` blocks with `input_json_delta`.
+
 * **Added rate limits, overload bursts and request limits.** New
   [Rate Limits, Overload Bursts and Request Limits](simulation/limits.md) concept.
 

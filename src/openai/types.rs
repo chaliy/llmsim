@@ -201,6 +201,9 @@ pub struct ToolChoiceFunction {
 pub struct ResponseFormat {
     #[serde(rename = "type")]
     pub format_type: String,
+    /// `{"name", "schema", "strict"}` when `type` is `json_schema`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub json_schema: Option<serde_json::Value>,
 }
 
 /// Chat completion request

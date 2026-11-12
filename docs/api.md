@@ -51,6 +51,29 @@ curl http://localhost:8080/openai/v1/chat/completions \
 | `max_tokens` | integer | No | Maximum tokens to generate |
 | `top_p` | number | No | Nucleus sampling parameter |
 | `reasoning_effort` | string | No | Reasoning models only: `none`, `minimal`, `low`, `medium` (default), `high`, `xhigh`, `max` |
+| `tools` | array | No | Function tools |
+| `tool_choice` | string \| object | No | `required` or `{"type": "function", "function": {"name"}}` forces a call with schema-valid arguments |
+| `response_format` | object | No | `{"type": "json_schema", "json_schema": {"schema"}}` returns JSON valid against the schema; `json_object` returns a JSON object |
+
+#### Structured output and tool calls
+
+Without a script or scenario, request controls shape the answer the way a
+real model must follow them:
+
+- `tool_choice: "required"` (or a named function) answers with one tool call
+  whose arguments validate against the tool's `parameters` schema,
+  `finish_reason: "tool_calls"`.
+- `response_format` `json_schema` answers with JSON valid against the schema
+  (types, `required`, `enum`, `const`, `anyOf`, local `$ref`, string formats,
+  numeric and length bounds), streamed or not.
+- With `[response] auto_tool_calls = true`, a request that offers tools and
+  ends with a user message gets a tool call even with `tool_choice: "auto"`;
+  once the tool result comes back the model answers in text. Off by default.
+
+Values are deterministic for the same last message, so tests can assert on
+them. The Responses API honours `text.format` `json_schema` the same way, and
+Anthropic Messages honour `tool_choice` (`any`, `tool`) and
+`output_config.format` `json_schema`.
 
 #### Reasoning tokens
 
@@ -486,10 +509,10 @@ curl http://localhost:8080/anthropic/v1/messages \
 | `stop_sequences` | array | no | |
 | `stream` | boolean | no | Stream Server-Sent Events |
 | `tools` | array | no | Tool definitions |
-| `tool_choice` | object | no | |
+| `tool_choice` | object | no | `{"type": "any"}` or `{"type": "tool", "name"}` forces a `tool_use` block with schema-valid `input`; streamed as `input_json_delta` |
 | `metadata` | object | no | E.g. `{"user_id": "..."}` |
 | `thinking` | object | no | `{"type": "adaptive"}` (or `"enabled"` + `budget_tokens` on older models, `"disabled"`), optional `display`: `"summarized"` / `"omitted"` |
-| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}` |
+| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}`; `format: {"type": "json_schema", "schema"}` returns schema-valid JSON text |
 
 #### Extended thinking
 

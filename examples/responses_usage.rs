@@ -45,6 +45,7 @@ async fn main() {
         reasoning: None,
         background: false,
         include: None,
+        text: None,
     };
     println!("Simple request model: {}", simple_request.model);
     println!(
@@ -80,6 +81,7 @@ async fn main() {
         reasoning: None,
         background: false,
         include: None,
+        text: None,
     };
 
     // Reasoning model request (o-series)
@@ -101,6 +103,7 @@ async fn main() {
         }),
         background: false,
         include: None,
+        text: None,
     };
     println!(
         "Reasoning request model: {} (effort: {:?})",
