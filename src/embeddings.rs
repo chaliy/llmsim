@@ -158,10 +158,7 @@ impl EmbeddingInput {
     /// Each input as text (token arrays become `t<id>` words) with its
     /// token count.
     pub fn items(&self) -> Vec<(String, usize)> {
-        let text = |s: &str| {
-            let n = crate::count_tokens_default(s).unwrap_or(s.len().div_ceil(4));
-            (s.to_string(), n)
-        };
+        let text = |s: &str| (s.to_string(), count_tokens(s));
         let tokens = |t: &[u32]| {
             (
                 t.iter()
@@ -177,6 +174,18 @@ impl EmbeddingInput {
             EmbeddingInput::Tokens(t) => vec![tokens(t)],
             EmbeddingInput::TokenArrays(v) => v.iter().map(|t| tokens(t)).collect(),
         }
+    }
+}
+
+/// Tokens in `s`: the tokenizer when built in, else about 4 bytes a token.
+fn count_tokens(s: &str) -> usize {
+    #[cfg(feature = "tokens")]
+    {
+        crate::count_tokens_default(s).unwrap_or(s.len().div_ceil(4))
+    }
+    #[cfg(not(feature = "tokens"))]
+    {
+        s.len().div_ceil(4)
     }
 }
 
