@@ -20,13 +20,13 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 ## Features
 
 - **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), Anthropic Messages, and TypeSafe System One APIs
-- **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
+- **Realistic Latency Simulation** - Time-to-first-token (TTFT) with a long-tail (log-normal) distribution, inter-token delays, and prefill time that grows with the prompt
 - **Streaming Support** - Server-Sent Events (SSE) for OpenAI, OpenResponses, and Anthropic streaming formats
 - **Image Generation** - Simulated gpt-image ("ChatGPT Images") endpoint returning watermarked PNGs, with streaming partial images
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
-- **Model-Specific Profiles** - GPT-5, GPT-4, Claude, Gemini latency profiles
+- **Model-Specific Profiles** - GPT-6 tiers (Sol, Terra, Luna, Astra), GPT-5, GPT-4, Claude, Gemini, Muse latency profiles
 - **Real-time Stats Dashboard** - TUI dashboard with live metrics (requests, tokens, latency, errors)
 - **Stats API** - JSON endpoint for programmatic access to server metrics
 
@@ -260,6 +260,7 @@ profile = "gpt5"
 # ttft_stddev_ms = 150
 # tbt_mean_ms = 40
 # tbt_stddev_ms = 12
+# prefill_us_per_token = 50   # added to TTFT per input token; 0 disables
 
 [response]
 generator = "lorem"
@@ -307,6 +308,11 @@ available = [
 
 | Profile | TTFT Mean | TBT Mean |
 |---------|-----------|----------|
+| sol (GPT-5.6+/GPT-6 Sol, measured) | 2000ms | 22ms |
+| terra (GPT-5.6+/GPT-6 Terra) | 2400ms | 14ms |
+| luna (GPT-5.6+/GPT-6 Luna, measured) | 2900ms | 9ms |
+| astra (GPT-6 Astra) | 3500ms | 30ms |
+| muse-spark (measured) | 12700ms | 7ms |
 | gpt-5 | 600ms | 40ms |
 | gpt-5-mini | 300ms | 20ms |
 | gpt-4 | 800ms | 50ms |
@@ -318,6 +324,12 @@ available = [
 | jev | 150ms | — (single verdict) |
 | instant | 0ms | 0ms |
 | fast | 10ms | 1ms |
+
+The profile is picked from the request's model id unless `[latency]` sets one.
+TTFT is log-normal around the mean (a few slow starts), and every input token
+adds `prefill_us_per_token` (default 50 µs) to it, so a 200k-token prompt
+starts about 10 s later. `instant` and `fast` skip both. See
+[knowledge/simulation/latency.md](knowledge/simulation/latency.md).
 
 ## Use Cases
 

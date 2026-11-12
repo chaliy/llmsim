@@ -11,7 +11,7 @@ use crate::typesafe::{
     answer_all, resolve_typesafe_model, typesafe_models, QuestionKind, SystemOneRequest,
     SystemOneResponse, SystemOneUsage, TypeSafeErrorResponse,
 };
-use crate::{EndpointType, ErrorInjector, LatencyProfile};
+use crate::{EndpointType, ErrorInjector};
 use axum::{
     body::Bytes,
     extract::State,
@@ -104,12 +104,7 @@ pub async fn systemone(State(state): State<Arc<AppState>>, body: Bytes) -> Respo
         return response;
     }
 
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     let answers = answer_all(&request);
     let usage = SystemOneUsage {

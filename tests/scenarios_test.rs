@@ -345,13 +345,71 @@ fn starter_library_loads() {
         vec![
             "broken-stream",
             "chat-short",
+            "console-file-research",
+            "file-research",
             "flaky-429",
             "long-answer",
+            "long-tool",
+            "luna-agent",
+            "muse-agent",
             "parallel-tools",
             "research-3-tools",
             "slow-first-token",
+            "sol-agent",
             "stream-stall",
             "thinking",
         ]
     );
+    // The compiled-in library is exactly the files on disk.
+    assert_eq!(ScenarioSet::builtin().names(), set.names());
+}
+
+#[test]
+fn builtin_scenarios_are_replaced_by_loaded_ones() {
+    let mut set = ScenarioSet::builtin();
+    let before = set.len();
+    let custom = ScenarioSet::from_json(
+        r#"{"name": "chat-short", "steps": [{"turn": {"type": "assistant", "text": "custom"}}]}"#,
+    )
+    .unwrap();
+    set.extend_replacing(custom);
+    assert_eq!(set.len(), before);
+    assert_eq!(set.get("chat-short").unwrap().steps.len(), 1);
+}
+
+#[tokio::test]
+async fn builtin_scenarios_play_without_configuration() {
+    let mut config = Config::default();
+    config.latency.profile = Some("instant".to_string());
+    let state = llmsim::cli::build_state(config, new_shared_stats()).unwrap();
+    let app = build_router(Arc::new(state));
+    let (status, headers, _) = post(
+        &app,
+        json!({
+            "model": "gpt-6-luna",
+            "messages": [{"role": "user", "content": "hi [[llmsim:chat-short speed=0.01]]"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(headers["x-llmsim-scenario"], "chat-short");
+}
+
+#[tokio::test]
+async fn builtin_scenarios_can_be_disabled() {
+    let mut config = Config::default();
+    config.latency.profile = Some("instant".to_string());
+    config.response.builtin_scenarios = false;
+    let state = llmsim::cli::build_state(config, new_shared_stats()).unwrap();
+    let app = build_router(Arc::new(state));
+    let (status, headers, _) = post(
+        &app,
+        json!({
+            "model": "gpt-6-luna",
+            "messages": [{"role": "user", "content": "hi [[llmsim:chat-short]]"}]
+        }),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(headers.get("x-llmsim-scenario").is_none());
 }

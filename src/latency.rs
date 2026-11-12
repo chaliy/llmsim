@@ -1,5 +1,21 @@
 // Latency Profiles Module
 // Defines latency profiles for simulating realistic LLM response times.
+//
+// Decisions:
+// - Time to first token is drawn from a log-normal distribution fitted to the
+//   profile's mean and stddev. Real TTFT is right-skewed: most calls land near
+//   the median and a few take several times longer. A normal draw clipped at
+//   1 ms had no tail at all. Inter-token gaps stay normal (they are small and
+//   averaged over hundreds of tokens).
+// - Prefill: `with_input_tokens` adds `prefill_us_per_token` per prompt token
+//   to the mean TTFT, so a 200k-token context starts noticeably later than a
+//   one-line prompt. The default 50 us/token (about 20k tokens/s) is a typical
+//   hosted prefill rate; `instant` and `fast` have none.
+// - GPT-5.6+/GPT-6 tier profiles (Sol, Terra, Luna, Astra) and Muse Spark come
+//   from everruns production timings measured on 2026-10-28 for full agent
+//   turns (TTFT includes default reasoning): Luna 2.9 s and 108 tokens/s, Sol
+//   2.0 s and 46 tokens/s, Muse Spark 12.7 s and 136 tokens/s. Terra and Astra
+//   were not measured; they are placed between and above Sol by tier.
 
 use rand::RngExt;
 use std::time::Duration;
@@ -15,7 +31,13 @@ pub struct LatencyProfile {
     pub tbt_mean_ms: u64,
     /// Standard deviation for time between tokens
     pub tbt_stddev_ms: u64,
+    /// Prefill cost per input token in microseconds, added to the mean TTFT
+    /// by [`LatencyProfile::with_input_tokens`].
+    pub prefill_us_per_token: u64,
 }
+
+/// Default prefill cost: about 20k input tokens per second.
+pub const DEFAULT_PREFILL_US_PER_TOKEN: u64 = 50;
 
 impl LatencyProfile {
     /// Create a new latency profile with custom values
@@ -30,7 +52,25 @@ impl LatencyProfile {
             ttft_stddev_ms,
             tbt_mean_ms,
             tbt_stddev_ms,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
+    }
+
+    /// Set the prefill cost per input token (microseconds).
+    pub fn with_prefill_us_per_token(mut self, us: u64) -> Self {
+        self.prefill_us_per_token = us;
+        self
+    }
+
+    /// This profile with prefill for `input_tokens` added to the mean TTFT.
+    /// Profiles with a zero TTFT (`instant`) stay instant.
+    pub fn with_input_tokens(mut self, input_tokens: usize) -> Self {
+        if self.ttft_mean_ms == 0 {
+            return self;
+        }
+        let prefill_ms = (input_tokens as u64).saturating_mul(self.prefill_us_per_token) / 1000;
+        self.ttft_mean_ms = self.ttft_mean_ms.saturating_add(prefill_ms);
+        self
     }
 
     /// GPT-4 profile - slower, higher quality model
@@ -41,6 +81,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 200,
             tbt_mean_ms: 50,
             tbt_stddev_ms: 15,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -51,6 +92,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 100,
             tbt_mean_ms: 25,
             tbt_stddev_ms: 8,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -62,6 +104,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 150,
             tbt_mean_ms: 40,
             tbt_stddev_ms: 12,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -72,6 +115,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 80,
             tbt_mean_ms: 20,
             tbt_stddev_ms: 6,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -82,6 +126,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 500,
             tbt_mean_ms: 30,
             tbt_stddev_ms: 10,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -92,6 +137,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 250,
             tbt_mean_ms: 60,
             tbt_stddev_ms: 20,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -102,6 +148,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 120,
             tbt_mean_ms: 30,
             tbt_stddev_ms: 10,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -112,6 +159,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 50,
             tbt_mean_ms: 15,
             tbt_stddev_ms: 5,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -122,6 +170,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 150,
             tbt_mean_ms: 35,
             tbt_stddev_ms: 10,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -132,6 +181,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 50,
             tbt_mean_ms: 15,
             tbt_stddev_ms: 5,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -142,6 +192,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 120,
             tbt_mean_ms: 30,
             tbt_stddev_ms: 10,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -152,7 +203,37 @@ impl LatencyProfile {
             ttft_stddev_ms: 400,
             tbt_mean_ms: 25,
             tbt_stddev_ms: 8,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
+    }
+
+    /// GPT-5.6+/GPT-6 Sol (frontier tier). Measured: TTFT about 2.0 s,
+    /// 46 tokens/s.
+    pub fn gpt_sol() -> Self {
+        Self::new(2000, 500, 22, 6)
+    }
+
+    /// GPT-5.6+/GPT-6 Terra (balanced tier). Not measured; between Sol and
+    /// Luna.
+    pub fn gpt_terra() -> Self {
+        Self::new(2400, 600, 14, 4)
+    }
+
+    /// GPT-5.6+/GPT-6 Luna (cost-efficient tier). Measured: TTFT about 2.9 s
+    /// (2-4.5 s), 108 tokens/s. Luna thinks before it answers, so its first
+    /// token is later than Sol's even though it streams faster.
+    pub fn gpt_luna() -> Self {
+        Self::new(2900, 800, 9, 3)
+    }
+
+    /// GPT-6 Astra (most capable tier). Not measured; slower than Sol.
+    pub fn gpt_astra() -> Self {
+        Self::new(3500, 1000, 30, 8)
+    }
+
+    /// Muse Spark. Measured: TTFT about 12.7 s, 136 tokens/s.
+    pub fn muse_spark() -> Self {
+        Self::new(12700, 3000, 7, 2)
     }
 
     /// TypeSafe Jev (System One) profile. A verdict is one forward pass with
@@ -163,6 +244,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 40,
             tbt_mean_ms: 0,
             tbt_stddev_ms: 0,
+            prefill_us_per_token: DEFAULT_PREFILL_US_PER_TOKEN,
         }
     }
 
@@ -173,6 +255,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 0,
             tbt_mean_ms: 0,
             tbt_stddev_ms: 0,
+            prefill_us_per_token: 0,
         }
     }
 
@@ -183,6 +266,7 @@ impl LatencyProfile {
             ttft_stddev_ms: 2,
             tbt_mean_ms: 1,
             tbt_stddev_ms: 0,
+            prefill_us_per_token: 0,
         }
     }
 
@@ -190,11 +274,24 @@ impl LatencyProfile {
     pub fn from_model(model: &str) -> Self {
         let model_lower = model.to_lowercase();
 
-        // GPT-5 family (check specific variants first)
-        // (GPT-5.6+/GPT-6 "Luna" is the cost-efficient tier, so it gets the mini profile)
-        if model_lower.contains("gpt-5-mini")
-            || (model_lower.starts_with("gpt-") && model_lower.contains("luna"))
+        let gpt = model_lower.starts_with("gpt-");
+        // GPT-5.6+/GPT-6 tiers (check before the generic GPT-5 family)
+        if gpt && model_lower.contains("luna") {
+            Self::gpt_luna()
+        } else if gpt && model_lower.contains("terra") {
+            Self::gpt_terra()
+        } else if gpt && model_lower.contains("astra") {
+            Self::gpt_astra()
+        } else if gpt
+            && (model_lower.contains("sol")
+                || model_lower.starts_with("gpt-5.6")
+                || model_lower.starts_with("gpt-6"))
         {
+            // Bare `gpt-5.6` / `gpt-6.1` are Sol aliases.
+            Self::gpt_sol()
+        } else if model_lower.starts_with("muse-spark") {
+            Self::muse_spark()
+        } else if model_lower.contains("gpt-5-mini") {
             Self::gpt5_mini()
         } else if model_lower.contains("gpt-5") || model_lower.contains("gpt-6") {
             Self::gpt5()
@@ -235,14 +332,15 @@ impl LatencyProfile {
         }
     }
 
-    /// Sample time to first token using normal distribution
+    /// Sample time to first token from a log-normal distribution with the
+    /// profile's mean and stddev (right-skewed: a long tail of slow starts).
     pub fn sample_ttft(&self) -> Duration {
         if self.ttft_mean_ms == 0 {
             return Duration::ZERO;
         }
 
         let mut rng = rand::rng();
-        let sample = sample_normal_ms(self.ttft_mean_ms, self.ttft_stddev_ms, &mut rng);
+        let sample = sample_lognormal_ms(self.ttft_mean_ms, self.ttft_stddev_ms, &mut rng);
 
         Duration::from_millis(sample)
     }
@@ -267,14 +365,30 @@ impl LatencyProfile {
     }
 }
 
+fn standard_normal(rng: &mut impl rand::Rng) -> f64 {
+    let u1: f64 = rng.random_range(f64::MIN_POSITIVE..1.0);
+    let u2: f64 = rng.random_range(0.0..1.0);
+    (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos()
+}
+
+/// Log-normal sample whose mean and stddev match the arguments.
+fn sample_lognormal_ms(mean_ms: u64, stddev_ms: u64, rng: &mut impl rand::Rng) -> u64 {
+    if stddev_ms == 0 {
+        return mean_ms;
+    }
+    let mean = mean_ms as f64;
+    let cv = stddev_ms as f64 / mean;
+    let sigma2 = (1.0 + cv * cv).ln();
+    let mu = mean.ln() - sigma2 / 2.0;
+    (mu + sigma2.sqrt() * standard_normal(rng)).exp().max(1.0) as u64
+}
+
 fn sample_normal_ms(mean_ms: u64, stddev_ms: u64, rng: &mut impl rand::Rng) -> u64 {
     if stddev_ms == 0 {
         return mean_ms;
     }
 
-    let u1: f64 = rng.random_range(f64::MIN_POSITIVE..1.0);
-    let u2: f64 = rng.random_range(0.0..1.0);
-    let z = (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos();
+    let z = standard_normal(rng);
 
     (mean_ms as f64 + stddev_ms as f64 * z).max(1.0) as u64
 }
@@ -376,11 +490,25 @@ mod tests {
         let gpt4o = LatencyProfile::from_model("gpt-4o-mini");
         assert_eq!(gpt4o.ttft_mean_ms, LatencyProfile::gpt4o().ttft_mean_ms);
 
-        // GPT-5.6 / GPT-6 tiers (Luna is the cost-efficient tier)
-        let gpt6 = LatencyProfile::from_model("gpt-6-sol");
-        assert_eq!(gpt6.ttft_mean_ms, LatencyProfile::gpt5().ttft_mean_ms);
-        let luna = LatencyProfile::from_model("gpt-6-luna");
-        assert_eq!(luna.ttft_mean_ms, LatencyProfile::gpt5_mini().ttft_mean_ms);
+        // GPT-5.6 / GPT-6 tiers use measured per-tier profiles
+        for (model, expected) in [
+            ("gpt-6-sol", LatencyProfile::gpt_sol()),
+            ("gpt-6.1-sol", LatencyProfile::gpt_sol()),
+            ("gpt-5.6", LatencyProfile::gpt_sol()),
+            ("gpt-6-luna", LatencyProfile::gpt_luna()),
+            ("gpt-5.6-luna", LatencyProfile::gpt_luna()),
+            ("gpt-6.1-terra", LatencyProfile::gpt_terra()),
+            ("gpt-6-astra", LatencyProfile::gpt_astra()),
+            ("muse-spark-1.3", LatencyProfile::muse_spark()),
+        ] {
+            let got = LatencyProfile::from_model(model);
+            assert_eq!(got.ttft_mean_ms, expected.ttft_mean_ms, "{model}");
+            assert_eq!(got.tbt_mean_ms, expected.tbt_mean_ms, "{model}");
+        }
+        // Luna starts later than Sol but streams faster (measured)
+        let (luna, sol) = (LatencyProfile::gpt_luna(), LatencyProfile::gpt_sol());
+        assert!(luna.ttft_mean_ms > sol.ttft_mean_ms);
+        assert!(luna.tbt_mean_ms < sol.tbt_mean_ms);
 
         // Claude Fable uses the Opus-tier profile
         let fable = LatencyProfile::from_model("claude-fable-5-1");
@@ -423,6 +551,49 @@ mod tests {
             "Mean {} not within tolerance of expected {}",
             mean,
             expected_mean
+        );
+    }
+
+    #[test]
+    fn ttft_is_right_skewed_with_matching_mean() {
+        let profile = LatencyProfile::gpt_luna();
+        let mut samples: Vec<u64> = (0..20_000)
+            .map(|_| profile.sample_ttft().as_millis() as u64)
+            .collect();
+        samples.sort_unstable();
+        let mean = samples.iter().sum::<u64>() as f64 / samples.len() as f64;
+        let median = samples[samples.len() / 2] as f64;
+        let p99 = samples[samples.len() * 99 / 100] as f64;
+        let expected = profile.ttft_mean_ms as f64;
+        assert!((mean - expected).abs() < expected * 0.05, "mean {mean}");
+        // Log-normal: median below the mean, and a long upper tail.
+        assert!(median < mean, "median {median} mean {mean}");
+        assert!(p99 > expected * 1.6, "p99 {p99}");
+    }
+
+    #[test]
+    fn input_tokens_add_prefill_to_ttft() {
+        let base = LatencyProfile::gpt_sol();
+        let long = base.clone().with_input_tokens(200_000);
+        // 200k tokens at the default 50 us/token = 10 s of prefill.
+        assert_eq!(long.ttft_mean_ms, base.ttft_mean_ms + 10_000);
+        let none = base
+            .clone()
+            .with_prefill_us_per_token(0)
+            .with_input_tokens(200_000);
+        assert_eq!(none.ttft_mean_ms, base.ttft_mean_ms);
+        // Instant and fast profiles never gain prefill.
+        assert_eq!(
+            LatencyProfile::instant()
+                .with_input_tokens(1_000_000)
+                .ttft_mean_ms,
+            0
+        );
+        assert_eq!(
+            LatencyProfile::fast()
+                .with_input_tokens(1_000_000)
+                .ttft_mean_ms,
+            LatencyProfile::fast().ttft_mean_ms
         );
     }
 }

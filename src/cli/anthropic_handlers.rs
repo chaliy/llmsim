@@ -15,7 +15,7 @@ use crate::anthropic::{
 };
 use crate::ids::prefixed_compact_id;
 use crate::script::{ScriptedResponse, SimError, SimToolCall, SimTurn};
-use crate::{create_generator, EndpointType, ErrorInjector, LatencyProfile};
+use crate::{create_generator, EndpointType, ErrorInjector};
 use axum::{
     body::Body,
     extract::{Path, State},
@@ -96,12 +96,7 @@ pub async fn create_message(
     }
 
     // Model-specific latency (unless overridden in config).
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     // Scripted non-streaming requests get full tool-call support.
     if let Some(script) = state.script.clone() {
@@ -133,6 +128,7 @@ pub async fn create_message(
     };
 
     let input_tokens = count_input_tokens(&request);
+    let latency = latency.with_input_tokens(input_tokens);
     let text_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 

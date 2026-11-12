@@ -1,5 +1,12 @@
 # LLMSim Knowledge Update Log
 
+## 2026-11-12
+
+* **Added the Latency Model.** New [Latency Model](simulation/latency.md) spec: measured
+  GPT-6 tier profiles (Luna, Sol) and Muse Spark, log-normal TTFT, prompt-size prefill.
+* **Built-in scenarios.** [Scenarios](simulation/scenarios.md) are compiled in and on by
+  default; six agent scenarios from everruns joined the starter library.
+
 ## 2026-11-10
 
 * **Added Python and Node bindings.** New [Python and Node Bindings](foundations/language-bindings.md)

@@ -10,7 +10,9 @@ non-streaming).
 
 ## Enable
 
-Point the server at a scenario file or a directory of them:
+The starter library below is built in and on by default: just add a marker.
+To add your own, point the server at a scenario file or a directory of them
+(a scenario with a built-in's name replaces it):
 
 ```toml
 # config.toml
@@ -22,7 +24,9 @@ scenarios_path = "examples/scenarios"
 llmsim serve --config config.toml
 ```
 
-The repository ships a starter library in `examples/scenarios/`:
+Set `builtin_scenarios = false` under `[response]` to turn the built-ins off.
+
+The starter library (also in `examples/scenarios/`):
 
 | Scenario | Steps | Exercises |
 |----------|-------|-----------|
@@ -35,6 +39,12 @@ The repository ships a starter library in `examples/scenarios/`:
 | `stream-stall` | 300 tokens with a 20 s stall after 100 | Keep-alives, proxy idle timeouts |
 | `broken-stream` | stream cut after 50 tokens, full answer on retry | Mid-stream failure recovery |
 | `thinking` | 400 reasoning tokens, then a 300-token answer | Reasoning deltas |
+| `file-research` | 3 file-tool rounds on `/load-test/research.md`, then 600 tokens | Agents with file tools |
+| `console-file-research` | Same, using only `read_file` | Agents exposing one file tool |
+| `long-tool` | Two 25 s `bash` commands, then an answer | Long tool time holding a turn open |
+| `luna-agent` | `file-research` rounds timed like GPT-6 Luna (TTFT 2-4.5 s, 108 tokens/s) | Capacity at Luna speed |
+| `sol-agent` | Same turn timed like GPT-6 Sol (about 2 s, 46 tokens/s) | Capacity at Sol speed |
+| `muse-agent` | Same turn timed like Muse Spark (about 12.7 s, 136 tokens/s) | Very slow first tokens |
 
 ## Select a scenario
 

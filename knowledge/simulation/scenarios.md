@@ -144,9 +144,15 @@ again: an extra error, never a wrong answer.
 
 ### Server mode
 
+- The starter library is compiled in (`ScenarioSet::builtin()`) and loaded by
+  default, so a marker works with no configuration; `[response]
+  builtin_scenarios = false` turns it off. Embedders such as everruns use
+  `builtin()` instead of copying the JSON files.
 - `[response] scenarios_path = "..."` loads one JSON file (an object or an
   array of objects) or every `*.json` file in a directory. Invalid scenarios
-  or duplicate names fail startup. `script_path` keeps working unchanged.
+  or duplicate names within the loaded files fail startup; a loaded scenario
+  replaces a built-in one of the same name. `script_path` keeps working
+  unchanged.
 - Wired into `POST /openai/v1/chat/completions`, streaming and
   non-streaming:
   - Streaming: role chunk, `delta.reasoning_content` deltas, content deltas
@@ -170,7 +176,14 @@ again: an extra error, never a wrong answer.
 `slow-first-token`, `parallel-tools`, `flaky-429`, `stream-stall`,
 `broken-stream` and `thinking`, with timing from production observations
 (TTFT 0.8-1.3 s, about 65 tokens/s). They use tool placeholders only, so
-they work with any agent. A test keeps them loadable.
+they work with any agent. A test keeps them loadable and identical to the
+compiled-in set.
+
+Agent-shaped scenarios that name concrete tools came from everruns' load
+tests: `file-research` and `console-file-research` (file tools against
+`/load-test/research.md`), `long-tool` (two 25 s `bash` commands), and
+`luna-agent`, `sol-agent` and `muse-agent`, which play the same tool-using
+turn at each model's measured timing (see [Latency Model](latency.md)).
 
 ### Public Rust API
 

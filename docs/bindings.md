@@ -90,7 +90,7 @@ merge in this order, later wins:
 | `port` | `port` | Bind port. Default `0`, a free port |
 | `generator` | `generator` | `lorem` (default), `echo`, `random`, `sequence`, `fixed:<text>` |
 | `target_tokens` | `targetTokens` | Target response length in tokens |
-| `latency` | `latency` | Latency profile: `instant`, `fast`, `gpt5`, `claude-sonnet`, ... |
+| `latency` | `latency` | Latency profile: `instant`, `fast`, `luna`, `sol`, `gpt5`, `claude-sonnet`, ... |
 | `script` | `script` | [Scripted mode](../knowledge/simulation/scripted-mode.md) file |
 | `scenarios` | `scenarios` | [Scenario](scenarios.md) file or directory |
 

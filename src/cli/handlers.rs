@@ -67,12 +67,7 @@ pub(crate) fn generate_responses_result(
     params: &ResponseGenerationParams<'_>,
 ) -> ResponseGenerationResult {
     // Get latency profile
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(params.model)
-        };
+    let latency = state.config.latency_for_model(params.model);
 
     // Extract text from input
     let input_text = extract_input_text(params.input, params.instructions);
@@ -153,7 +148,7 @@ pub(crate) fn generate_responses_result(
         usage,
         reasoning_tokens,
         reasoning_summary,
-        latency,
+        latency: latency.with_input_tokens(input_tokens),
     }
 }
 
@@ -225,12 +220,7 @@ pub async fn chat_completions(
     }
 
     // Get latency profile (use model-specific if not configured)
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     // Scenario mode: a `[[llmsim:<name>]]` marker in the last user message
     // (or an `llmsim-scenario-<name>` model) picks the step to play.
@@ -273,6 +263,7 @@ pub async fn chat_completions(
     // Count tokens. Reasoning models bill hidden reasoning tokens inside
     // completion_tokens and break them out in completion_tokens_details.
     let prompt_tokens = count_request_tokens(&request);
+    let latency = latency.with_input_tokens(prompt_tokens);
     let visible_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let reasoning = request
@@ -371,6 +362,7 @@ async fn handle_scripted_chat_completions(
     };
 
     let prompt_tokens = count_request_tokens(&request);
+    let latency = latency.with_input_tokens(prompt_tokens);
     let text_for_usage = text.clone().unwrap_or_default();
     let completion_tokens = crate::count_tokens_default(&text_for_usage)
         .unwrap_or(text_for_usage.split_whitespace().count());
@@ -483,6 +475,7 @@ async fn handle_scenario_chat_completions(
         })
         .sum();
     let prompt_tokens = count_request_tokens(&request);
+    let latency = latency.with_input_tokens(prompt_tokens);
     let completion_tokens = text_tokens + reasoning_tokens + tool_call_tokens;
     let usage = Usage {
         prompt_tokens: prompt_tokens as u32,
@@ -785,12 +778,7 @@ pub async fn create_openresponses_response(
     }
 
     // Get latency profile (use model-specific if not configured)
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     // Generate response using the input text
     let input_text = request.input.extract_text();
@@ -846,6 +834,7 @@ pub async fn create_openresponses_response(
 
     // Count tokens
     let input_tokens = count_openresponses_input_tokens(&request);
+    let latency = latency.with_input_tokens(input_tokens);
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let usage = OpenResponsesUsage {
@@ -1173,12 +1162,7 @@ pub async fn create_image(
     // Image-generation timing is anchored to the configured latency profile;
     // model-derived latency (the default) yields realistic multi-second waits,
     // while `instant`/`fast` profiles collapse it for tests and load runs.
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     let params = request.resolve();
 

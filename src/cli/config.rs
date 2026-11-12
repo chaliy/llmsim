@@ -51,6 +51,24 @@ impl Config {
         serde_json::from_value(base).map_err(|e| ConfigError::Parse(e.to_string()))
     }
 
+    /// Latency for a request to `model`: the configured profile or custom
+    /// timings when set, otherwise the model's own profile. A configured
+    /// `prefill_us_per_token` overrides the profile's prefill rate.
+    pub fn latency_for_model(&self, model: &str) -> LatencyProfile {
+        let profile = if self.latency.profile.is_some()
+            || self.latency.ttft_mean_ms.is_some()
+            || self.latency.tbt_mean_ms.is_some()
+        {
+            self.latency_profile()
+        } else {
+            LatencyProfile::from_model(model)
+        };
+        match self.latency.prefill_us_per_token {
+            Some(us) => profile.with_prefill_us_per_token(us),
+            None => profile,
+        }
+    }
+
     /// Create a latency profile from the configuration
     pub fn latency_profile(&self) -> LatencyProfile {
         if let Some(ref profile) = self.latency.profile {
@@ -58,6 +76,12 @@ impl Config {
                 // GPT-5 family
                 "gpt5" | "gpt-5" => LatencyProfile::gpt5(),
                 "gpt5-mini" | "gpt-5-mini" => LatencyProfile::gpt5_mini(),
+                // GPT-5.6+/GPT-6 tiers
+                "sol" | "gpt-sol" => LatencyProfile::gpt_sol(),
+                "terra" | "gpt-terra" => LatencyProfile::gpt_terra(),
+                "luna" | "gpt-luna" => LatencyProfile::gpt_luna(),
+                "astra" | "gpt-astra" => LatencyProfile::gpt_astra(),
+                "muse-spark" | "muse" => LatencyProfile::muse_spark(),
                 // O-series reasoning models (o3, o4)
                 "o3" | "o4" | "o-series" => LatencyProfile::o_series(),
                 // GPT-4 family
@@ -168,6 +192,8 @@ pub struct LatencyConfig {
     pub tbt_mean_ms: Option<u64>,
     /// Custom time between tokens stddev (ms)
     pub tbt_stddev_ms: Option<u64>,
+    /// Prefill cost per input token (microseconds) added to TTFT; 0 disables
+    pub prefill_us_per_token: Option<u64>,
 }
 
 /// Response generation configuration
@@ -190,6 +216,15 @@ pub struct ResponseConfig {
     /// script / generator behaviour. See `knowledge/simulation/scenarios.md`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenarios_path: Option<String>,
+    /// Load the built-in starter scenarios (`examples/scenarios/`, compiled
+    /// in). Scenarios from `scenarios_path` replace built-ins of the same
+    /// name. Default `true`; a scenario only plays when a request names it.
+    #[serde(default = "default_true")]
+    pub builtin_scenarios: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_generator() -> String {
@@ -207,6 +242,7 @@ impl Default for ResponseConfig {
             target_tokens: default_target_tokens(),
             script_path: None,
             scenarios_path: None,
+            builtin_scenarios: true,
         }
     }
 }
