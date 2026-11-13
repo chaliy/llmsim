@@ -1,6 +1,6 @@
 {
   "name": "llmsim",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "In-process LLM API simulator (OpenAI, Anthropic, OpenResponses) for tests and load testing",
   "type": "module",
   "main": "wrapper.js",
