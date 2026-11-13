@@ -13,9 +13,9 @@
 use serde::{Deserialize, Serialize};
 
 /// The model the aliases currently resolve to.
-pub const JEV_CURRENT: &str = "jev-1.13.0";
-/// Release date of [`JEV_CURRENT`] (from the dated `jev-1.13-20260917` snapshot).
-pub const JEV_CURRENT_RELEASE_DATE: &str = "2026-09-17";
+pub const JEV_CURRENT: &str = "jev-1.14.0";
+/// Release date of [`JEV_CURRENT`] (from the dated `jev-1.14-20261014` snapshot).
+pub const JEV_CURRENT_RELEASE_DATE: &str = "2026-10-14";
 /// Default model used by the TypeSafe SDKs.
 pub const TYPESAFE_DEFAULT_MODEL: &str = "jev-latest";
 
@@ -43,7 +43,7 @@ pub fn typesafe_models() -> TypeSafeModelsResponse {
             TypeSafeModel {
                 name: "jev-latest".to_string(),
                 description: "Jev, TypeSafe's flagship System One model. \
-                              Most recent stable release (currently Jev 1.13)."
+                              Most recent stable release (currently Jev 1.14)."
                     .to_string(),
                 release_date: JEV_CURRENT_RELEASE_DATE.to_string(),
             },
@@ -63,7 +63,8 @@ pub fn typesafe_models() -> TypeSafeModelsResponse {
 /// Aliases resolve to [`JEV_CURRENT`]; anything else is echoed unchanged.
 pub fn resolve_typesafe_model(model: &str) -> &str {
     match model {
-        "jev-latest" | "jev-preview" | "jev-1.13" => JEV_CURRENT,
+        "jev-latest" | "jev-preview" | "jev-1.14" => JEV_CURRENT,
+        "jev-1.13" => "jev-1.13.0",
         other => other,
     }
 }
@@ -74,8 +75,10 @@ mod tests {
 
     #[test]
     fn aliases_resolve_to_the_versioned_id() {
-        assert_eq!(resolve_typesafe_model("jev-latest"), "jev-1.13.0");
-        assert_eq!(resolve_typesafe_model("jev-preview"), "jev-1.13.0");
+        assert_eq!(resolve_typesafe_model("jev-latest"), "jev-1.14.0");
+        assert_eq!(resolve_typesafe_model("jev-preview"), "jev-1.14.0");
+        assert_eq!(resolve_typesafe_model("jev-1.14"), "jev-1.14.0");
+        assert_eq!(resolve_typesafe_model("jev-1.13"), "jev-1.13.0");
         assert_eq!(resolve_typesafe_model("jev-1.13.0"), "jev-1.13.0");
     }
 

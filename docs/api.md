@@ -9,7 +9,9 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | **OpenAI** | `/openai/v1/` | OpenAI-compatible Chat Completions and Responses API |
 | **OpenResponses** | `/openresponses/v1/` | [OpenResponses](https://www.openresponses.org) specification |
 | **Anthropic** | `/anthropic/v1/` | [Anthropic Messages API](https://docs.anthropic.com/en/api/messages) |
+| **Gemini** | `/gemini/v1beta/` | [Gemini API](https://ai.google.dev/api) (`generateContent`, streaming, embeddings) |
 | **TypeSafe** | `/typesafe/v1/` | [TypeSafe System One API](https://docs.typesafe.ai/api) (Jev) |
+| **Decisions** | `/openai/v1/decisions`, `/gemini/v1beta/decisions`, `/foundry/providers/microsoft/v1/systemone` | OpenAI, Gemini and Microsoft Foundry typed-judgment APIs |
 
 ## OpenAI API (`/openai/v1/...`)
 
@@ -20,6 +22,14 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/responses` | WS | WebSocket mode for Responses API |
+| `/openai/v1/responses/{id}` | GET, DELETE | Retrieve or delete a background response |
+| `/openai/v1/responses/{id}/cancel` | POST | Cancel a background response |
+| `/openai/v1/files` | POST | Upload a file (multipart) |
+| `/openai/v1/files/{id}`, `/openai/v1/files/{id}/content` | GET | File metadata, file content |
+| `/openai/v1/batches` | POST, GET | Create or list batches |
+| `/openai/v1/batches/{id}`, `/openai/v1/batches/{id}/cancel` | GET, POST | Retrieve or cancel a batch |
+| `/openai/v1/embeddings` | POST | Embeddings |
+| `/openai/v1/realtime?model=...` | GET (WebSocket) | Realtime voice sessions |
 | `/openai/v1/images/generations` | POST | Image generation (streaming & non-streaming) |
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/:id` | GET | Get model details |
@@ -50,6 +60,29 @@ curl http://localhost:8080/openai/v1/chat/completions \
 | `max_tokens` | integer | No | Maximum tokens to generate |
 | `top_p` | number | No | Nucleus sampling parameter |
 | `reasoning_effort` | string | No | Reasoning models only: `none`, `minimal`, `low`, `medium` (default), `high`, `xhigh`, `max` |
+| `tools` | array | No | Function tools |
+| `tool_choice` | string \| object | No | `required` or `{"type": "function", "function": {"name"}}` forces a call with schema-valid arguments |
+| `response_format` | object | No | `{"type": "json_schema", "json_schema": {"schema"}}` returns JSON valid against the schema; `json_object` returns a JSON object |
+
+#### Structured output and tool calls
+
+Without a script or scenario, request controls shape the answer the way a
+real model must follow them:
+
+- `tool_choice: "required"` (or a named function) answers with one tool call
+  whose arguments validate against the tool's `parameters` schema,
+  `finish_reason: "tool_calls"`.
+- `response_format` `json_schema` answers with JSON valid against the schema
+  (types, `required`, `enum`, `const`, `anyOf`, local `$ref`, string formats,
+  numeric and length bounds), streamed or not.
+- With `[response] auto_tool_calls = true`, a request that offers tools and
+  ends with a user message gets a tool call even with `tool_choice: "auto"`;
+  once the tool result comes back the model answers in text. Off by default.
+
+Values are deterministic for the same last message, so tests can assert on
+them. The Responses API honours `text.format` `json_schema` the same way, and
+Anthropic Messages honour `tool_choice` (`any`, `tool`) and
+`output_config.format` `json_schema`.
 
 #### Reasoning tokens
 
@@ -233,6 +266,90 @@ curl http://localhost:8080/openai/v1/models
 ```bash
 curl http://localhost:8080/openai/v1/models/gpt-5
 ```
+
+### Realtime
+
+`ws://localhost:8080/openai/v1/realtime?model=gpt-realtime` simulates the
+Realtime API: the client streams PCM16 audio (24 kHz mono, base64) and gets
+spoken answers back as events.
+
+- Events follow the GA API (`session.update`, `input_audio_buffer.append` /
+  `commit` / `clear`, `conversation.item.create`, `response.create` /
+  `cancel`; `response.output_audio.delta`,
+  `response.output_audio_transcript.delta`, `response.done`, ...). Send
+  `OpenAI-Beta: realtime=v1` for the beta names (`response.audio.delta`,
+  `conversation.item.created`) and session shape.
+- Server VAD runs on the audio you send: speech starts when 20 ms frames get
+  loud (scaled by `threshold`), and `silence_duration_ms` of quiet ends the
+  turn, commits it and answers (`create_response`). Speaking during an
+  answer cancels it (`interrupt_response`). Set `turn_detection` to `null`
+  for manual `commit` + `response.create`.
+- Answers are lorem words with a quiet tone, 400 ms of audio per word, or
+  text with `output_modalities: ["text"]`. `tool_choice: "required"` (or a
+  named function) returns a `function_call` item.
+- `input_audio_transcription` / `audio.input.transcription` adds
+  `conversation.item.input_audio_transcription.completed`.
+- Usage: input audio 10 tokens/s, output audio 20 tokens/s, text through the
+  tokenizer. Errors match the API (`input_audio_buffer_commit_empty`,
+  `conversation_already_has_active_response`, `response_cancel_not_active`).
+
+### Background Responses
+
+`"background": true` on `POST /openai/v1/responses` returns at once with
+`status: "queued"`. Poll `GET /openai/v1/responses/{id}`: it reports
+`in_progress` until the model would have finished (its latency profile over
+the output), then the full response. `POST .../cancel` before then gives
+`cancelled`; `DELETE` removes it. `store: false` with `background` is a 400.
+
+### Batches
+
+Upload a JSONL file (`purpose=batch`), create a batch, poll it, download the
+output file:
+
+```bash
+curl http://localhost:8080/openai/v1/files -F purpose=batch -F file=@requests.jsonl
+curl http://localhost:8080/openai/v1/batches -H "Content-Type: application/json" \
+  -d '{"input_file_id": "file-...", "endpoint": "/v1/chat/completions", "completion_window": "24h"}'
+curl http://localhost:8080/openai/v1/batches/batch_...
+curl http://localhost:8080/openai/v1/files/file-.../content   # output_file_id
+```
+
+- Endpoints: `/v1/chat/completions`, `/v1/responses`, `/v1/embeddings`. Each
+  line runs exactly as the synchronous endpoint would (scenarios and forced
+  tools included).
+- Status: `validating`, `in_progress`, then `completed` after `[batch]
+  completion_ms` (default 2000). Lines that fail (non-200) go to
+  `error_file_id`; invalid JSON or a mismatched `url` fails the whole batch
+  with `errors`.
+- `POST /openai/v1/batches/{id}/cancel` before completion gives `cancelled`.
+
+### Embeddings
+
+Deterministic vectors for `text-embedding-3-small` (1536 dims),
+`text-embedding-3-large` (3072) and `text-embedding-ada-002` (1536). Texts that
+share words get similar vectors (each word has a fixed direction), so
+retrieval, ranking and dedup code sees meaningful cosine similarity; the same
+text always returns the same vector.
+
+```bash
+curl http://localhost:8080/openai/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{"model": "text-embedding-3-small", "input": ["refund policy", "kubernetes"]}'
+# {"object": "list", "model": "text-embedding-3-small",
+#  "data": [{"object": "embedding", "index": 0, "embedding": [0.012, ...]}, ...],
+#  "usage": {"prompt_tokens": 4, "total_tokens": 4}}
+```
+
+- `input`: a string, an array of strings, a token array, or an array of token
+  arrays.
+- `dimensions` (v3 models): a shorter vector that is the renormalized prefix of
+  the full one, as on OpenAI. `text-embedding-ada-002` rejects it.
+- `encoding_format: "base64"`: little-endian float32 bytes, base64-encoded.
+- Limits as on OpenAI: 8192 tokens per input, 2048 inputs and 300,000 tokens
+  per request; empty inputs are rejected.
+- Latency: about 120 ms plus 2 µs per input token (the `instant` profile makes
+  it immediate). Unknown model ids get the `text-embedding-3-small` shape
+  unless `[validation] strict_models` is on.
 
 ### Image Generation
 
@@ -485,10 +602,10 @@ curl http://localhost:8080/anthropic/v1/messages \
 | `stop_sequences` | array | no | |
 | `stream` | boolean | no | Stream Server-Sent Events |
 | `tools` | array | no | Tool definitions |
-| `tool_choice` | object | no | |
+| `tool_choice` | object | no | `{"type": "any"}` or `{"type": "tool", "name"}` forces a `tool_use` block with schema-valid `input`; streamed as `input_json_delta` |
 | `metadata` | object | no | E.g. `{"user_id": "..."}` |
 | `thinking` | object | no | `{"type": "adaptive"}` (or `"enabled"` + `budget_tokens` on older models, `"disabled"`), optional `display`: `"summarized"` / `"omitted"` |
-| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}` |
+| `output_config` | object | no | `{"effort": "low" \| "medium" \| "high" \| "xhigh" \| "max"}`; `format: {"type": "json_schema", "schema"}` returns schema-valid JSON text |
 
 #### Extended thinking
 
@@ -575,6 +692,21 @@ curl http://localhost:8080/anthropic/v1/messages/count_tokens \
 The count equals the `usage.input_tokens` a Messages request with the same
 `system` and `messages` would report.
 
+### Message Batches
+
+```bash
+curl http://localhost:8080/anthropic/v1/messages/batches -H "content-type: application/json" \
+  -d '{"requests": [{"custom_id": "a", "params": {"model": "claude-opus-5-5",
+       "max_tokens": 256, "messages": [{"role": "user", "content": "hi"}]}}]}'
+```
+
+`processing_status` is `in_progress` until `[batch] completion_ms` passes, then
+`ended` with `request_counts` and a `results_url`
+(`/anthropic/v1/messages/batches/{id}/results`, JSONL of `succeeded` /
+`errored` results by `custom_id`). Cancel before then and every request is
+`canceled`. `custom_id` must match `^[a-zA-Z0-9_-]{1,64}$` and be unique.
+List, retrieve and delete (ended batches only) work as on the real API.
+
 ### List Models
 
 ```bash
@@ -594,6 +726,52 @@ Errors use the Anthropic error envelope:
 ```json
 {"type": "error", "error": {"type": "rate_limit_error", "message": "..."}}
 ```
+
+## Gemini API (`/gemini/v1beta/...`)
+
+Simulates Google's Gemini API. Point the Google Gen AI SDK at
+`http://localhost:8080/gemini` (`http_options={"base_url": ...}`).
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/gemini/v1beta/models/{model}:generateContent` | POST | Generate content |
+| `/gemini/v1beta/models/{model}:streamGenerateContent` | POST | Stream (`?alt=sse` for SSE, otherwise a JSON array) |
+| `/gemini/v1beta/models/{model}:countTokens` | POST | Count tokens (`contents` or `generateContentRequest`) |
+| `/gemini/v1beta/models/{model}:embedContent` | POST | Embed one content |
+| `/gemini/v1beta/models/{model}:batchEmbedContents` | POST | Embed several |
+| `/gemini/v1beta/models`, `/gemini/v1beta/models/{model}` | GET | Models in Google's shape |
+
+```bash
+curl "http://localhost:8080/gemini/v1beta/models/gemini-2.5-flash:generateContent" \
+  -H "Content-Type: application/json" \
+  -d '{"contents": [{"role": "user", "parts": [{"text": "Hello"}]}]}'
+# {"candidates": [{"content": {"role": "model", "parts": [{"text": "..."}]},
+#   "finishReason": "STOP", "index": 0}],
+#  "usageMetadata": {"promptTokenCount": 3, "candidatesTokenCount": 100,
+#   "thoughtsTokenCount": 200, "totalTokenCount": 303, ...},
+#  "modelVersion": "gemini-2.5-flash", "responseId": "..."}
+```
+
+- Field names in camelCase or snake_case.
+- Thinking: 2.5 (not Flash-Lite), 3.x and 4.x models think by default and
+  bill `thoughtsTokenCount`. `thinkingConfig.thinkingBudget: 0` turns it off
+  (a 400 on Pro), `thinkingLevel` scales it, `includeThoughts` adds a
+  `thought: true` part. Thinking counts against `maxOutputTokens`: a small cap
+  gives `finishReason: MAX_TOKENS` and no parts, as on the real API.
+- Tools: `toolConfig.functionCallingConfig.mode: ANY` (optionally with
+  `allowedFunctionNames`) returns a `functionCall` with schema-valid `args`;
+  thinking models add a `thoughtSignature`.
+- `responseMimeType: application/json` with `responseSchema` (upper-case
+  OpenAPI types) or `responseJsonSchema` returns schema-valid JSON.
+- Implicit caching: a repeated prefix of 1024+ tokens (4096 on Pro) reports
+  `cachedContentTokenCount`.
+- Scenarios play here too: `functionCall` parts carry the `call_llmsim_...`
+  `id`; send it back in `functionResponse.id`.
+- Embeddings: `gemini-embedding-001` (3072, `outputDimensionality` 128-3072,
+  shortened vectors not renormalized, as Google documents) and
+  `text-embedding-004` (768).
+- Errors use Google's envelope:
+  `{"error": {"code": 400, "message": "...", "status": "INVALID_ARGUMENT"}}`.
 
 ## TypeSafe API (`/typesafe/v1/...`)
 
@@ -640,7 +818,7 @@ curl -X POST http://localhost:8080/typesafe/v1/systemone \
 
 ```json
 {
-  "model": "jev-1.13.0",
+  "model": "jev-1.14.0",
   "answers": {
     "is_urgent": {"type": "noul", "noul": 0.95},
     "team": {"type": "choice", "choice": "billing", "confidence": 0.62,
@@ -656,7 +834,7 @@ curl -X POST http://localhost:8080/typesafe/v1/systemone \
 Answers are deterministic: the same state and question always get the same
 answer, so tests can assert on thresholds and routing. Probabilities always sum
 to 1, and `choice` is always the most likely option. Aliases (`jev-latest`,
-`jev-preview`) resolve to `jev-1.13.0` in `model`; other model names are echoed.
+`jev-preview`) resolve to `jev-1.14.0` in `model`; other model names are echoed.
 
 ### List Models
 
@@ -678,6 +856,53 @@ Other errors (including injected ones) use TypeSafe's envelope:
 ```json
 {"detail": {"error_type": "rate_limit_error", "message": "..."}}
 ```
+
+## Decisions APIs
+
+Typed judgments from other providers, answered by the same engine as System
+One: the same input and question always get the same answer.
+
+| Endpoint | Provider shape | Default model |
+|----------|----------------|---------------|
+| `POST /openai/v1/decisions` | OpenAI Decisions API | `gpt-6-luna` |
+| `POST /gemini/v1beta/decisions` | Gemini Decisions API | `gemini-decision-1` |
+| `POST /foundry/providers/microsoft/v1/systemone` | System One at a Foundry resource root (base URL `{llmsim}/foundry`) | echoes the deployment |
+
+### OpenAI
+
+```bash
+curl http://localhost:8080/openai/v1/decisions -H 'content-type: application/json' -d '{
+  "model": "gpt-6-luna",
+  "input": "My payment failed twice today.",
+  "questions": [
+    {"type": "predicate", "name": "urgent", "instructions": "Is it urgent?"},
+    {"type": "choice", "name": "team", "instructions": "Which team?",
+     "choices": [{"value": "billing"}, {"value": "technical"}]},
+    {"type": "score", "name": "priority", "instructions": "Priority?",
+     "levels": [{"label": "Routine"}, {"label": "Important"}, {"label": "Urgent"}]}
+  ]
+}'
+# {"model": "gpt-6-luna", "answers": [
+#   {"type": "predicate", "name": "urgent", "probability": 0.81},
+#   {"type": "choice", "name": "team", "choice": "billing", "confidence": 0.4,
+#    "probabilities": [{"value": "billing", "probability": 0.83}, ...]},
+#   {"type": "score", "name": "priority", "score": 1.4, "confidence": 0.3,
+#    "probabilities": [{"value": 0, "probability": 0.2}, ...]}],
+#  "usage": {"input_tokens": 61, "output_tokens": 60}}
+```
+
+Limits match the live API: up to 24 questions, unique names, at least two
+choices, 2 to 10 score levels. Put `[[llmsim:refuse]]` in `input` to get a
+`refusal` answer for every question.
+
+### Gemini
+
+Questions are keyed (`[A-Za-z0-9_-]{1,64}`) and use System One's primitives
+with Google's criteria: `noul` takes `true_description`/`false_description`,
+`choice` maps options to descriptions, `score` lists levels. `input` may be a
+string or Content parts (`text`, `image`, `audio`, `video`, `document`). The
+response has `answers` under the same keys and `usage.total_input_tokens`.
+Errors use Google's `{"error": {"code", "message", "status"}}` envelope.
 
 ## LLMSim Endpoints
 
@@ -730,14 +955,15 @@ curl http://localhost:8080/llmsim/stats
 | Family | Models |
 |--------|--------|
 | GPT-5 | gpt-5, gpt-5-pro, gpt-5-mini, gpt-5-nano, gpt-5-codex, gpt-5.1, gpt-5.2, gpt-5.3-codex, gpt-5.3-codex-spark, gpt-5.3-chat-latest, gpt-5.4, gpt-5.4-pro, gpt-5.4-mini, gpt-5.4-nano, gpt-5.5, gpt-5.5-pro, gpt-5.6, gpt-5.6-sol, gpt-5.6-terra, gpt-5.6-luna |
-| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol |
+| GPT-6 | gpt-6-astra, gpt-6-sol, gpt-6-luna, gpt-6.1-sol, gpt-6.1-terra |
 | O-Series | o1, o1-mini, o3, o3-mini, o4-mini |
 | GPT-4 | gpt-4, gpt-4-turbo, gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini, gpt-4.1-nano |
-| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5, claude-opus-5, claude-opus-5.5, claude-sonnet-5, claude-sonnet-5.5, claude-haiku-5.5, claude-fable-5, claude-fable-5.1 |
-| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash |
+| Claude | claude-3.5-sonnet, claude-3.7-sonnet, claude-sonnet-4, claude-sonnet-4.5, claude-sonnet-4.6, claude-opus-4, claude-opus-4.1, claude-opus-4.5, claude-opus-4.6, claude-opus-4.7, claude-opus-4.8, claude-haiku-4.5, claude-opus-5, claude-opus-5.5, claude-sonnet-5, claude-sonnet-5.5, claude-haiku-5.5, claude-fable-5, claude-fable-5.1, claude-fable-5.2, claude-mythos-5.2 |
+| Gemini | gemini-2.0-flash, gemini-2.5-flash, gemini-2.5-pro, gemini-3-pro-preview, gemini-3-flash-preview, gemini-3.1-pro-preview, gemini-3.1-flash-lite, gemini-3.5-flash, gemini-3.5-flash-lite, gemini-3.6-flash, gemini-3.7-flash, gemini-3.8-flash, gemini-4-argon |
 | DeepSeek | deepseek-chat, deepseek-reasoner, deepseek-v4-pro, deepseek-flash |
-| Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2 |
-| TypeSafe | jev-latest, jev-preview, jev-1.13.0 |
+| Other | grok-4.7, kimi-k3, qwen3.8-max, mistral-large-4, muse-spark-1.3 |
+| Image | gpt-image-1, gpt-image-1-mini, gpt-image-1.5, gpt-image-2, gpt-image-2.5, gpt-image-2.6 |
+| TypeSafe | jev-latest, jev-preview, jev-1.14.0, jev-1.13.0 |
 
 ## Scripted Mode
 
@@ -792,3 +1018,72 @@ Errors follow OpenAI/OpenResponses format:
 | 500 | `server_error` | Internal server error |
 | 503 | `server_error` | Service unavailable |
 | 504 | `timeout_error` | Gateway timeout |
+| 529 | `overloaded_error` | Overload burst (Anthropic and TypeSafe shapes) |
+
+### Rate Limits
+
+Set per-key limits to get real RPM/TPM behaviour (keys come from
+`Authorization`, `x-api-key` or `x-goog-api-key`):
+
+```toml
+[rate_limits]
+requests_per_minute = 500
+tokens_per_minute = 200000
+```
+
+Tokens are charged on arrival as an estimate of the prompt plus the
+requested output cap (`max_tokens`, `max_completion_tokens` or
+`max_output_tokens`; 1000 when absent), and refill continuously over a
+minute. Every generation response then carries the provider's headers:
+
+- OpenAI-shaped endpoints: `x-ratelimit-limit-requests`,
+  `x-ratelimit-remaining-requests`, `x-ratelimit-reset-requests` (`6m0s`
+  style) and the same three for `tokens`.
+- Anthropic: `anthropic-ratelimit-requests-*`, `anthropic-ratelimit-tokens-*`
+  and `anthropic-ratelimit-input-tokens-*` with RFC 3339 reset times.
+
+An exhausted key gets 429 with `retry-after` (seconds) and `retry-after-ms`.
+
+### Overload Bursts
+
+`[errors] overload_burst_rate` is the chance per request that a burst
+starts; for `overload_burst_ms` every generation request then fails, 529
+`overloaded_error` on Anthropic and TypeSafe, 503 elsewhere, with
+`retry-after` set to the time left. Incidents arrive in clusters, so this
+tests circuit breakers and fallbacks better than independent random errors.
+
+### Request Limits
+
+Requests a provider would reject are rejected here too (`[validation]
+enforce_limits = true`, the default), for models llmsim has a profile for:
+
+| Case | OpenAI-shaped | Anthropic |
+|------|---------------|-----------|
+| Prompt plus output cap over the context window | 400 `context_length_exceeded` | 400 "prompt is too long: N tokens > M maximum" |
+| Output cap over the model's max output | 400 `invalid_value` on the cap's param | 400 "max_tokens: N > M, ..." |
+| Unknown model (`strict_models = true` only) | 404 `model_not_found` | 404 `not_found_error` |
+
+## Prompt Caching
+
+Repeated prompt prefixes report cached tokens the way each provider does
+(`[response] prompt_caching = true`, the default). Prefixes are message,
+system block and tool boundaries, so an agent loop that appends messages
+keeps hitting. Entries live 5 minutes, and cached tokens skip prefill latency.
+
+| API | When it caches | Where it shows |
+|-----|----------------|----------------|
+| OpenAI chat | Prompts of 1024+ tokens, automatically; 1024 + n·128 tokens | `usage.prompt_tokens_details.cached_tokens` |
+| OpenAI Responses | Same | `usage.input_tokens_details.cached_tokens` |
+| Anthropic Messages | Up to `cache_control` breakpoints of 1024+ tokens | `usage.cache_read_input_tokens`, `usage.cache_creation_input_tokens` (also in `message_start`) |
+
+Anthropic's `input_tokens` excludes cached and newly cached tokens, as on the
+real API.
+
+## Thinking
+
+- Reasoning effort scales time to first token for reasoning models
+  (`reasoning_effort` / `reasoning.effort`): `none` 0.35×, `minimal` 0.5×,
+  `low` 0.7×, `medium` 1×, `high` 1.8×, `xhigh` 3×, `max` 4.5×.
+- Anthropic streams wait for hidden (omitted) thinking before the text starts.
+- Put `[[llmsim:redacted-thinking]]` in the last user message to get a
+  `redacted_thinking` block instead of `thinking`.

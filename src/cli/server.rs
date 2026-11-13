@@ -54,16 +54,25 @@ pub fn build_state(config: Config, stats: SharedStats) -> Result<AppState, Confi
         );
         state = state.with_script(Arc::new(script));
     }
+    let mut scenarios = if state.config.response.builtin_scenarios {
+        ScenarioSet::builtin()
+    } else {
+        ScenarioSet::new()
+    };
     if let Some(path) = state.config.response.scenarios_path.clone() {
-        let scenarios = ScenarioSet::from_path(&path).map_err(|e| {
+        let loaded = ScenarioSet::from_path(&path).map_err(|e| {
             ConfigError::Validation(format!("Failed to load scenarios from {}: {}", path, e))
         })?;
         tracing::info!(
-            "Scenarios enabled: {} from {} ({})",
-            scenarios.len(),
+            "Scenarios loaded: {} from {} ({})",
+            loaded.len(),
             path,
-            scenarios.names().join(", ")
+            loaded.names().join(", ")
         );
+        scenarios.extend_replacing(loaded);
+    }
+    if !scenarios.is_empty() {
+        tracing::info!("Scenarios enabled: {}", scenarios.names().join(", "));
         state = state.with_scenarios(Arc::new(scenarios));
     }
     Ok(state)

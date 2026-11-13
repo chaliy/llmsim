@@ -98,6 +98,9 @@ pub struct ResponseCreateBody {
     /// Reasoning configuration
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reasoning: Option<ReasoningConfig>,
+    /// Output text configuration (`format` for structured output).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<serde_json::Value>,
     /// Include additional data
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,

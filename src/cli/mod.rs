@@ -4,10 +4,19 @@
 
 mod anthropic_handlers;
 mod config;
+mod decisions_handlers;
+mod embeddings_handlers;
+mod gemini_handlers;
 mod handlers;
+mod jobs;
+pub mod limits;
+pub mod prompt_cache;
+mod realtime;
+mod scenario_handlers;
 mod server;
 mod state;
 mod typesafe_handlers;
+pub mod validation;
 mod ws_handler;
 
 pub use config::{Config, ConfigError};
@@ -42,6 +51,37 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             post(handlers::create_response).get(ws_handler::ws_responses),
         )
         .route(
+            "/openai/v1/responses/{response_id}",
+            get(jobs::get_response).delete(jobs::delete_response),
+        )
+        .route(
+            "/openai/v1/responses/{response_id}/cancel",
+            post(jobs::cancel_response),
+        )
+        .route("/openai/v1/realtime", get(realtime::ws_realtime))
+        .route("/openai/v1/files", post(jobs::upload_file))
+        .route(
+            "/openai/v1/files/{file_id}",
+            get(jobs::get_file).delete(jobs::delete_file),
+        )
+        .route(
+            "/openai/v1/files/{file_id}/content",
+            get(jobs::get_file_content),
+        )
+        .route(
+            "/openai/v1/batches",
+            post(jobs::create_openai_batch).get(jobs::list_openai_batches),
+        )
+        .route("/openai/v1/batches/{batch_id}", get(jobs::get_openai_batch))
+        .route(
+            "/openai/v1/batches/{batch_id}/cancel",
+            post(jobs::cancel_openai_batch),
+        )
+        .route(
+            "/openai/v1/embeddings",
+            post(embeddings_handlers::create_embeddings),
+        )
+        .route(
             "/openai/v1/images/generations",
             post(handlers::create_image),
         )
@@ -59,6 +99,22 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             "/anthropic/v1/messages/count_tokens",
             post(anthropic_handlers::count_tokens),
         )
+        .route(
+            "/anthropic/v1/messages/batches",
+            post(jobs::create_anthropic_batch).get(jobs::list_anthropic_batches),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}",
+            get(jobs::get_anthropic_batch).delete(jobs::delete_anthropic_batch),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}/cancel",
+            post(jobs::cancel_anthropic_batch),
+        )
+        .route(
+            "/anthropic/v1/messages/batches/{batch_id}/results",
+            get(jobs::anthropic_batch_results),
+        )
         .route("/anthropic/v1/models", get(anthropic_handlers::list_models))
         .route(
             "/anthropic/v1/models/{model_id}",
@@ -67,6 +123,28 @@ pub fn build_router(state: Arc<AppState>) -> Router {
         // TypeSafe API routes (System One)
         .route("/typesafe/v1/systemone", post(typesafe_handlers::systemone))
         .route("/typesafe/v1/models", get(typesafe_handlers::list_models))
+        // Decisions APIs (typed judgments)
+        .route(
+            "/openai/v1/decisions",
+            post(decisions_handlers::openai_decisions),
+        )
+        .route("/gemini/v1beta/models", get(gemini_handlers::list_models))
+        .route(
+            "/gemini/v1beta/models/{model}",
+            get(gemini_handlers::get_model).post(gemini_handlers::model_action),
+        )
+        .route(
+            "/gemini/v1beta/decisions",
+            post(decisions_handlers::gemini_decisions),
+        )
+        .route(
+            "/foundry/providers/microsoft/v1/systemone",
+            post(typesafe_handlers::systemone),
+        )
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            limits::middleware,
+        ))
         .layer(TraceLayer::new_for_http())
         .layer(CorsLayer::permissive())
         .with_state(state)
@@ -104,6 +182,9 @@ pub async fn run_server_with_stats(
     );
     tracing::info!("Anthropic endpoints: /anthropic/v1/messages, /anthropic/v1/messages/count_tokens, /anthropic/v1/models");
     tracing::info!("TypeSafe endpoints: /typesafe/v1/systemone, /typesafe/v1/models");
+    tracing::info!(
+        "Decisions endpoints: /openai/v1/decisions, /gemini/v1beta/decisions, /foundry/providers/microsoft/v1/systemone"
+    );
     tracing::info!("Stats endpoint: /llmsim/stats");
 
     let state = build_state(config, stats)?;

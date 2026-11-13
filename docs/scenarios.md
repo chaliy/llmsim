@@ -5,12 +5,25 @@ long answers, reasoning, slow first tokens, mid-stream stalls, a 429 halfway,
 or a dropped stream. Many sessions can share one llmsim server, because the
 step to play is worked out from each request's own message history.
 
-Scenarios currently play on `POST /openai/v1/chat/completions` (streaming and
-non-streaming).
+Scenarios play on these endpoints, streaming and non-streaming, each in its
+own wire shape:
+
+| Endpoint | Reasoning | Tool calls |
+|----------|-----------|------------|
+| `POST /openai/v1/chat/completions` | `reasoning_content` deltas | `tool_calls` |
+| `POST /openai/v1/responses` | `reasoning` item with a summary | `function_call` items |
+| `POST /anthropic/v1/messages` | `thinking` block | `tool_use` blocks |
+
+Send history back the way each API expects (Responses `function_call` and
+`function_call_output` items, Anthropic `tool_use` and `tool_result` blocks).
+Keep the tool call ids llmsim issued (`call_llmsim_...`): they are how a step
+is counted when history is compacted.
 
 ## Enable
 
-Point the server at a scenario file or a directory of them:
+The starter library below is built in and on by default: just add a marker.
+To add your own, point the server at a scenario file or a directory of them
+(a scenario with a built-in's name replaces it):
 
 ```toml
 # config.toml
@@ -22,7 +35,9 @@ scenarios_path = "examples/scenarios"
 llmsim serve --config config.toml
 ```
 
-The repository ships a starter library in `examples/scenarios/`:
+Set `builtin_scenarios = false` under `[response]` to turn the built-ins off.
+
+The starter library (also in `examples/scenarios/`):
 
 | Scenario | Steps | Exercises |
 |----------|-------|-----------|
@@ -35,6 +50,12 @@ The repository ships a starter library in `examples/scenarios/`:
 | `stream-stall` | 300 tokens with a 20 s stall after 100 | Keep-alives, proxy idle timeouts |
 | `broken-stream` | stream cut after 50 tokens, full answer on retry | Mid-stream failure recovery |
 | `thinking` | 400 reasoning tokens, then a 300-token answer | Reasoning deltas |
+| `file-research` | 3 file-tool rounds on `/load-test/research.md`, then 600 tokens | Agents with file tools |
+| `console-file-research` | Same, using only `read_file` | Agents exposing one file tool |
+| `long-tool` | Two 25 s `bash` commands, then an answer | Long tool time holding a turn open |
+| `luna-agent` | `file-research` rounds timed like GPT-6 Luna (TTFT 2-4.5 s, 108 tokens/s) | Capacity at Luna speed |
+| `sol-agent` | Same turn timed like GPT-6 Sol (about 2 s, 46 tokens/s) | Capacity at Sol speed |
+| `muse-agent` | Same turn timed like Muse Spark (about 12.7 s, 136 tokens/s) | Very slow first tokens |
 
 ## Select a scenario
 

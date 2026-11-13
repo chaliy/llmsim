@@ -58,6 +58,8 @@ impl MessageContent {
 pub enum RequestContentBlock {
     Text {
         text: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cache_control: Option<serde_json::Value>,
     },
     ToolUse {
         id: String,
@@ -68,6 +70,8 @@ pub enum RequestContentBlock {
         tool_use_id: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         content: Option<serde_json::Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        cache_control: Option<serde_json::Value>,
     },
     /// Any other block type (image, document, thinking, ...). Captured so we
     /// can round-trip without erroring; the inner value is the raw JSON.
@@ -78,7 +82,7 @@ pub enum RequestContentBlock {
 impl RequestContentBlock {
     fn extract_text(&self) -> Option<String> {
         match self {
-            RequestContentBlock::Text { text } => Some(text.clone()),
+            RequestContentBlock::Text { text, .. } => Some(text.clone()),
             RequestContentBlock::ToolResult {
                 content: Some(value),
                 ..
@@ -132,6 +136,9 @@ pub struct SystemBlock {
     #[serde(default = "default_text_type", rename = "type")]
     pub block_type: String,
     pub text: String,
+    /// Prompt-caching breakpoint (`{"type": "ephemeral"}`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<serde_json::Value>,
 }
 
 fn default_text_type() -> String {
@@ -146,6 +153,9 @@ pub struct Tool {
     pub description: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub input_schema: Option<serde_json::Value>,
+    /// Prompt-caching breakpoint (`{"type": "ephemeral"}`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<serde_json::Value>,
 }
 
 /// Request metadata (e.g. `user_id`).
@@ -210,6 +220,9 @@ pub struct MessagesRequest {
     pub thinking: Option<ThinkingConfig>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub output_config: Option<OutputConfig>,
+    /// Automatic prompt caching: a breakpoint on the last cacheable block.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cache_control: Option<serde_json::Value>,
 }
 
 impl MessagesRequest {
@@ -277,6 +290,10 @@ pub enum ContentBlock {
     Thinking {
         thinking: String,
         signature: String,
+    },
+    /// Thinking the safety system encrypted; clients pass `data` back as is.
+    RedactedThinking {
+        data: String,
     },
     Text {
         text: String,

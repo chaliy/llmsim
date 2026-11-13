@@ -367,6 +367,71 @@ pub enum ScenarioLoadError {
     Duplicate(String),
 }
 
+/// Built-in starter scenarios: (file stem, JSON). A test keeps this list in
+/// sync with `examples/scenarios/`.
+pub const BUILTIN_SCENARIOS: &[(&str, &str)] = &[
+    (
+        "broken-stream",
+        include_str!("../examples/scenarios/broken-stream.json"),
+    ),
+    (
+        "chat-short",
+        include_str!("../examples/scenarios/chat-short.json"),
+    ),
+    (
+        "console-file-research",
+        include_str!("../examples/scenarios/console-file-research.json"),
+    ),
+    (
+        "file-research",
+        include_str!("../examples/scenarios/file-research.json"),
+    ),
+    (
+        "flaky-429",
+        include_str!("../examples/scenarios/flaky-429.json"),
+    ),
+    (
+        "long-answer",
+        include_str!("../examples/scenarios/long-answer.json"),
+    ),
+    (
+        "long-tool",
+        include_str!("../examples/scenarios/long-tool.json"),
+    ),
+    (
+        "luna-agent",
+        include_str!("../examples/scenarios/luna-agent.json"),
+    ),
+    (
+        "muse-agent",
+        include_str!("../examples/scenarios/muse-agent.json"),
+    ),
+    (
+        "parallel-tools",
+        include_str!("../examples/scenarios/parallel-tools.json"),
+    ),
+    (
+        "research-3-tools",
+        include_str!("../examples/scenarios/research-3-tools.json"),
+    ),
+    (
+        "slow-first-token",
+        include_str!("../examples/scenarios/slow-first-token.json"),
+    ),
+    (
+        "sol-agent",
+        include_str!("../examples/scenarios/sol-agent.json"),
+    ),
+    (
+        "stream-stall",
+        include_str!("../examples/scenarios/stream-stall.json"),
+    ),
+    (
+        "thinking",
+        include_str!("../examples/scenarios/thinking.json"),
+    ),
+];
+
 /// Scenarios looked up by name.
 #[derive(Debug, Clone, Default)]
 pub struct ScenarioSet {
@@ -397,6 +462,21 @@ impl ScenarioSet {
         }
         self.scenarios.insert(scenario.name.clone(), scenario);
         Ok(())
+    }
+
+    /// The starter library shipped in `examples/scenarios/`, compiled in.
+    pub fn builtin() -> Self {
+        let mut set = Self::new();
+        for (name, json) in BUILTIN_SCENARIOS {
+            set.add_json(json, None)
+                .unwrap_or_else(|e| panic!("built-in scenario {name} is invalid: {e}"));
+        }
+        set
+    }
+
+    /// Add every scenario from `other`, replacing any with the same name.
+    pub fn extend_replacing(&mut self, other: ScenarioSet) {
+        self.scenarios.extend(other.scenarios);
     }
 
     /// Parse JSON holding one scenario object or an array of them.

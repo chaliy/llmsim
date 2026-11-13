@@ -14,8 +14,9 @@ use crate::{
         },
         ChatCompletionRequest, ChatCompletionResponse, CompletionTokensDetails, ErrorResponse,
         InputItem, InputRole, MessageContent, Model, ModelsResponse, OutputContentPart, OutputItem,
-        OutputRole, OutputTokensDetails, ReasoningConfig, ResponseStatus, ResponsesErrorResponse,
-        ResponsesInput, ResponsesRequest, ResponsesResponse, ResponsesUsage, Usage,
+        OutputRole, OutputTokensDetails, PromptTokensDetails, ReasoningConfig, ResponseStatus,
+        ResponsesErrorResponse, ResponsesInput, ResponsesRequest, ResponsesResponse,
+        ResponsesUsage, Usage,
     },
     openresponses::{
         self, OpenResponsesStreamBuilder, Response as OpenResponsesResponse, ResponseRequest,
@@ -58,6 +59,7 @@ pub(crate) struct ResponseGenerationParams<'a> {
     pub top_p: Option<f32>,
     pub max_output_tokens: Option<u32>,
     pub reasoning: &'a Option<ReasoningConfig>,
+    pub text: &'a Option<serde_json::Value>,
 }
 
 /// Generate a response for the Responses API.
@@ -67,12 +69,7 @@ pub(crate) fn generate_responses_result(
     params: &ResponseGenerationParams<'_>,
 ) -> ResponseGenerationResult {
     // Get latency profile
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(params.model)
-        };
+    let latency = state.config.latency_for_model(params.model);
 
     // Extract text from input
     let input_text = extract_input_text(params.input, params.instructions);
@@ -95,6 +92,21 @@ pub(crate) fn generate_responses_result(
             }
             ScriptedResponse::Exhausted => "[llmsim script exhausted]".to_string(),
         }
+    } else if let Some(schema) = params
+        .text
+        .as_ref()
+        .and_then(|t| t.get("format"))
+        .filter(|f| f.get("type").and_then(|t| t.as_str()) == Some("json_schema"))
+    {
+        // Structured output: schema-valid JSON seeded by the input.
+        let schema = schema
+            .get("schema")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({"type": "object"}));
+        crate::forced::json_for_schema(
+            &schema,
+            crate::schema_fake::seed_from(input_text.as_bytes()),
+        )
     } else {
         // Create a minimal ChatCompletionRequest for the generator
         let chat_request = crate::openai::ChatCompletionRequest {
@@ -132,11 +144,39 @@ pub(crate) fn generate_responses_result(
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
+    // Prompt caching over instructions and input items.
+    let cached_tokens = if state.config.response.prompt_caching {
+        let mut prefixes = super::prompt_cache::PrefixBuilder::new(params.model);
+        let mut push = |piece: String| {
+            let tokens = crate::count_tokens_default(&piece).unwrap_or(piece.len() / 4);
+            prefixes.push(&piece, tokens);
+        };
+        if let Some(instructions) = params.instructions {
+            push(instructions.clone());
+        }
+        match params.input {
+            crate::openai::ResponsesInput::Text(t) => push(t.clone()),
+            crate::openai::ResponsesInput::Items(items) => {
+                for item in items {
+                    push(serde_json::to_string(item).unwrap_or_default());
+                }
+            }
+        }
+        state
+            .prompt_cache
+            .openai(&prefixes.prefixes, input_tokens, Instant::now())
+    } else {
+        0
+    };
+
     // Reasoning tokens
     let reasoning_tokens =
         calculate_reasoning_tokens(params.model, params.reasoning, output_tokens);
 
     let usage = ResponsesUsage {
+        input_tokens_details: Some(crate::openai::ResponsesInputTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
         total_tokens: (input_tokens + output_tokens + reasoning_tokens) as u32,
@@ -153,7 +193,15 @@ pub(crate) fn generate_responses_result(
         usage,
         reasoning_tokens,
         reasoning_summary,
-        latency,
+        latency: {
+            let latency = latency.with_input_tokens(input_tokens - cached_tokens.min(input_tokens));
+            match params.reasoning.as_ref().and_then(|r| r.effort.as_deref()) {
+                Some(effort) if is_reasoning_model(params.model) => {
+                    latency.with_reasoning_effort(effort)
+                }
+                _ => latency,
+            }
+        },
     }
 }
 
@@ -224,13 +272,24 @@ pub async fn chat_completions(
         return Ok(err.into_response());
     }
 
+    // Reject requests over the model's context window or output cap.
+    let (max_param, max_tokens) = match (request.max_completion_tokens, request.max_tokens) {
+        (Some(n), _) => ("max_completion_tokens", Some(n)),
+        (None, n) => ("max_tokens", n),
+    };
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::openai_limits(&request.model),
+        count_request_tokens(&request),
+        max_tokens,
+    ) {
+        state.stats.record_error(v_status(&v));
+        return Ok(super::validation::openai_response(&v, max_param));
+    }
+
     // Get latency profile (use model-specific if not configured)
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     // Scenario mode: a `[[llmsim:<name>]]` marker in the last user message
     // (or an `llmsim-scenario-<name>` model) picks the step to play.
@@ -263,6 +322,17 @@ pub async fn chat_completions(
             .await;
     }
 
+    // tool_choice / response_format force a tool call or schema-valid JSON.
+    if let Some(forced) =
+        crate::forced::openai_chat(&request, state.config.response.auto_tool_calls)
+    {
+        let turn = match forced {
+            crate::forced::Forced::ToolCalls(calls) => SimTurn::ToolCalls { calls },
+            crate::forced::Forced::Json(text) => SimTurn::Assistant { text },
+        };
+        return play_chat_turn(state, request, request_start, latency, 0, turn).await;
+    }
+
     // Generate response
     let generator = create_generator(
         &state.config.response.generator,
@@ -273,6 +343,8 @@ pub async fn chat_completions(
     // Count tokens. Reasoning models bill hidden reasoning tokens inside
     // completion_tokens and break them out in completion_tokens_details.
     let prompt_tokens = count_request_tokens(&request);
+    let cached_tokens = chat_cached_tokens(&state, &request, prompt_tokens);
+    let latency = latency.with_input_tokens(prompt_tokens - cached_tokens);
     let visible_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let reasoning = request
@@ -283,8 +355,15 @@ pub async fn chat_completions(
             summary: None,
         });
     let reasoning_tokens = calculate_reasoning_tokens(&request.model, &reasoning, visible_tokens);
+    let latency = match request.reasoning_effort.as_deref() {
+        Some(effort) if is_reasoning_model(&request.model) => latency.with_reasoning_effort(effort),
+        _ => latency,
+    };
     let completion_tokens = visible_tokens + reasoning_tokens;
     let usage = Usage {
+        prompt_tokens_details: Some(PromptTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -359,7 +438,19 @@ async fn handle_scripted_chat_completions(
             }));
         }
     };
+    play_chat_turn(state, request, request_start, latency, turn_index, turn).await
+}
 
+/// Answer a chat completions request with one turn (text, tool calls, or an
+/// error), streaming or not. Shared by scripted mode and forced outputs.
+async fn play_chat_turn(
+    state: Arc<AppState>,
+    request: ChatCompletionRequest,
+    request_start: Instant,
+    latency: LatencyProfile,
+    turn_index: usize,
+    turn: SimTurn,
+) -> Result<Response, AppError> {
     let (text, tool_calls) = match turn {
         SimTurn::Assistant { text } => (Some(text), Vec::new()),
         SimTurn::ToolCalls { calls } => (None, calls),
@@ -371,10 +462,22 @@ async fn handle_scripted_chat_completions(
     };
 
     let prompt_tokens = count_request_tokens(&request);
+    let cached_tokens = chat_cached_tokens(&state, &request, prompt_tokens);
+    let latency = latency.with_input_tokens(prompt_tokens - cached_tokens);
     let text_for_usage = text.clone().unwrap_or_default();
     let completion_tokens = crate::count_tokens_default(&text_for_usage)
-        .unwrap_or(text_for_usage.split_whitespace().count());
+        .unwrap_or(text_for_usage.split_whitespace().count())
+        + tool_calls
+            .iter()
+            .map(|c| {
+                let args = c.arguments.to_string();
+                crate::count_tokens_default(&args).unwrap_or(args.len() / 4) + 1
+            })
+            .sum::<usize>();
     let usage = Usage {
+        prompt_tokens_details: Some(PromptTokensDetails {
+            cached_tokens: cached_tokens as u32,
+        }),
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -483,8 +586,10 @@ async fn handle_scenario_chat_completions(
         })
         .sum();
     let prompt_tokens = count_request_tokens(&request);
+    let latency = latency.with_input_tokens(prompt_tokens);
     let completion_tokens = text_tokens + reasoning_tokens + tool_call_tokens;
     let usage = Usage {
+        prompt_tokens_details: None,
         prompt_tokens: prompt_tokens as u32,
         completion_tokens: completion_tokens as u32,
         total_tokens: (prompt_tokens + completion_tokens) as u32,
@@ -548,7 +653,7 @@ async fn handle_scenario_chat_completions(
 
 /// Render a scenario step error, with `Retry-After` / `retry-after-ms` when
 /// the step sets `retry_after_ms`.
-fn step_error_response(err: &StepError) -> Response {
+pub(super) fn step_error_response(err: &StepError) -> Response {
     let mut response = sim_error_to_response(&err.error);
     if let (Some(secs), Some(ms)) = (err.retry_after_secs(), err.retry_after_ms) {
         let headers = response.headers_mut();
@@ -609,6 +714,7 @@ async fn handle_scripted_responses_api(
     let output_tokens = output_text_tokens + tool_call_tokens;
 
     let usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
         total_tokens: (input_tokens + output_tokens) as u32,
@@ -668,7 +774,7 @@ async fn handle_scripted_responses_api(
 }
 
 /// Build an OpenAI Responses-API-shaped error response for a SimError.
-fn sim_error_to_responses_api_response(err: &SimError) -> Response {
+pub(super) fn sim_error_to_responses_api_response(err: &SimError) -> Response {
     let status = match err.status_code() {
         429 => StatusCode::TOO_MANY_REQUESTS,
         500 => StatusCode::INTERNAL_SERVER_ERROR,
@@ -785,12 +891,7 @@ pub async fn create_openresponses_response(
     }
 
     // Get latency profile (use model-specific if not configured)
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     // Generate response using the input text
     let input_text = request.input.extract_text();
@@ -846,6 +947,7 @@ pub async fn create_openresponses_response(
 
     // Count tokens
     let input_tokens = count_openresponses_input_tokens(&request);
+    let latency = latency.with_input_tokens(input_tokens);
     let output_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
     let usage = OpenResponsesUsage {
@@ -1039,6 +1141,39 @@ pub async fn create_response(
         return Ok(response);
     }
 
+    // Reject requests over the model's context window or output cap.
+    let input_estimate = serde_json::to_string(&request.input).unwrap_or_default();
+    let input_estimate = crate::count_tokens_default(&input_estimate)
+        .unwrap_or(input_estimate.len() / 4)
+        + request
+            .instructions
+            .as_deref()
+            .map_or(0, |i| crate::count_tokens_default(i).unwrap_or(i.len() / 4));
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::openai_limits(&request.model),
+        input_estimate,
+        request.max_output_tokens,
+    ) {
+        state.stats.record_error(v_status(&v));
+        return Ok(super::validation::openai_response(&v, "max_output_tokens"));
+    }
+
+    // Background mode: the response is computed now and reported as
+    // queued / in_progress until the model would have finished.
+    if request.background && !request.stream {
+        return Ok(super::jobs::start_background_response(&state, &request).await);
+    }
+
+    // Scenario mode, as on chat completions.
+    let latency = state.config.latency_for_model(&request.model);
+    if let Some(response) =
+        super::scenario_handlers::responses(&state, &request, request_start, latency).await
+    {
+        return Ok(response);
+    }
+
     // Scripted mode: handle non-streaming with full tool-call support;
     // streaming falls through to the text-based scripted result built
     // by generate_responses_result (text + error turns only).
@@ -1059,6 +1194,7 @@ pub async fn create_response(
             top_p: request.top_p,
             max_output_tokens: request.max_output_tokens,
             reasoning: &request.reasoning,
+            text: &request.text,
         },
     );
 
@@ -1173,12 +1309,7 @@ pub async fn create_image(
     // Image-generation timing is anchored to the configured latency profile;
     // model-derived latency (the default) yields realistic multi-second waits,
     // while `instant`/`fast` profiles collapse it for tests and load runs.
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
 
     let params = request.resolve();
 
@@ -1273,7 +1404,7 @@ pub async fn create_image(
 }
 
 /// Extract text content from ResponsesInput for processing
-fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> String {
+pub(super) fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> String {
     let mut parts = Vec::new();
 
     // Add instructions if present
@@ -1322,7 +1453,7 @@ fn extract_input_text(input: &ResponsesInput, instructions: &Option<String>) -> 
 /// Approximate the image-input token cost for a Responses API request.
 /// The Responses `input_image` part carries no `detail`, so each image is
 /// charged at the high-detail default (see `estimate_image_tokens`).
-fn count_responses_input_image_tokens(input: &ResponsesInput) -> usize {
+pub(super) fn count_responses_input_image_tokens(input: &ResponsesInput) -> usize {
     let ResponsesInput::Items(items) = input else {
         return 0;
     };
@@ -1528,6 +1659,38 @@ fn validate_input_modalities(request: &ChatCompletionRequest) -> Result<(), AppE
     }
 
     Ok(())
+}
+
+/// Cached prompt tokens for a chat request (OpenAI automatic caching).
+fn chat_cached_tokens(
+    state: &AppState,
+    request: &ChatCompletionRequest,
+    prompt_tokens: usize,
+) -> usize {
+    if !state.config.response.prompt_caching {
+        return 0;
+    }
+    let mut prefixes = super::prompt_cache::PrefixBuilder::new(&request.model);
+    for message in &request.messages {
+        let piece = serde_json::to_string(message).unwrap_or_default();
+        let text = message
+            .content
+            .as_ref()
+            .map(|c| c.text())
+            .unwrap_or_default();
+        let tokens = crate::count_tokens_default(&text).unwrap_or(text.len() / 4) + 4;
+        prefixes.push(&piece, tokens);
+    }
+    state
+        .prompt_cache
+        .openai(&prefixes.prefixes, prompt_tokens, Instant::now())
+}
+
+fn v_status(v: &super::validation::LimitViolation) -> u16 {
+    match v {
+        super::validation::LimitViolation::UnknownModel { .. } => 404,
+        _ => 400,
+    }
 }
 
 /// Count tokens in a chat request

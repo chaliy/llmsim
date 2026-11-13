@@ -25,7 +25,8 @@ stays as it is for single-agent tests.
 
 The engine is a library module (`llmsim::scenario`) so embedders (Everruns'
 llmsim driver, yolop) can call the pure `resolve` function directly; the
-server wires it into the chat completions endpoint.
+server wires it into chat completions, the Responses API and Anthropic
+Messages.
 
 ## Requirements
 
@@ -144,9 +145,15 @@ again: an extra error, never a wrong answer.
 
 ### Server mode
 
+- The starter library is compiled in (`ScenarioSet::builtin()`) and loaded by
+  default, so a marker works with no configuration; `[response]
+  builtin_scenarios = false` turns it off. Embedders such as everruns use
+  `builtin()` instead of copying the JSON files.
 - `[response] scenarios_path = "..."` loads one JSON file (an object or an
   array of objects) or every `*.json` file in a directory. Invalid scenarios
-  or duplicate names fail startup. `script_path` keeps working unchanged.
+  or duplicate names within the loaded files fail startup; a loaded scenario
+  replaces a built-in one of the same name. `script_path` keeps working
+  unchanged.
 - Wired into `POST /openai/v1/chat/completions`, streaming and
   non-streaming:
   - Streaming: role chunk, `delta.reasoning_content` deltas, content deltas
@@ -161,8 +168,21 @@ again: an extra error, never a wrong answer.
   - Responses carry `x-llmsim-scenario`, `x-llmsim-step` and
     `x-llmsim-attempt` headers for debugging.
 - Error injection from `[errors]` still applies first.
-- Other endpoints (Responses, OpenResponses, Anthropic Messages) do not play
-  scenarios yet; they keep their current behaviour.
+- The Responses API and Anthropic Messages play scenarios with the same
+  resolution, attempts, failures, timing and cuts, in their own wire shapes
+  ([`src/cli/scenario_handlers.rs`](../../src/cli/scenario_handlers.rs),
+  [`src/scenario_frames.rs`](../../src/scenario_frames.rs)):
+  - Responses: a `reasoning` item (summary), a `message`, then one
+    `function_call` item per call, streamed with `response.*` events and
+    gap-free `sequence_number`s. History items of one model turn (`reasoning`,
+    assistant `message`, `function_call`) count as one step.
+  - Anthropic: a `thinking` block, a `text` block, then `tool_use` blocks
+    (arguments as one `input_json_delta`); `stop_reason` is `tool_use` or
+    `end_turn`. A user message holding only `tool_result` blocks is tool
+    output, not a new user message.
+  - Tool call ids stay `call_llmsim_...` on both, since resolution reads them
+    back to count steps. Errors use each API's error envelope.
+- OpenResponses does not play scenarios yet.
 
 ### Starter library
 
@@ -170,7 +190,14 @@ again: an extra error, never a wrong answer.
 `slow-first-token`, `parallel-tools`, `flaky-429`, `stream-stall`,
 `broken-stream` and `thinking`, with timing from production observations
 (TTFT 0.8-1.3 s, about 65 tokens/s). They use tool placeholders only, so
-they work with any agent. A test keeps them loadable.
+they work with any agent. A test keeps them loadable and identical to the
+compiled-in set.
+
+Agent-shaped scenarios that name concrete tools came from everruns' load
+tests: `file-research` and `console-file-research` (file tools against
+`/load-test/research.md`), `long-tool` (two 25 s `bash` commands), and
+`luna-agent`, `sol-agent` and `muse-agent`, which play the same tool-using
+turn at each model's measured timing (see [Latency Model](latency.md)).
 
 ### Public Rust API
 
@@ -200,5 +227,5 @@ The pacing and SSE engine is `llmsim::scenario_stream`.
 
 ## Future work
 
-- Scenarios on the Responses, OpenResponses and Anthropic endpoints.
+- Scenarios on the OpenResponses endpoint.
 - Custom scenarios supplied per request or via an admin endpoint.

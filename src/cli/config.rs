@@ -18,6 +18,67 @@ pub struct Config {
     pub errors: ErrorsConfig,
     #[serde(default)]
     pub models: ModelsConfig,
+    #[serde(default)]
+    pub rate_limits: RateLimitsConfig,
+    #[serde(default)]
+    pub validation: ValidationConfig,
+    #[serde(default)]
+    pub batch: BatchConfig,
+}
+
+/// Batch APIs (OpenAI `/v1/batches`, Anthropic message batches).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatchConfig {
+    /// Time from creation until a batch reports completed (real batches take
+    /// minutes to hours; tests want it short)
+    #[serde(default = "default_batch_completion_ms")]
+    pub completion_ms: u64,
+}
+
+fn default_batch_completion_ms() -> u64 {
+    2000
+}
+
+impl Default for BatchConfig {
+    fn default() -> Self {
+        Self {
+            completion_ms: default_batch_completion_ms(),
+        }
+    }
+}
+
+/// Request limits the real APIs enforce.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationConfig {
+    /// Reject prompts over the model's context window and output caps over
+    /// its max output tokens (models without a profile are never checked)
+    #[serde(default = "default_true")]
+    pub enforce_limits: bool,
+    /// Reject model ids llmsim has no profile for (404), like the real APIs
+    #[serde(default)]
+    pub strict_models: bool,
+}
+
+impl Default for ValidationConfig {
+    fn default() -> Self {
+        Self {
+            enforce_limits: true,
+            strict_models: false,
+        }
+    }
+}
+
+/// Provider-style rate limits per API key (0 = unlimited). When set,
+/// responses carry `x-ratelimit-*` / `anthropic-ratelimit-*` headers and an
+/// exhausted key gets 429 with Retry-After.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RateLimitsConfig {
+    /// Requests per minute per key
+    #[serde(default)]
+    pub requests_per_minute: u64,
+    /// Estimated tokens (prompt + output cap) per minute per key
+    #[serde(default)]
+    pub tokens_per_minute: u64,
 }
 
 impl Config {
@@ -51,6 +112,24 @@ impl Config {
         serde_json::from_value(base).map_err(|e| ConfigError::Parse(e.to_string()))
     }
 
+    /// Latency for a request to `model`: the configured profile or custom
+    /// timings when set, otherwise the model's own profile. A configured
+    /// `prefill_us_per_token` overrides the profile's prefill rate.
+    pub fn latency_for_model(&self, model: &str) -> LatencyProfile {
+        let profile = if self.latency.profile.is_some()
+            || self.latency.ttft_mean_ms.is_some()
+            || self.latency.tbt_mean_ms.is_some()
+        {
+            self.latency_profile()
+        } else {
+            LatencyProfile::from_model(model)
+        };
+        match self.latency.prefill_us_per_token {
+            Some(us) => profile.with_prefill_us_per_token(us),
+            None => profile,
+        }
+    }
+
     /// Create a latency profile from the configuration
     pub fn latency_profile(&self) -> LatencyProfile {
         if let Some(ref profile) = self.latency.profile {
@@ -58,6 +137,12 @@ impl Config {
                 // GPT-5 family
                 "gpt5" | "gpt-5" => LatencyProfile::gpt5(),
                 "gpt5-mini" | "gpt-5-mini" => LatencyProfile::gpt5_mini(),
+                // GPT-5.6+/GPT-6 tiers
+                "sol" | "gpt-sol" => LatencyProfile::gpt_sol(),
+                "terra" | "gpt-terra" => LatencyProfile::gpt_terra(),
+                "luna" | "gpt-luna" => LatencyProfile::gpt_luna(),
+                "astra" | "gpt-astra" => LatencyProfile::gpt_astra(),
+                "muse-spark" | "muse" => LatencyProfile::muse_spark(),
                 // O-series reasoning models (o3, o4)
                 "o3" | "o4" | "o-series" => LatencyProfile::o_series(),
                 // GPT-4 family
@@ -168,6 +253,8 @@ pub struct LatencyConfig {
     pub tbt_mean_ms: Option<u64>,
     /// Custom time between tokens stddev (ms)
     pub tbt_stddev_ms: Option<u64>,
+    /// Prefill cost per input token (microseconds) added to TTFT; 0 disables
+    pub prefill_us_per_token: Option<u64>,
 }
 
 /// Response generation configuration
@@ -190,6 +277,25 @@ pub struct ResponseConfig {
     /// script / generator behaviour. See `knowledge/simulation/scenarios.md`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scenarios_path: Option<String>,
+    /// Load the built-in starter scenarios (`examples/scenarios/`, compiled
+    /// in). Scenarios from `scenarios_path` replace built-ins of the same
+    /// name. Default `true`; a scenario only plays when a request names it.
+    #[serde(default = "default_true")]
+    pub builtin_scenarios: bool,
+    /// With `tool_choice` auto (or unset), answer a user message with a call
+    /// to one of the offered tools (schema-valid arguments), then answer in
+    /// text once the tool result comes back. Default `false`: text only.
+    #[serde(default)]
+    pub auto_tool_calls: bool,
+    /// Report cached prompt tokens when a prompt prefix repeats within five
+    /// minutes (OpenAI automatic caching, Anthropic `cache_control`).
+    /// Default `true`.
+    #[serde(default = "default_true")]
+    pub prompt_caching: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_generator() -> String {
@@ -207,6 +313,9 @@ impl Default for ResponseConfig {
             target_tokens: default_target_tokens(),
             script_path: None,
             scenarios_path: None,
+            builtin_scenarios: true,
+            auto_tool_calls: false,
+            prompt_caching: true,
         }
     }
 }
@@ -226,6 +335,18 @@ pub struct ErrorsConfig {
     /// Milliseconds before timeout (default 30000)
     #[serde(default = "default_timeout")]
     pub timeout_after_ms: u64,
+    /// Chance per request (0.0-1.0) that an overload burst starts: every
+    /// generation request then fails (529 on Anthropic/TypeSafe, 503
+    /// elsewhere) until `overload_burst_ms` passes
+    #[serde(default)]
+    pub overload_burst_rate: f64,
+    /// Length of an overload burst in milliseconds (default 10000)
+    #[serde(default = "default_burst_ms")]
+    pub overload_burst_ms: u64,
+}
+
+fn default_burst_ms() -> u64 {
+    10_000
 }
 
 fn default_timeout() -> u64 {
@@ -275,6 +396,7 @@ fn default_models() -> Vec<String> {
         "gpt-6-sol".to_string(),
         "gpt-6-luna".to_string(),
         "gpt-6.1-sol".to_string(),
+        "gpt-6.1-terra".to_string(),
         // O-series reasoning models
         "o1".to_string(),
         "o1-mini".to_string(),
@@ -294,6 +416,15 @@ fn default_models() -> Vec<String> {
         "gpt-image-1-mini".to_string(),
         "gpt-image-1.5".to_string(),
         "gpt-image-2".to_string(),
+        "gpt-image-2.5".to_string(),
+        "gpt-image-2.6".to_string(),
+        // OpenAI realtime models
+        "gpt-realtime".to_string(),
+        "gpt-realtime-mini".to_string(),
+        // OpenAI embedding models
+        "text-embedding-3-small".to_string(),
+        "text-embedding-3-large".to_string(),
+        "text-embedding-ada-002".to_string(),
         // Claude family
         "claude-3.5-sonnet".to_string(),
         "claude-3.7-sonnet".to_string(),
@@ -314,6 +445,8 @@ fn default_models() -> Vec<String> {
         "claude-haiku-5.5".to_string(),
         "claude-fable-5".to_string(),
         "claude-fable-5.1".to_string(),
+        "claude-fable-5.2".to_string(),
+        "claude-mythos-5.2".to_string(),
         // Gemini family
         "gemini-2.0-flash".to_string(),
         "gemini-2.5-flash".to_string(),
@@ -327,11 +460,18 @@ fn default_models() -> Vec<String> {
         "gemini-3.6-flash".to_string(),
         "gemini-3.7-flash".to_string(),
         "gemini-3.8-flash".to_string(),
+        "gemini-4-argon".to_string(),
         // DeepSeek family
         "deepseek-chat".to_string(),
         "deepseek-reasoner".to_string(),
         "deepseek-v4-pro".to_string(),
         "deepseek-flash".to_string(),
+        // Other providers
+        "grok-4.7".to_string(),
+        "kimi-k3".to_string(),
+        "qwen3.8-max".to_string(),
+        "mistral-large-4".to_string(),
+        "muse-spark-1.3".to_string(),
     ]
 }
 

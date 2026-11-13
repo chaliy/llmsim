@@ -43,6 +43,10 @@ pub enum EndpointType {
     Images,
     /// TypeSafe System One API (/typesafe/v1/systemone)
     SystemOne,
+    /// Embeddings API (/openai/v1/embeddings)
+    Embeddings,
+    /// Gemini generateContent API (/gemini/v1beta/models/...)
+    Gemini,
 }
 
 /// Global statistics tracker for the LLMSim server.
@@ -72,6 +76,10 @@ pub struct Stats {
     pub image_requests: AtomicU64,
     /// TypeSafe System One API requests
     pub systemone_requests: AtomicU64,
+    /// Embeddings API requests
+    pub embeddings_requests: AtomicU64,
+    /// Gemini generateContent requests
+    pub gemini_requests: AtomicU64,
     /// Currently active WebSocket connections
     pub active_websocket_connections: AtomicU64,
 
@@ -133,6 +141,8 @@ impl Stats {
             messages_requests: AtomicU64::new(0),
             image_requests: AtomicU64::new(0),
             systemone_requests: AtomicU64::new(0),
+            embeddings_requests: AtomicU64::new(0),
+            gemini_requests: AtomicU64::new(0),
             active_websocket_connections: AtomicU64::new(0),
             prompt_tokens: AtomicU64::new(0),
             completion_tokens: AtomicU64::new(0),
@@ -179,6 +189,12 @@ impl Stats {
             }
             EndpointType::SystemOne => {
                 self.systemone_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Embeddings => {
+                self.embeddings_requests.fetch_add(1, ORDERING);
+            }
+            EndpointType::Gemini => {
+                self.gemini_requests.fetch_add(1, ORDERING);
             }
         }
 
@@ -406,6 +422,8 @@ impl Stats {
             messages_requests: self.messages_requests.load(ORDERING),
             image_requests: self.image_requests.load(ORDERING),
             systemone_requests: self.systemone_requests.load(ORDERING),
+            embeddings_requests: self.embeddings_requests.load(ORDERING),
+            gemini_requests: self.gemini_requests.load(ORDERING),
             active_websocket_connections: self.active_websocket_connections.load(ORDERING),
             prompt_tokens: self.prompt_tokens.load(ORDERING),
             completion_tokens: self.completion_tokens.load(ORDERING),
@@ -440,6 +458,10 @@ pub struct StatsSnapshot {
     pub image_requests: u64,
     #[serde(default)]
     pub systemone_requests: u64,
+    #[serde(default)]
+    pub embeddings_requests: u64,
+    #[serde(default)]
+    pub gemini_requests: u64,
     pub active_websocket_connections: u64,
     pub prompt_tokens: u64,
     pub completion_tokens: u64,

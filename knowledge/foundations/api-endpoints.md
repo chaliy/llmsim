@@ -32,6 +32,9 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | OpenResponses | `/openresponses` | `/v1/responses` | `/openresponses/v1/responses` |
 | Anthropic | `/anthropic` | `/v1/messages` | `/anthropic/v1/messages` |
 | TypeSafe | `/typesafe` | `/v1/systemone` | `/typesafe/v1/systemone` |
+| OpenAI | `/openai` | `/v1/decisions` | `/openai/v1/decisions` |
+| Gemini | `/gemini` | `/v1beta/decisions` | `/gemini/v1beta/decisions` |
+| Microsoft Foundry | `/foundry` | `/providers/microsoft/v1/systemone` | `/foundry/providers/microsoft/v1/systemone` |
 
 ### R2: OpenAI Endpoints
 
@@ -42,6 +45,15 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `POST` | `/openai/v1/chat/completions` | Chat Completions API |
 | `POST` | `/openai/v1/responses` | Responses API |
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
+| `POST` | `/openai/v1/embeddings` | Embeddings API |
+| `WS` | `/openai/v1/realtime` | Realtime API (voice sessions) |
+| `GET/DELETE` | `/openai/v1/responses/:id` | Retrieve or delete a background response |
+| `POST` | `/openai/v1/responses/:id/cancel` | Cancel a background response |
+| `POST` | `/openai/v1/files` | Upload a file (multipart) |
+| `GET` | `/openai/v1/files/:id`, `/openai/v1/files/:id/content` | File metadata and content |
+| `POST/GET` | `/openai/v1/batches` | Create or list batches |
+| `GET` | `/openai/v1/batches/:id` | Retrieve a batch |
+| `POST` | `/openai/v1/batches/:id/cancel` | Cancel a batch |
 | `POST` | `/openai/v1/images/generations` | Image generation API (streaming supported) |
 | `GET` | `/openai/v1/models` | List available models |
 | `GET` | `/openai/v1/models/:model_id` | Get model details |
@@ -62,6 +74,15 @@ family ("ChatGPT Images"), returning a synthetic watermarked PNG of the
 requested size. It supports both non-streaming JSON and SSE streaming with
 progressive partial images. See [image-generation](../apis/image-generation.md) for the full
 specification.
+
+**R2.7**: The `/openai/v1/embeddings` endpoint returns deterministic,
+similarity-preserving vectors. See [embeddings-api](../apis/embeddings-api.md).
+
+**R2.9**: The `/openai/v1/realtime` WebSocket simulates voice sessions. See
+[realtime-api](../apis/realtime-api.md).
+
+**R2.8**: Background responses, Files and Batches simulate asynchronous work.
+See [batch-and-background](../apis/batch-and-background.md).
 
 **R2.4**: The `/openai/v1/responses` endpoint supports WebSocket upgrade for persistent connections. When a WebSocket upgrade is requested, the endpoint switches to WebSocket mode where clients send `response.create` events and receive the same streaming events as the SSE format, but as JSON text frames without the SSE envelope.
 
@@ -96,6 +117,10 @@ the official Anthropic SDKs work when configured with `{base_url}/anthropic`.
 |--------|------|-------------|
 | `POST` | `/anthropic/v1/messages` | Messages API (streaming and non-streaming) |
 | `POST` | `/anthropic/v1/messages/count_tokens` | Count input tokens |
+| `POST/GET` | `/anthropic/v1/messages/batches` | Create or list message batches |
+| `GET/DELETE` | `/anthropic/v1/messages/batches/:id` | Retrieve or delete a batch |
+| `POST` | `/anthropic/v1/messages/batches/:id/cancel` | Cancel a batch |
+| `GET` | `/anthropic/v1/messages/batches/:id/results` | Batch results (JSONL) |
 | `GET` | `/anthropic/v1/models` | List available Claude models |
 | `GET` | `/anthropic/v1/models/:model_id` | Get model details |
 
@@ -117,6 +142,23 @@ and the stream terminates after `message_stop` with **no** `[DONE]` sentinel.
 e.g. `claude-opus-4-8`) plus dated snapshot and `-latest` aliases. See
 [anthropic-api](../apis/anthropic-api.md) for the full specification.
 
+### R4c: Gemini Endpoints
+
+**R4c.1**: Gemini endpoints mirror Google's `v1beta` paths under `/gemini`, so
+the Google Gen AI SDK works with `{base_url}/gemini`. The model and method
+share one path segment (`models/{model}:{method}`).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/gemini/v1beta/models/:model:generateContent` | Generate content |
+| `POST` | `/gemini/v1beta/models/:model:streamGenerateContent` | Stream (`alt=sse` or JSON array) |
+| `POST` | `/gemini/v1beta/models/:model:countTokens` | Count tokens |
+| `POST` | `/gemini/v1beta/models/:model:embedContent` | Embed content |
+| `POST` | `/gemini/v1beta/models/:model:batchEmbedContents` | Embed contents |
+| `GET` | `/gemini/v1beta/models`, `/gemini/v1beta/models/:model` | Models |
+
+See [gemini-api](../apis/gemini-api.md).
+
 ### R4a: TypeSafe Endpoints
 
 **R4a.1**: TypeSafe endpoints follow the provider-prefixed pattern and accept
@@ -131,6 +173,13 @@ official `typesafe-sdk` clients work when configured with `{base_url}/typesafe`.
 **R4a.2**: Validation errors return `422` with the FastAPI `{"detail": [...]}`
 body; other errors use `{"detail": {"error_type": "...", "message": "..."}}`.
 See [TypeSafe System One API Specification](../apis/typesafe-api.md) for the full specification.
+
+### R4b: Decisions Endpoints
+
+**R4b.1**: Typed-judgment endpoints of other providers follow the same
+pattern: `POST /openai/v1/decisions`, `POST /gemini/v1beta/decisions`, and
+`POST /foundry/providers/microsoft/v1/systemone`. See
+[Decisions APIs Specification](../apis/decisions-api.md).
 
 ### R5: System Endpoints
 

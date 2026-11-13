@@ -42,7 +42,9 @@
 
 // Core library modules
 pub mod anthropic;
+pub mod embeddings;
 pub mod errors;
+pub mod forced;
 pub mod generator;
 mod ids;
 pub mod image_stream;
@@ -52,7 +54,9 @@ pub mod openai;
 pub mod openresponses;
 pub mod responses_stream;
 pub mod scenario;
+pub mod scenario_frames;
 pub mod scenario_stream;
+pub mod schema_fake;
 pub mod script;
 pub mod script_stream;
 pub mod stats;

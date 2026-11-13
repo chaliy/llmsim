@@ -50,7 +50,7 @@ API has no streaming mode.
 
 ```json
 {
-  "model": "jev-1.13.0",
+  "model": "jev-1.14.0",
   "answers": {
     "is_urgent": {"type": "noul", "noul": 0.95},
     "team": {"type": "choice", "choice": "billing", "confidence": 0.62,
@@ -111,8 +111,8 @@ Non-Requirements).
 `{"models": [{"name", "description", "release_date"}]}`, listing the aliases
 `jev-latest` and `jev-preview` like the real API.
 
-**R3.2**: `jev-latest`, `jev-preview`, and `jev-1.13` resolve to `jev-1.13.0`
-(Jev 1.13, released 2026-09-17). Any other model name, including future
+**R3.2**: `jev-latest`, `jev-preview`, and `jev-1.14` resolve to `jev-1.14.0`
+(Jev 1.14, released 2026-10-14; `jev-1.13` resolves to `jev-1.13.0`). Any other model name, including future
 versioned `jev-*` IDs, is accepted and echoed unchanged in `model`.
 
 ### R4: Scope

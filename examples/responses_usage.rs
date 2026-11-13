@@ -44,7 +44,9 @@ async fn main() {
         tool_choice: None,
         reasoning: None,
         background: false,
+        store: None,
         include: None,
+        text: None,
     };
     println!("Simple request model: {}", simple_request.model);
     println!(
@@ -79,7 +81,9 @@ async fn main() {
         tool_choice: None,
         reasoning: None,
         background: false,
+        store: None,
         include: None,
+        text: None,
     };
 
     // Reasoning model request (o-series)
@@ -100,7 +104,9 @@ async fn main() {
             summary: None,
         }),
         background: false,
+        store: None,
         include: None,
+        text: None,
     };
     println!(
         "Reasoning request model: {} (effort: {:?})",
@@ -165,6 +171,7 @@ async fn main() {
     println!("-----------------------------------");
 
     let usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: input_tokens as u32,
         output_tokens: output_tokens as u32,
         total_tokens: (input_tokens + output_tokens) as u32,
@@ -228,6 +235,7 @@ async fn main() {
     println!("--------------------------");
 
     let stream_usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: 10,
         output_tokens: 15,
         total_tokens: 25,
@@ -303,6 +311,7 @@ async fn main() {
 
     // Create a response with reasoning output item
     let reasoning_usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: 8,
         output_tokens: 10,
         total_tokens: 48,
@@ -369,6 +378,7 @@ async fn main() {
     println!("---------------------------");
 
     let reasoning_stream_usage = ResponsesUsage {
+        input_tokens_details: None,
         input_tokens: 5,
         output_tokens: 8,
         total_tokens: 37,

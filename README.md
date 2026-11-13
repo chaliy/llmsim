@@ -20,13 +20,14 @@ LLMSim replicates realistic LLM API behavior without running actual models. It s
 ## Features
 
 - **Multi-Provider API Support** - OpenAI Chat Completions, [OpenResponses](https://www.openresponses.org), Anthropic Messages, and TypeSafe System One APIs
-- **Realistic Latency Simulation** - Time-to-first-token (TTFT) and inter-token delays with normal distribution
+- **Realistic Latency Simulation** - Time-to-first-token (TTFT) with a long-tail (log-normal) distribution, inter-token delays, and prefill time that grows with the prompt
 - **Streaming Support** - Server-Sent Events (SSE) for OpenAI, OpenResponses, and Anthropic streaming formats
 - **Image Generation** - Simulated gpt-image ("ChatGPT Images") endpoint returning watermarked PNGs, with streaming partial images
 - **Accurate Token Counting** - Uses tiktoken-rs (OpenAI's tokenizer implementation)
 - **Error Injection** - Rate limits (429), server errors (500/503), timeouts
+- **Prompt Caching** - Cached-token usage for repeated prefixes, in OpenAI and Anthropic (`cache_control`) shapes
 - **Multiple Response Generators** - Lorem ipsum, echo, fixed, random, sequence
-- **Model-Specific Profiles** - GPT-5, GPT-4, Claude, Gemini latency profiles
+- **Model-Specific Profiles** - GPT-6 tiers (Sol, Terra, Luna, Astra), GPT-5, GPT-4, Claude, Gemini, Muse latency profiles
 - **Real-time Stats Dashboard** - TUI dashboard with live metrics (requests, tokens, latency, errors)
 - **Stats API** - JSON endpoint for programmatic access to server metrics
 
@@ -173,6 +174,10 @@ server.shutdown().await?;
 | `/openai/v1/models` | GET | List available models |
 | `/openai/v1/models/{model_id}` | GET | Get specific model details |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
+| `/openai/v1/embeddings` | POST | Embeddings (deterministic, similarity-preserving) |
+| `/openai/v1/realtime` | WebSocket | Realtime voice sessions (server VAD, audio + transcript) |
+| `/openai/v1/responses/{id}` (`/cancel`) | GET, DELETE, POST | Background responses |
+| `/openai/v1/files`, `/openai/v1/batches` | POST, GET | Files and Batch API |
 | `/openai/v1/images/generations` | POST | Image generation (gpt-image, streaming & non-streaming) |
 
 When using OpenAI SDKs, set the base URL to `http://localhost:8080/openai/v1`.
@@ -193,6 +198,7 @@ Simulates the [Anthropic Messages API](https://docs.anthropic.com/en/api/message
 |----------|--------|-------------|
 | `/anthropic/v1/messages` | POST | Messages API (streaming & non-streaming, extended thinking) |
 | `/anthropic/v1/messages/count_tokens` | POST | Count input tokens for a Messages request |
+| `/anthropic/v1/messages/batches` | POST, GET | Message Batches (retrieve, cancel, results, delete) |
 | `/anthropic/v1/models` | GET | List available Claude models |
 | `/anthropic/v1/models/{model_id}` | GET | Get specific model details |
 
@@ -212,6 +218,21 @@ print(msg.content[0].text)
 
 Runnable examples for Python, TypeScript, Go, curl, and LangChain live in
 [`examples/`](examples/) (see [`examples/README.md`](examples/README.md)).
+
+### Gemini API (`/gemini/v1beta/...`)
+
+Simulates Google's [Gemini API](https://ai.google.dev/api): thinking with
+`thoughtsTokenCount`, function calling, JSON schema output, SSE and JSON-array
+streaming, implicit caching and embeddings. Set the Google Gen AI SDK base URL
+to `http://localhost:8080/gemini`.
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/gemini/v1beta/models/{model}:generateContent` | POST | Generate content |
+| `/gemini/v1beta/models/{model}:streamGenerateContent` | POST | Streaming (`?alt=sse`) |
+| `/gemini/v1beta/models/{model}:countTokens` | POST | Count tokens |
+| `/gemini/v1beta/models/{model}:embedContent` / `:batchEmbedContents` | POST | Embeddings |
+| `/gemini/v1beta/models` | GET | List models |
 
 ### TypeSafe API (`/typesafe/v1/...`)
 
@@ -260,10 +281,12 @@ profile = "gpt5"
 # ttft_stddev_ms = 150
 # tbt_mean_ms = 40
 # tbt_stddev_ms = 12
+# prefill_us_per_token = 50   # added to TTFT per input token; 0 disables
 
 [response]
 generator = "lorem"
 target_tokens = 100
+# auto_tool_calls = false   # call an offered tool even with tool_choice auto
 # Named load-test scenarios, picked per message with [[llmsim:<name>]]
 # (see docs/scenarios.md):
 # scenarios_path = "examples/scenarios"
@@ -273,6 +296,19 @@ rate_limit_rate = 0.01
 server_error_rate = 0.001
 timeout_rate = 0.0
 timeout_after_ms = 30000
+# overload_burst_rate = 0.001  # chance a burst starts; every request then fails
+# overload_burst_ms = 10000    # (529 on Anthropic, 503 on OpenAI) for this long
+
+[rate_limits]                  # per API key; 0 = unlimited
+# requests_per_minute = 500
+# tokens_per_minute = 200000
+
+[batch]
+# completion_ms = 2000         # batches report completed after this long
+
+[validation]
+# enforce_limits = true        # 400 over context window / max output tokens
+# strict_models = false        # 404 for model ids llmsim has no profile for
 
 [models]
 available = [
@@ -307,6 +343,11 @@ available = [
 
 | Profile | TTFT Mean | TBT Mean |
 |---------|-----------|----------|
+| sol (GPT-5.6+/GPT-6 Sol, measured) | 2000ms | 22ms |
+| terra (GPT-5.6+/GPT-6 Terra) | 2400ms | 14ms |
+| luna (GPT-5.6+/GPT-6 Luna, measured) | 2900ms | 9ms |
+| astra (GPT-6 Astra) | 3500ms | 30ms |
+| muse-spark (measured) | 12700ms | 7ms |
 | gpt-5 | 600ms | 40ms |
 | gpt-5-mini | 300ms | 20ms |
 | gpt-4 | 800ms | 50ms |
@@ -318,6 +359,12 @@ available = [
 | jev | 150ms | — (single verdict) |
 | instant | 0ms | 0ms |
 | fast | 10ms | 1ms |
+
+The profile is picked from the request's model id unless `[latency]` sets one.
+TTFT is log-normal around the mean (a few slow starts), and every input token
+adds `prefill_us_per_token` (default 50 µs) to it, so a 200k-token prompt
+starts about 10 s later. `instant` and `fast` skip both. See
+[knowledge/simulation/latency.md](knowledge/simulation/latency.md).
 
 ## Use Cases
 

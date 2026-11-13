@@ -30,6 +30,17 @@ pub enum InputItem {
     },
     /// A function call result (tool output)
     FunctionCallOutput { call_id: String, output: String },
+    /// A function call the model made earlier, sent back as history.
+    FunctionCall {
+        call_id: String,
+        name: String,
+        arguments: String,
+    },
+    /// A reasoning item sent back as history. Its content is not read.
+    Reasoning {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        id: Option<String>,
+    },
 }
 
 impl<'de> serde::Deserialize<'de> for InputItem {
@@ -72,9 +83,30 @@ impl<'de> serde::Deserialize<'de> for InputItem {
                     .to_string();
                 Ok(InputItem::FunctionCallOutput { call_id, output })
             }
+            Some("function_call") => {
+                let field = |name: &'static str| {
+                    obj.get(name)
+                        .and_then(|v| v.as_str())
+                        .map(str::to_string)
+                        .ok_or_else(|| serde::de::Error::missing_field(name))
+                };
+                Ok(InputItem::FunctionCall {
+                    call_id: field("call_id")?,
+                    name: field("name")?,
+                    arguments: field("arguments")?,
+                })
+            }
+            Some("reasoning") => Ok(InputItem::Reasoning {
+                id: obj.get("id").and_then(|v| v.as_str()).map(str::to_string),
+            }),
             Some(other) => Err(serde::de::Error::unknown_variant(
                 other,
-                &["message", "function_call_output"],
+                &[
+                    "message",
+                    "function_call_output",
+                    "function_call",
+                    "reasoning",
+                ],
             )),
             None => Err(serde::de::Error::custom(
                 "missing 'type' or 'role' field in input item",
@@ -171,9 +203,16 @@ pub struct ResponsesRequest {
     /// Enable background/async processing for long-running tasks
     #[serde(default)]
     pub background: bool,
+    /// Whether to keep the response for later retrieval (default true).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub store: Option<bool>,
     /// Include additional data in response (e.g., "reasoning.encrypted_content")
     #[serde(skip_serializing_if = "Option::is_none")]
     pub include: Option<Vec<String>>,
+    /// Output text configuration; `format: {"type": "json_schema", "schema"}`
+    /// makes the answer schema-valid JSON.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<serde_json::Value>,
 }
 
 /// A tool definition for the Responses API
@@ -418,6 +457,15 @@ pub struct ResponsesUsage {
     pub total_tokens: u32,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub output_tokens_details: Option<OutputTokensDetails>,
+    /// Breakdown of input tokens (`cached_tokens` from prompt caching).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_tokens_details: Option<ResponsesInputTokensDetails>,
+}
+
+/// Details about input token usage
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct ResponsesInputTokensDetails {
+    pub cached_tokens: u32,
 }
 
 /// Details about output token usage
@@ -857,6 +905,7 @@ mod tests {
     #[test]
     fn test_responses_response_new() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 30,
@@ -874,6 +923,7 @@ mod tests {
     #[test]
     fn test_responses_response_serialization() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 30,
@@ -920,6 +970,7 @@ mod tests {
     #[test]
     fn test_responses_response_with_reasoning() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 90,
@@ -967,6 +1018,7 @@ mod tests {
     #[test]
     fn test_responses_response_with_reasoning_no_summary() {
         let usage = ResponsesUsage {
+            input_tokens_details: None,
             input_tokens: 10,
             output_tokens: 20,
             total_tokens: 90,

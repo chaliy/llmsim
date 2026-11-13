@@ -7,6 +7,11 @@
 // (`thinking_delta` events, then one `signature_delta`) and the text block
 // follows at index 1, matching the real extended-thinking stream.
 //
+// Tool calls follow the text as `tool_use` blocks whose input streams as
+// `input_json_delta` chunks of the JSON text (the SDKs concatenate
+// `partial_json`); the message then stops with `stop_reason: "tool_use"`.
+// A turn with tool calls and no text has no text block, as on the real API.
+//
 // The Anthropic SSE wire format differs from OpenAI's: each event carries an
 // explicit `event:` line in addition to `data:`, and there is NO terminal
 // `[DONE]` sentinel — the stream simply ends after `message_stop`.
@@ -31,10 +36,34 @@ pub struct MessagesTokenStream {
     latency: LatencyProfile,
     content: String,
     input_tokens: u32,
+    cache_usage: Option<(u32, u32)>,
     output_tokens: u32,
     /// Optional thinking block: (visible text, signature).
     thinking: Option<(String, String)>,
+    /// Tool calls after the text: (id, name, input).
+    tool_uses: Vec<(String, String, serde_json::Value)>,
+    /// Stream the thinking block as `redacted_thinking` with this data.
+    redacted_thinking: Option<String>,
+    /// Total time the thinking block takes, however much of it is visible.
+    thinking_time: std::time::Duration,
     on_complete: Option<OnCompleteCallback>,
+}
+
+/// Split JSON text into a few `partial_json` chunks (about 16 bytes each, on
+/// char boundaries).
+fn json_chunks(text: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut current = String::new();
+    for ch in text.chars() {
+        current.push(ch);
+        if current.len() >= 16 {
+            out.push(std::mem::take(&mut current));
+        }
+    }
+    if !current.is_empty() {
+        out.push(current);
+    }
+    out
 }
 
 impl MessagesTokenStream {
@@ -45,10 +74,33 @@ impl MessagesTokenStream {
             latency,
             content,
             input_tokens: 0,
+            cache_usage: None,
             output_tokens: 0,
             thinking: None,
+            tool_uses: Vec::new(),
+            redacted_thinking: None,
+            thinking_time: std::time::Duration::ZERO,
             on_complete: None,
         }
+    }
+
+    /// Stream the thinking block as `redacted_thinking` carrying `data`.
+    pub fn with_redacted_thinking(mut self, data: impl Into<String>) -> Self {
+        self.redacted_thinking = Some(data.into());
+        self
+    }
+
+    /// How long the thinking block takes in total. Hidden (omitted or
+    /// summarized) thinking still takes the time of every thinking token.
+    pub fn with_thinking_time(mut self, time: std::time::Duration) -> Self {
+        self.thinking_time = time;
+        self
+    }
+
+    /// Stream `tool_use` blocks after the text: (id, name, input).
+    pub fn with_tool_uses(mut self, tool_uses: Vec<(String, String, serde_json::Value)>) -> Self {
+        self.tool_uses = tool_uses;
+        self
     }
 
     /// Stream a thinking block (visible text may be empty) before the text.
@@ -60,6 +112,9 @@ impl MessagesTokenStream {
     pub fn with_usage(mut self, usage: Usage) -> Self {
         self.input_tokens = usage.input_tokens;
         self.output_tokens = usage.output_tokens;
+        self.cache_usage = usage
+            .cache_read_input_tokens
+            .zip(usage.cache_creation_input_tokens);
         self
     }
 
@@ -84,8 +139,17 @@ impl MessagesTokenStream {
         let model = self.model.clone();
         let latency = self.latency.clone();
         let input_tokens = self.input_tokens;
+        let mut start_usage = json!({"input_tokens": input_tokens, "output_tokens": 1});
+        if let Some((read, creation)) = self.cache_usage {
+            start_usage["cache_read_input_tokens"] = json!(read);
+            start_usage["cache_creation_input_tokens"] = json!(creation);
+        }
         let output_tokens = self.output_tokens;
         let thinking = self.thinking;
+        let redacted = self.redacted_thinking;
+        let thinking_time = self.thinking_time;
+        let tool_uses = self.tool_uses;
+        let skip_text = self.content.is_empty() && !tool_uses.is_empty();
         let on_complete = self.on_complete;
 
         Box::pin(stream! {
@@ -106,14 +170,30 @@ impl MessagesTokenStream {
                     "content": [],
                     "stop_reason": null,
                     "stop_sequence": null,
-                    "usage": {"input_tokens": input_tokens, "output_tokens": 1}
+                    "usage": start_usage
                 }
             });
             yield format_event("message_start", &message_start);
 
             // Optional thinking block at index 0.
             let mut text_index = 0;
-            if let Some((thinking_text, signature)) = thinking {
+            if let Some(data) = redacted {
+                let block_start = json!({
+                    "type": "content_block_start",
+                    "index": 0,
+                    "content_block": {"type": "redacted_thinking", "data": data}
+                });
+                yield format_event("content_block_start", &block_start);
+                yield format_event("ping", &json!({"type": "ping"}));
+                if !thinking_time.is_zero() {
+                    sleep(thinking_time).await;
+                }
+                yield format_event(
+                    "content_block_stop",
+                    &json!({"type": "content_block_stop", "index": 0}),
+                );
+                text_index = 1;
+            } else if let Some((thinking_text, signature)) = thinking {
                 let block_start = json!({
                     "type": "content_block_start",
                     "index": 0,
@@ -122,10 +202,12 @@ impl MessagesTokenStream {
                 yield format_event("content_block_start", &block_start);
                 yield format_event("ping", &json!({"type": "ping"}));
 
+                let mut spent = std::time::Duration::ZERO;
                 for token in tokenize_words(&thinking_text) {
                     let tbt = latency.sample_tbt();
                     if !tbt.is_zero() {
                         sleep(tbt).await;
+                        spent += tbt;
                     }
                     let delta = json!({
                         "type": "content_block_delta",
@@ -133,6 +215,10 @@ impl MessagesTokenStream {
                         "delta": {"type": "thinking_delta", "thinking": token}
                     });
                     yield format_event("content_block_delta", &delta);
+                }
+                // The rest of the thinking happens out of sight.
+                if thinking_time > spent {
+                    sleep(thinking_time - spent).await;
                 }
 
                 let delta = json!({
@@ -148,43 +234,80 @@ impl MessagesTokenStream {
                 text_index = 1;
             }
 
-            // 2. content_block_start (text block).
-            let block_start = json!({
-                "type": "content_block_start",
-                "index": text_index,
-                "content_block": {"type": "text", "text": ""}
-            });
-            yield format_event("content_block_start", &block_start);
-
-            // 3. ping (Anthropic interleaves these to keep the connection warm).
-            if text_index == 0 {
-                yield format_event("ping", &json!({"type": "ping"}));
-            }
-
-            // 4. content_block_delta for each token.
-            for token in tokens {
-                let tbt = latency.sample_tbt();
-                if !tbt.is_zero() {
-                    sleep(tbt).await;
-                }
-                let delta = json!({
-                    "type": "content_block_delta",
+            let mut next_index = text_index;
+            if !skip_text {
+                // 2. content_block_start (text block).
+                let block_start = json!({
+                    "type": "content_block_start",
                     "index": text_index,
-                    "delta": {"type": "text_delta", "text": token}
+                    "content_block": {"type": "text", "text": ""}
                 });
-                yield format_event("content_block_delta", &delta);
+                yield format_event("content_block_start", &block_start);
+
+                // 3. ping (Anthropic interleaves these to keep the connection warm).
+                if text_index == 0 {
+                    yield format_event("ping", &json!({"type": "ping"}));
+                }
+
+                // 4. content_block_delta for each token.
+                for token in tokens {
+                    let tbt = latency.sample_tbt();
+                    if !tbt.is_zero() {
+                        sleep(tbt).await;
+                    }
+                    let delta = json!({
+                        "type": "content_block_delta",
+                        "index": text_index,
+                        "delta": {"type": "text_delta", "text": token}
+                    });
+                    yield format_event("content_block_delta", &delta);
+                }
+
+                // 5. content_block_stop.
+                yield format_event(
+                    "content_block_stop",
+                    &json!({"type": "content_block_stop", "index": text_index}),
+                );
+                next_index = text_index + 1;
             }
 
-            // 5. content_block_stop.
-            yield format_event(
-                "content_block_stop",
-                &json!({"type": "content_block_stop", "index": text_index}),
-            );
+            // 5b. tool_use blocks, input streamed as input_json_delta.
+            let has_tool_uses = !tool_uses.is_empty();
+            for (id, name, input) in tool_uses {
+                let index = next_index;
+                next_index += 1;
+                let block_start = json!({
+                    "type": "content_block_start",
+                    "index": index,
+                    "content_block": {"type": "tool_use", "id": id, "name": name, "input": {}}
+                });
+                yield format_event("content_block_start", &block_start);
+                let text = serde_json::to_string(&input).unwrap_or_else(|_| "{}".into());
+                for chunk in json_chunks(&text) {
+                    let tbt = latency.sample_tbt();
+                    if !tbt.is_zero() {
+                        sleep(tbt).await;
+                    }
+                    let delta = json!({
+                        "type": "content_block_delta",
+                        "index": index,
+                        "delta": {"type": "input_json_delta", "partial_json": chunk}
+                    });
+                    yield format_event("content_block_delta", &delta);
+                }
+                yield format_event(
+                    "content_block_stop",
+                    &json!({"type": "content_block_stop", "index": index}),
+                );
+            }
 
             // 6. message_delta with final stop_reason + cumulative output usage.
             let message_delta = json!({
                 "type": "message_delta",
-                "delta": {"stop_reason": "end_turn", "stop_sequence": null},
+                "delta": {
+                    "stop_reason": if has_tool_uses { "tool_use" } else { "end_turn" },
+                    "stop_sequence": null
+                },
                 "usage": {"output_tokens": output_tokens}
             });
             yield format_event("message_delta", &message_delta);
@@ -234,6 +357,9 @@ pub struct MessagesStreamBuilder {
     latency: LatencyProfile,
     usage: Option<Usage>,
     thinking: Option<(String, String)>,
+    tool_uses: Vec<(String, String, serde_json::Value)>,
+    redacted_thinking: Option<String>,
+    thinking_time: std::time::Duration,
     on_complete: Option<OnCompleteCallback>,
 }
 
@@ -246,8 +372,29 @@ impl MessagesStreamBuilder {
             latency: LatencyProfile::default(),
             usage: None,
             thinking: None,
+            tool_uses: Vec::new(),
+            redacted_thinking: None,
+            thinking_time: std::time::Duration::ZERO,
             on_complete: None,
         }
+    }
+
+    /// Emit the thinking block as `redacted_thinking` carrying `data`.
+    pub fn redacted_thinking(mut self, data: impl Into<String>) -> Self {
+        self.redacted_thinking = Some(data.into());
+        self
+    }
+
+    /// Total thinking time (hidden thinking still takes time).
+    pub fn thinking_time(mut self, time: std::time::Duration) -> Self {
+        self.thinking_time = time;
+        self
+    }
+
+    /// Emit `tool_use` blocks after the text: (id, name, input).
+    pub fn tool_uses(mut self, tool_uses: Vec<(String, String, serde_json::Value)>) -> Self {
+        self.tool_uses = tool_uses;
+        self
     }
 
     /// Emit a thinking block (index 0) before the text block.
@@ -288,6 +435,13 @@ impl MessagesStreamBuilder {
         if let Some((text, signature)) = self.thinking {
             stream = stream.with_thinking(text, signature);
         }
+        if !self.tool_uses.is_empty() {
+            stream = stream.with_tool_uses(self.tool_uses);
+        }
+        if let Some(data) = self.redacted_thinking {
+            stream = stream.with_redacted_thinking(data);
+        }
+        stream = stream.with_thinking_time(self.thinking_time);
         if let Some(on_complete) = self.on_complete {
             stream = stream.with_on_complete(on_complete);
         }
@@ -372,5 +526,40 @@ mod tests {
             .build();
         let _: Vec<String> = stream.into_stream().collect().await;
         assert!(called.load(Ordering::SeqCst));
+    }
+
+    #[tokio::test]
+    async fn test_tool_use_streams_input_json_deltas() {
+        use futures_util::StreamExt;
+        let input = json!({"path": "/tmp/some/long/file/name.txt", "limit": 10});
+        let stream = MessagesStreamBuilder::new("claude-sonnet-4-5", "")
+            .latency(LatencyProfile::instant())
+            .tool_uses(vec![("toolu_1".into(), "read_file".into(), input.clone())])
+            .build();
+        let events: Vec<String> = stream.into_stream().collect().await;
+        let all = events.join("");
+        assert!(!all.contains("\"type\":\"text\""), "no empty text block");
+        assert!(all.contains("\"type\":\"tool_use\""));
+        assert!(all.contains("\"stop_reason\":\"tool_use\""));
+        let partial: String = events
+            .iter()
+            .filter(|e| e.contains("input_json_delta"))
+            .map(|e| {
+                let data = e.lines().find(|l| l.starts_with("data: ")).unwrap();
+                let v: serde_json::Value = serde_json::from_str(&data[6..]).unwrap();
+                v["delta"]["partial_json"].as_str().unwrap().to_string()
+            })
+            .collect();
+        assert!(
+            events
+                .iter()
+                .filter(|e| e.contains("input_json_delta"))
+                .count()
+                > 1
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&partial).unwrap(),
+            input
+        );
     }
 }

@@ -113,6 +113,7 @@ async fn main() {
     println!("-------------------------");
 
     let usage = Usage {
+        prompt_tokens_details: None,
         prompt_tokens: 15,
         completion_tokens: 8,
         total_tokens: 23,

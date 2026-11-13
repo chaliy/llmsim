@@ -315,6 +315,8 @@ mod tests {
             messages_requests: 0,
             image_requests: 0,
             systemone_requests: 0,
+            embeddings_requests: 0,
+            gemini_requests: 0,
             active_websocket_connections: 0,
             prompt_tokens: 0,
             completion_tokens: 0,

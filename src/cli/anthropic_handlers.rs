@@ -15,7 +15,7 @@ use crate::anthropic::{
 };
 use crate::ids::prefixed_compact_id;
 use crate::script::{ScriptedResponse, SimError, SimToolCall, SimTurn};
-use crate::{create_generator, EndpointType, ErrorInjector, LatencyProfile};
+use crate::{create_generator, EndpointType, ErrorInjector};
 use axum::{
     body::Body,
     extract::{Path, State},
@@ -44,7 +44,7 @@ fn anthropic_error(status: u16, message: impl Into<String>) -> Response {
 }
 
 /// Render a scripted `SimError` as an Anthropic error response.
-fn sim_error_to_anthropic_response(err: &SimError) -> Response {
+pub(super) fn sim_error_to_anthropic_response(err: &SimError) -> Response {
     anthropic_error(err.status_code(), err.message())
 }
 
@@ -95,13 +95,28 @@ pub async fn create_message(
         return anthropic_error(400, message);
     }
 
+    // Reject requests over the model's context window or output cap.
+    if let Err(v) = super::validation::check(
+        &state.config.validation,
+        &request.model,
+        super::validation::anthropic_limits(&request.model),
+        count_input_tokens(&request),
+        Some(request.max_tokens),
+    ) {
+        let (status, message) = super::validation::anthropic_parts(&v);
+        state.stats.record_error(status);
+        return anthropic_error(status, message);
+    }
+
     // Model-specific latency (unless overridden in config).
-    let latency =
-        if state.config.latency.profile.is_some() || state.config.latency.ttft_mean_ms.is_some() {
-            state.config.latency_profile()
-        } else {
-            LatencyProfile::from_model(&request.model)
-        };
+    let latency = state.config.latency_for_model(&request.model);
+
+    // Scenario mode, as on chat completions.
+    if let Some(response) =
+        super::scenario_handlers::anthropic(&state, &request, request_start, latency.clone()).await
+    {
+        return response;
+    }
 
     // Scripted non-streaming requests get full tool-call support.
     if let Some(script) = state.script.clone() {
@@ -110,12 +125,31 @@ pub async fn create_message(
         }
     }
 
-    // Resolve the response content (scripted text turn, or generated).
+    // Resolve the response: a scripted turn, a forced tool call or JSON
+    // (tool_choice / output_config.format), or generated text.
+    let mut tool_uses: Vec<(String, String, serde_json::Value)> = Vec::new();
+    let to_uses = |turn_index: usize, calls: Vec<crate::script::SimToolCall>| {
+        calls
+            .into_iter()
+            .enumerate()
+            .map(|(i, c)| {
+                let id = c.id.unwrap_or_else(|| anthropic_tool_use_id(turn_index, i));
+                (id, c.name, c.arguments)
+            })
+            .collect::<Vec<_>>()
+    };
     let content = if let Some(script) = state.script.as_ref() {
+        let turn_index = script.cursor();
         match script.next_turn() {
             ScriptedResponse::Turn(SimTurn::Assistant { text }) => text,
-            ScriptedResponse::Turn(SimTurn::Mixed { text, .. }) => text,
-            ScriptedResponse::Turn(SimTurn::ToolCalls { .. }) => String::new(),
+            ScriptedResponse::Turn(SimTurn::Mixed { text, calls }) => {
+                tool_uses = to_uses(turn_index, calls);
+                text
+            }
+            ScriptedResponse::Turn(SimTurn::ToolCalls { calls }) => {
+                tool_uses = to_uses(turn_index, calls);
+                String::new()
+            }
             ScriptedResponse::Turn(SimTurn::Error(err)) => {
                 state.stats.record_error(err.status_code());
                 return sim_error_to_anthropic_response(&err);
@@ -128,11 +162,26 @@ pub async fn create_message(
                 });
             }
         }
+    } else if let Some(forced) =
+        crate::forced::anthropic(&request, state.config.response.auto_tool_calls)
+    {
+        match forced {
+            crate::forced::Forced::ToolCalls(calls) => {
+                tool_uses = to_uses(0, calls)
+                    .into_iter()
+                    .map(|(id, name, input)| (id.replacen("call_", "toolu_", 1), name, input))
+                    .collect();
+                String::new()
+            }
+            crate::forced::Forced::Json(text) => text,
+        }
     } else {
         generate_content(&state, &request)
     };
 
     let input_tokens = count_input_tokens(&request);
+    let (cache_read, cache_creation) = anthropic_cache(&state, &request, input_tokens);
+    let latency = latency.with_input_tokens(input_tokens - cache_read);
     let text_tokens =
         crate::count_tokens_default(&content).unwrap_or(content.split_whitespace().count());
 
@@ -148,18 +197,47 @@ pub async fn create_message(
     } else {
         None
     };
-    let output_tokens = text_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
-    let usage = Usage::new(input_tokens as u32, output_tokens as u32);
+    // `[[llmsim:redacted-thinking]]` in the last message redacts the thinking
+    // block, the way the safety system occasionally does.
+    let redact = request
+        .messages
+        .last()
+        .is_some_and(|m| m.content.extract_text().contains(REDACTED_THINKING_MARKER));
+    let tool_tokens: usize = tool_uses
+        .iter()
+        .map(|(_, _, input)| {
+            let text = input.to_string();
+            crate::count_tokens_default(&text).unwrap_or(text.len() / 4) + 1
+        })
+        .sum();
+    let output_tokens = text_tokens + tool_tokens + thinking_plan.as_ref().map_or(0, |p| p.tokens);
+    // Anthropic bills cached and newly cached tokens apart from `input_tokens`.
+    let mut usage = Usage::new(
+        (input_tokens - cache_read - cache_creation) as u32,
+        output_tokens as u32,
+    );
+    if state.config.response.prompt_caching {
+        usage.cache_read_input_tokens = Some(cache_read as u32);
+        usage.cache_creation_input_tokens = Some(cache_creation as u32);
+    }
 
     if request.stream {
         let stats = state.stats.clone();
         let input_tok = usage.input_tokens;
         let output_tok = usage.output_tokens;
 
+        let thinking_time = std::time::Duration::from_millis(
+            thinking_plan.as_ref().map_or(0, |p| p.tokens as u64) * latency.tbt_mean_ms,
+        );
         let mut builder = MessagesStreamBuilder::new(&request.model, content)
             .latency(latency)
-            .usage(usage);
+            .usage(usage)
+            .tool_uses(tool_uses)
+            .thinking_time(thinking_time);
         if let Some(plan) = thinking_plan {
+            if redact {
+                builder = builder.redacted_thinking(redacted_data(&plan.signature));
+            }
             builder = builder.thinking(plan.text, plan.signature);
         }
         let stream = builder
@@ -188,18 +266,30 @@ pub async fn create_message(
         );
         let mut blocks = Vec::with_capacity(2);
         if let Some(plan) = thinking_plan {
-            blocks.push(ContentBlock::Thinking {
-                thinking: plan.text,
-                signature: plan.signature,
-            });
+            if redact {
+                blocks.push(ContentBlock::RedactedThinking {
+                    data: redacted_data(&plan.signature),
+                });
+            } else {
+                blocks.push(ContentBlock::Thinking {
+                    thinking: plan.text,
+                    signature: plan.signature,
+                });
+            }
         }
-        blocks.push(ContentBlock::text(content));
-        let response = MessagesResponse::with_content(
-            request.model.clone(),
-            blocks,
-            StopReason::EndTurn,
-            usage,
-        );
+        if !content.is_empty() || tool_uses.is_empty() {
+            blocks.push(ContentBlock::text(content));
+        }
+        let stop_reason = if tool_uses.is_empty() {
+            StopReason::EndTurn
+        } else {
+            StopReason::ToolUse
+        };
+        for (id, name, input) in tool_uses {
+            blocks.push(ContentBlock::ToolUse { id, name, input });
+        }
+        let response =
+            MessagesResponse::with_content(request.model.clone(), blocks, stop_reason, usage);
         Json(response).into_response()
     }
 }
@@ -302,6 +392,80 @@ async fn handle_scripted_message(
     Json(response).into_response()
 }
 
+/// Message marker that turns the thinking block into `redacted_thinking`.
+pub const REDACTED_THINKING_MARKER: &str = "[[llmsim:redacted-thinking]]";
+
+/// Opaque `redacted_thinking` data derived from the block's signature.
+fn redacted_data(signature: &str) -> String {
+    format!("EmwK{}", signature.chars().rev().collect::<String>())
+}
+
+/// Prompt caching for a Messages request: (cache_read, cache_creation)
+/// tokens, both within `input_tokens`. Breakpoints are blocks carrying
+/// `cache_control` (tools, then system, then messages), plus the last block
+/// when the request has top-level `cache_control`.
+fn anthropic_cache(
+    state: &AppState,
+    request: &MessagesRequest,
+    input_tokens: usize,
+) -> (usize, usize) {
+    if !state.config.response.prompt_caching {
+        return (0, 0);
+    }
+    let mut prefixes = super::prompt_cache::PrefixBuilder::new(&request.model);
+    let mut breakpoints = Vec::new();
+    let mut push = |piece: String, marked: bool| {
+        let tokens = crate::count_tokens_default(&piece).unwrap_or(piece.len() / 4);
+        let p = prefixes.push(&piece, tokens);
+        if marked {
+            breakpoints.push(p);
+        }
+    };
+    for tool in request.tools.iter().flatten() {
+        push(
+            serde_json::to_string(tool).unwrap_or_default(),
+            tool.cache_control.is_some(),
+        );
+    }
+    match &request.system {
+        Some(crate::anthropic::SystemPrompt::Text(t)) => push(t.clone(), false),
+        Some(crate::anthropic::SystemPrompt::Blocks(blocks)) => {
+            for b in blocks {
+                push(b.text.clone(), b.cache_control.is_some());
+            }
+        }
+        None => {}
+    }
+    for message in &request.messages {
+        match &message.content {
+            crate::anthropic::MessageContent::Text(t) => push(t.clone(), false),
+            crate::anthropic::MessageContent::Blocks(blocks) => {
+                for b in blocks {
+                    let marked = matches!(
+                        b,
+                        crate::anthropic::RequestContentBlock::Text {
+                            cache_control: Some(_),
+                            ..
+                        } | crate::anthropic::RequestContentBlock::ToolResult {
+                            cache_control: Some(_),
+                            ..
+                        }
+                    ) || matches!(b, crate::anthropic::RequestContentBlock::Other(v) if v.get("cache_control").is_some());
+                    push(serde_json::to_string(b).unwrap_or_default(), marked);
+                }
+            }
+        }
+    }
+    if request.cache_control.is_some() {
+        if let Some(last) = prefixes.prefixes.last() {
+            breakpoints.push(*last);
+        }
+    }
+    let (read, creation) = state.prompt_cache.anthropic(&breakpoints, Instant::now());
+    let read = read.min(input_tokens);
+    (read, creation.min(input_tokens - read))
+}
+
 /// Generate response content for non-scripted requests via the configured
 /// generator, reusing the OpenAI `ChatCompletionRequest` the generators accept.
 fn generate_content(state: &AppState, request: &MessagesRequest) -> String {
@@ -334,7 +498,7 @@ fn generate_content(state: &AppState, request: &MessagesRequest) -> String {
 }
 
 /// Count input tokens for a Messages request (prompt text + small overhead).
-fn count_input_tokens(request: &MessagesRequest) -> usize {
+pub(super) fn count_input_tokens(request: &MessagesRequest) -> usize {
     count_prompt_tokens(&request.prompt_text(), request.messages.len())
 }
 
