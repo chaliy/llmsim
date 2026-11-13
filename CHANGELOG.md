@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-13
+
+### Highlights
+
+- **Realistic latency and built-in scenarios**: model tiers (Sol, Luna,
+  flash, mini, Pro) get their own time-to-first-token and throughput, and
+  `ScenarioSet::builtin()` ships the scenarios agent runtimes need (stalls,
+  cuts, retries, forced tools). Scenarios now play on the Responses, Anthropic
+  and Gemini APIs, not only chat completions.
+- **New APIs**: OpenAI and Gemini Decisions plus Microsoft Foundry System One; OpenAI and
+  Gemini embeddings (deterministic, similarity-preserving vectors); OpenAI
+  Batch and Files, Anthropic Message Batches, and background Responses;
+  native Gemini `generateContent` / `streamGenerateContent` / `countTokens`;
+  and OpenAI Realtime voice over WebSocket with server VAD and barge-in.
+- **Closer to production behavior**: rate and request-size limits
+  with real error envelopes and headers, structured outputs and forced tool
+  calls without a script, prompt-cache usage on OpenAI, Anthropic and Gemini,
+  and thinking tokens that count against the output budget.
+
+### What's Changed
+
+* feat: realism and coverage pass (tier latency, Decisions, limits, caching, Gemini, batches, realtime, ...) ([#89](https://github.com/chaliy/llmsim/pull/89)) by @chaliy
+
+**Full Changelog**: https://github.com/chaliy/llmsim/compare/v0.7.0...v0.8.0
+
 ## [0.7.0] - 2026-11-10
 
 ### Highlights
@@ -273,7 +298,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Full Changelog**: https://github.com/chaliy/llmsim/commits/v0.2.0
 
-[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/chaliy/llmsim/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/chaliy/llmsim/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/chaliy/llmsim/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/chaliy/llmsim/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/chaliy/llmsim/compare/v0.5.0...v0.5.1
