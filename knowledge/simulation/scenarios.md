@@ -59,8 +59,13 @@ steps. Each step is one model call.
 |-------|------|---------|
 | `turn` | object | What the model returns: `assistant`, `tool_calls`, `mixed` or `error`. |
 | `turn.text` | string | Fixed text. Mutually exclusive with `lorem_tokens`; one is required for `assistant` and `mixed`. |
-| `turn.lorem_tokens` | number or [min, max] | Generated lorem text of this many words. |
-| `turn.reasoning_tokens` | number or [min, max] | Reasoning text emitted before the answer. |
+| `turn.lorem_tokens` | number, [min, max] or {median, p99} | Generated lorem text of this many words. |
+| `turn.reasoning_tokens` | number, [min, max] or {median, p99} | Reasoning text emitted before the answer. |
+
+A `{"median": m, "p99": n}` value is log-normal: most samples land near the
+median and one in a hundred passes `p99`, capped at four times `p99`. Real
+answer and reasoning sizes have that heavy tail, and the tail is what fills
+histories and storage in long sessions. A uniform range never produces it.
 | `turn.calls[].name` | string | An exact tool name. If the request does not offer it, the call fails with a 400. |
 | `turn.calls[].tool` | placeholder | `any_read`, `any_write` or `any`: picks a tool the request offers (read-like or write-like by name; any tool when none match). A request offering no tools fails with a 400. |
 | `turn.calls[].arguments` | any | Arguments. When absent, the tool's required JSON-schema parameters are filled with placeholders (`"."` for path-like strings, `"llmsim"` for other strings, `1`, `false`, `[]`, first `enum` value). |
@@ -198,6 +203,9 @@ tests: `file-research` and `console-file-research` (file tools against
 `/load-test/research.md`), `long-tool` (two 25 s `bash` commands), and
 `luna-agent`, `sol-agent` and `muse-agent`, which play the same tool-using
 turn at each model's measured timing (see [Latency Model](latency.md)).
+`coding-agent` is a long agentic turn: 48 steps with parallel fan-out of 3 to
+8 reads, kilobytes of shell output and skewed sizes. `tool-trouble` makes the
+model retry after a failing command, a timeout and a missing file.
 
 ### Public Rust API
 

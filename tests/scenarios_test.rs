@@ -345,6 +345,7 @@ fn starter_library_loads() {
         vec![
             "broken-stream",
             "chat-short",
+            "coding-agent",
             "console-file-research",
             "file-research",
             "flaky-429",
@@ -358,6 +359,7 @@ fn starter_library_loads() {
             "sol-agent",
             "stream-stall",
             "thinking",
+            "tool-trouble",
         ]
     );
     // The compiled-in library is exactly the files on disk.

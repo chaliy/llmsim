@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Scenario sizes accept `{"median": m, "p99": n}` for a log-normal size with a heavy tail.
+- Built-in `coding-agent` (48-step agentic turn with parallel fan-out) and `tool-trouble` (failing, timed-out and missing-file tools, retried) scenarios.
+
 ## [0.8.0] - 2026-11-13
 
 ### Highlights
