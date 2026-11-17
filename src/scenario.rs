@@ -38,19 +38,39 @@ pub const MODEL_PREFIX: &str = "llmsim-scenario-";
 /// Prefix of tool call ids issued by scenarios.
 pub const CALL_ID_PREFIX: &str = "call_llmsim_";
 
-/// A number, or an inclusive `[min, max]` range sampled per step.
+/// A number, an inclusive `[min, max]` range, or a right-skewed
+/// `{"median": m, "p99": n}` distribution, sampled per step.
+///
+/// The skewed form is log-normal: most samples land near the median and one
+/// in a hundred passes `p99`, the heavy tail real answers and tool outputs
+/// have. Samples are capped at four times `p99`.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq)]
 #[serde(untagged)]
 pub enum ValueRange {
     Fixed(u64),
     Between([u64; 2]),
+    Skewed { median: u64, p99: u64 },
 }
+
+/// z-score of the 99th percentile of a standard normal.
+const Z99: f64 = 2.326_347_874;
 
 impl ValueRange {
     fn sample(&self, rng: &mut SplitMix64) -> u64 {
         match *self {
             ValueRange::Fixed(v) => v,
             ValueRange::Between([min, max]) => min + rng.below((max - min).saturating_add(1)),
+            ValueRange::Skewed { median, p99 } => {
+                if median == 0 || p99 <= median {
+                    return median;
+                }
+                let sigma = ((p99 as f64) / (median as f64)).ln() / Z99;
+                // Box-Muller from two uniforms; 1 - u keeps ln away from 0.
+                let (u1, u2) = (1.0 - rng.unit(), rng.unit());
+                let z = (-2.0 * u1.ln()).sqrt() * (std::f64::consts::TAU * u2).cos();
+                let value = (median as f64) * (sigma * z).exp();
+                (value.round() as u64).clamp(1, p99.saturating_mul(4))
+            }
         }
     }
 
@@ -58,6 +78,9 @@ impl ValueRange {
         match *self {
             ValueRange::Between([min, max]) if min > max => Err(format!(
                 "{field}: range min {min} is greater than max {max}"
+            )),
+            ValueRange::Skewed { median, p99 } if median == 0 || p99 < median => Err(format!(
+                "{field}: median must be positive and at most p99 (median {median}, p99 {p99})"
             )),
             _ => Ok(()),
         }
@@ -379,6 +402,10 @@ pub const BUILTIN_SCENARIOS: &[(&str, &str)] = &[
         include_str!("../examples/scenarios/chat-short.json"),
     ),
     (
+        "coding-agent",
+        include_str!("../examples/scenarios/coding-agent.json"),
+    ),
+    (
         "console-file-research",
         include_str!("../examples/scenarios/console-file-research.json"),
     ),
@@ -429,6 +456,10 @@ pub const BUILTIN_SCENARIOS: &[(&str, &str)] = &[
     (
         "thinking",
         include_str!("../examples/scenarios/thinking.json"),
+    ),
+    (
+        "tool-trouble",
+        include_str!("../examples/scenarios/tool-trouble.json"),
     ),
 ];
 
@@ -1833,5 +1864,55 @@ mod tests {
                 _ => panic!("no calls"),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod skewed_tests {
+    use super::*;
+
+    #[test]
+    fn skewed_sizes_center_on_the_median_with_a_heavy_tail() {
+        let range: ValueRange = serde_json::from_str(r#"{"median": 1000, "p99": 10000}"#).unwrap();
+        assert_eq!(
+            range,
+            ValueRange::Skewed {
+                median: 1000,
+                p99: 10000
+            }
+        );
+        let mut rng = SplitMix64::new(42);
+        let mut samples: Vec<u64> = (0..20_000).map(|_| range.sample(&mut rng)).collect();
+        samples.sort_unstable();
+        let at = |p: f64| samples[((samples.len() - 1) as f64 * p) as usize];
+        assert!((850..=1150).contains(&at(0.5)), "median {}", at(0.5));
+        assert!((7_500..=13_000).contains(&at(0.99)), "p99 {}", at(0.99));
+        assert!(*samples.last().unwrap() <= 40_000);
+        assert!(*samples.first().unwrap() >= 1);
+    }
+
+    #[test]
+    fn skewed_ranges_validate() {
+        assert!(ValueRange::Skewed { median: 0, p99: 10 }
+            .validate("f")
+            .is_err());
+        assert!(ValueRange::Skewed { median: 10, p99: 5 }
+            .validate("f")
+            .is_err());
+        assert!(ValueRange::Skewed {
+            median: 10,
+            p99: 10
+        }
+        .validate("f")
+        .is_ok());
+        let mut rng = SplitMix64::new(1);
+        assert_eq!(
+            ValueRange::Skewed {
+                median: 10,
+                p99: 10
+            }
+            .sample(&mut rng),
+            10
+        );
     }
 }

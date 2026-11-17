@@ -1,5 +1,9 @@
 # LLMSim Knowledge Update Log
 
+## 2026-11-17
+
+* **Scenario sizes and agentic scenarios.** [Scenarios](simulation/scenarios.md): skewed `{median, p99}` sizes for answers and reasoning; built-in `coding-agent` and `tool-trouble` scenarios for long agentic turns and tool failures.
+
 ## 2026-11-12
 
 * **Added the Realtime API.** New [OpenAI Realtime API Specification](apis/realtime-api.md):

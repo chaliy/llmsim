@@ -1,0 +1,859 @@
+{
+ "name": "coding-agent",
+ "description": "A coding-agent turn: 48 model steps over 8 areas, each with a listing, a parallel fan-out of 3 to 8 reads, shell output of 1 to 70 KB, an edit and a test run, then a long answer. Skewed reasoning and answer sizes, timed like GPT-6.1 Sol. Needs the bash tool and a read tool.",
+ "defaults": {
+  "timing": {
+   "ttft_ms": [
+    1500,
+    2500
+   ],
+   "tokens_per_sec": 46
+  }
+ },
+ "steps": [
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the request router next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/0",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 200",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 0' > /tmp/patch-0.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the session store next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/1",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 2000",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 1' > /tmp/patch-1.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the auth middleware next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/2",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 800",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 2' > /tmp/patch-2.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the retry policy next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/3",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 6000",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 3' > /tmp/patch-3.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the stream encoder next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/4",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 400",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 4' > /tmp/patch-4.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the config loader next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/5",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 12000",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 5' > /tmp/patch-5.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the billing hooks next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/6",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 1500",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 6' > /tmp/patch-6.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "text": "Looking at the test fixtures next.",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "ls -la src/7",
+       "timeout_ms": 30000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 120,
+     "p99": 900
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "seq 1 3000",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "mixed",
+    "lorem_tokens": {
+     "median": 60,
+     "p99": 400
+    },
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "echo 'patch 7' > /tmp/patch-7.diff",
+       "timeout_ms": 30000
+      }
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "tool": "any_read"
+     },
+     {
+      "tool": "any_read"
+     }
+    ]
+   }
+  },
+  {
+   "turn": {
+    "type": "tool_calls",
+    "calls": [
+     {
+      "name": "bash",
+      "arguments": {
+       "commands": "sleep 3; echo tests ok",
+       "timeout_ms": 60000
+      }
+     }
+    ],
+    "reasoning_tokens": {
+     "median": 200,
+     "p99": 1500
+    }
+   }
+  },
+  {
+   "turn": {
+    "type": "assistant",
+    "lorem_tokens": {
+     "median": 400,
+     "p99": 2500
+    }
+   }
+  }
+ ]
+}

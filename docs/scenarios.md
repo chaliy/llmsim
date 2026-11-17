@@ -56,6 +56,8 @@ The starter library (also in `examples/scenarios/`):
 | `luna-agent` | `file-research` rounds timed like GPT-6 Luna (TTFT 2-4.5 s, 108 tokens/s) | Capacity at Luna speed |
 | `sol-agent` | Same turn timed like GPT-6 Sol (about 2 s, 46 tokens/s) | Capacity at Sol speed |
 | `muse-agent` | Same turn timed like Muse Spark (about 12.7 s, 136 tokens/s) | Very slow first tokens |
+| `coding-agent` | 48 steps: per area a listing, 3-8 parallel reads, 1-70 KB of shell output, an edit and a test run; skewed reasoning and answer sizes, Sol timing | Long agentic turns that hold executors and grow history fast |
+| `tool-trouble` | A command that exits 1, one that outlives its timeout, a missing file, each retried, then an answer | Tool failure and retry paths |
 
 ## Select a scenario
 
@@ -95,7 +97,8 @@ session draws its own timing while reruns stay reproducible.
 ```
 
 - **Turns:** `assistant`, `tool_calls`, `mixed` (text + calls) or `error`.
-  Text is either `text` or `lorem_tokens` (a number or `[min, max]`).
+  Text is either `text` or `lorem_tokens` (a number, `[min, max]`, or
+  `{"median": m, "p99": n}` for a log-normal size with a heavy tail).
   `reasoning_tokens` streams as `delta.reasoning_content` before the answer.
 - **Tool calls:** `name` must be a tool the request offers (else HTTP 400).
   `tool` is a placeholder (`any_read`, `any_write`, `any`) that picks an
