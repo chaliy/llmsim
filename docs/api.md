@@ -926,6 +926,8 @@ Errors use Google's `{"error": {"code", "message", "status"}}` envelope.
 |----------|--------|-------------|
 | `/health` | GET | Health check |
 | `/llmsim/stats` | GET | Real-time server statistics |
+| `/llmsim/calls` | GET | Recent generation requests, when call logging is enabled |
+| `/llmsim/calls/reset` | POST | Clear recorded calls and restart scenario attempt counts |
 
 ### Health Check
 
@@ -965,6 +967,34 @@ curl http://localhost:8080/llmsim/stats
   }
 }
 ```
+
+### Call log
+
+Enable the test log on a loopback server:
+
+```toml
+[server]
+host = "127.0.0.1"
+call_log = true
+```
+
+`GET /llmsim/calls` returns an array of the last 500 recorded HTTP generation
+requests, oldest entry first. It covers OpenAI
+Chat Completions and Responses, OpenResponses, Anthropic Messages, and Gemini
+GenerateContent. Each entry includes `path`, HTTP `status`, and the
+`scenario`, zero-based `step`, and zero-based `attempt` when available.
+`body` contains the submitted JSON, including prompts and tool arguments,
+when read in full and within 16 KiB. Larger bodies have `body: null` and
+`body_truncated: true`. The log omits the request headers, URL query, and
+response body. For SSE, the HTTP status describes the headers, so assert
+stream completion in the SDK.
+
+`POST /llmsim/calls/reset` returns 204 and clears the log and the scenario
+attempt counters. Call it between tests after requests have finished. Use
+a fresh server per worker for independent reset and retry assertions.
+
+The controls are available to local HTTP clients using a loopback host
+and no `Origin` header. See the [TypeScript tool-loop example](../examples/node/agent_tool_loop.ts).
 
 ## Supported Models
 

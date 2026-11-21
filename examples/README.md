@@ -179,6 +179,13 @@ Direct usage of the official OpenAI Node.js library:
 npx tsx openai_client.ts
 ```
 
+### Assert an agent tool loop
+
+From the repository root, start `cargo run -- serve --config examples/node/agent_tool_loop.toml`.
+After installing the Node dependencies above, run `npx tsx agent_tool_loop.ts`
+from `examples/node`. The example verifies an SDK retry, the tool arguments,
+and the tool results submitted to LLMSim using the [call log](../docs/api.md#call-log).
+
 ### OpenAI Image Generation
 
 Generate simulated images (gpt-image / "ChatGPT Images"), including streaming

@@ -17,7 +17,7 @@ const native = require("./index.cjs") as typeof NativeModule;
 
 /** Config shaped like the `llmsim serve` TOML file. Unknown keys are ignored. */
 export interface LlmSimConfig {
-  server?: { host?: string; port?: number; max_websocket_connections?: number };
+  server?: { host?: string; port?: number; max_websocket_connections?: number; call_log?: boolean };
   latency?: {
     profile?: string;
     ttft_mean_ms?: number;

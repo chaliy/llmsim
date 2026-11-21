@@ -4,6 +4,8 @@
 
 * **HTTP Responses continuation.** [Responses API](apis/responses-api.md) now stores
   completed ordinary HTTP responses and resolves previous response IDs for tool loops.
+* **Scenario call assertions.** [Scenarios](simulation/scenarios.md) can expose a
+  bounded, opt-in call log and reset for SDK integration tests on loopback.
 
 ## 2026-11-17
 

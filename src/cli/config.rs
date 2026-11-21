@@ -213,6 +213,9 @@ pub struct ServerConfig {
     pub port: u16,
     #[serde(default = "default_host")]
     pub host: String,
+    /// Capture recent model requests for test assertions on loopback servers.
+    #[serde(default)]
+    pub call_log: bool,
     /// Maximum number of active WebSocket connections allowed
     #[serde(default = "default_max_websocket_connections")]
     pub max_websocket_connections: u64,
@@ -235,6 +238,7 @@ impl Default for ServerConfig {
         Self {
             port: default_port(),
             host: default_host(),
+            call_log: false,
             max_websocket_connections: default_max_websocket_connections(),
         }
     }

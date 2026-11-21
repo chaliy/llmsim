@@ -1305,6 +1305,14 @@ impl AttemptTracker {
         self.entries.lock().map(|m| m.len()).unwrap_or(0)
     }
 
+    #[cfg(feature = "server")]
+    pub(crate) fn clear(&self) {
+        self.entries
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .clear();
+    }
+
     pub fn is_empty(&self) -> bool {
         self.len() == 0
     }

@@ -27,6 +27,7 @@ pub struct AppState {
     /// Background responses, files and batches.
     pub jobs: Arc<super::jobs::JobStore>,
     pub(super) stored_responses: Arc<super::response_store::ResponseStore>,
+    pub(super) call_log: Option<super::call_log::CallLog>,
     /// Router with instant timing and no injected errors, for work done on
     /// the server's behalf (batch lines, background responses).
     internal: OnceLock<axum::Router>,
@@ -38,6 +39,10 @@ impl AppState {
             config.rate_limits.requests_per_minute,
             config.rate_limits.tokens_per_minute,
         ));
+        let call_log = config
+            .server
+            .call_log
+            .then(super::call_log::CallLog::default);
         Self {
             limiter,
             prompt_cache: Arc::new(PromptCache::default()),
@@ -48,6 +53,7 @@ impl AppState {
             attempts: Arc::new(AttemptTracker::default()),
             jobs: Arc::default(),
             stored_responses: Arc::default(),
+            call_log,
             internal: OnceLock::new(),
         }
     }
@@ -61,6 +67,7 @@ impl AppState {
                 config.latency.prefill_us_per_token = Some(0);
                 config.errors = Default::default();
                 config.rate_limits = Default::default();
+                config.server.call_log = false;
                 let mut inner = AppState::new(config, crate::stats::new_shared_stats());
                 inner.scenarios = self.scenarios.clone();
                 super::build_router(Arc::new(inner))

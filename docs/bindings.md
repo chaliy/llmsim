@@ -104,6 +104,10 @@ Server({"errors": {"rate_limit_rate": 0.2, "server_error_rate": 0.05}})
 await Server.start({ config: { errors: { rate_limit_rate: 0.2 } } });
 ```
 
+For [call assertions](api.md#call-log), pass
+`config: { server: { call_log: true } }` in Node or
+`config={"server": {"call_log": True}}` in Python.
+
 An invalid config raises `ValueError` in Python (when `Server(...)` is
 constructed) and rejects `Server.start()` in Node. A port that is already in
 use, or a script file that cannot be read, fails at start (`LlmSimError` in
