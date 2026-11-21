@@ -1,4 +1,5 @@
 [toolchain]
-channel = "1.99"
+# Match the full version installed by GitHub Actions so rustup reuses it.
+channel = "1.99.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"

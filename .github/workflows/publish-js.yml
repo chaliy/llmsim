@@ -87,10 +87,6 @@ jobs:
           node-version: "22"
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
-      # rust-toolchain.toml pins channel "1.99", a different rustup toolchain
-      # name than the action's "1.99.0", so add the target from the repo root
-      # where the pin applies (cross targets such as x86_64-apple-darwin on
-      # arm64 runners otherwise fail with "can't find crate for core").
       - name: Add Rust target for the pinned toolchain
         run: rustup target add ${{ matrix.target }}
       - name: Install dependencies
