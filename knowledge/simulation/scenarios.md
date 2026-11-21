@@ -30,6 +30,12 @@ Messages.
 
 ## Requirements
 
+Tests may opt into a bounded [call log](../../docs/api.md#call-log) on a
+loopback server to assert the submitted JSON and the scenario step, attempt,
+and HTTP status. Reset clears the log and retry counters between test runs.
+The log captures incoming requests so tests can distinguish actual SDK retries
+from simulated outcomes. Concurrent workers can use separate servers.
+
 ### Scenario format
 
 A scenario is a JSON object: a name (`[a-z0-9-]+`) plus an ordered list of

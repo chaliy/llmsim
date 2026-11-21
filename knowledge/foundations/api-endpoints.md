@@ -189,6 +189,8 @@ pattern: `POST /openai/v1/decisions`, `POST /gemini/v1beta/decisions`, and
 |--------|------|-------------|
 | `GET` | `/health` | Health check endpoint |
 | `GET` | `/llmsim/stats` | Server statistics (requests, tokens, latency) |
+| `GET` | `/llmsim/calls` | Opt-in local generation request log |
+| `POST` | `/llmsim/calls/reset` | Clear the log and scenario attempts between tests |
 
 ### R6: SDK Compatibility
 

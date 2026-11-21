@@ -8,6 +8,43 @@
 
 **LLM Traffic Simulator** - A lightweight, high-performance LLM API simulator for load testing, CI/CD, and local development.
 
+## Test an agent tool loop locally
+
+Run the simulator from this checkout on a loopback address with call logging enabled.
+
+```bash
+cargo run -- serve --config examples/node/agent_tool_loop.toml
+```
+
+From a second terminal, run the official OpenAI SDK example. It verifies a 429
+retry, four tool calls and their arguments, and the tool results sent back to
+LLMSim. Tool results come from fixtures.
+
+```bash
+cd examples/node
+npm install
+npx tsx agent_tool_loop.ts
+```
+
+See [Call log](docs/api.md#call-log) for the assertion and reset endpoints.
+
+## Load-test realistic agent traffic
+
+```bash
+cargo run --release -- serve --host 127.0.0.1
+```
+
+Point your agent client at `http://127.0.0.1:8080/openai/v1` and append
+`[[llmsim:coding-agent]]` to each test session's initial user message. Offer
+`bash` and a read tool, and have the test harness return fixture results to
+the simulator. The scenario replays 48 tool-call turns with parallel reads
+and long reasoning, then returns a final answer at model-like speeds. Use a
+distinct session label in each prompt for reproducible variation under
+concurrency. Read request, token, and latency metrics from `/llmsim/stats`.
+
+See [Scenarios](docs/scenarios.md) for workload selection and
+[Benchmarks](benchmarks/README.md) for k6 load profiles.
+
 ## Overview
 
 LLMSim replicates realistic LLM API behavior without running actual models. It solves common challenges when testing LLM-integrated applications:

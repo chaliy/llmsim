@@ -3,6 +3,7 @@
 //! This module provides the `llmsim serve` command implementation.
 
 mod anthropic_handlers;
+mod call_log;
 mod config;
 mod decisions_handlers;
 mod embeddings_handlers;
@@ -37,7 +38,7 @@ use tower_http::{cors::CorsLayer, trace::TraceLayer};
 /// Build the Axum router with all endpoints.
 /// Exposed for integration testing.
 pub fn build_router(state: Arc<AppState>) -> Router {
-    Router::new()
+    let app = Router::new()
         .route("/health", get(handlers::health))
         .route("/llmsim/stats", get(handlers::get_stats))
         // OpenAI API routes
@@ -147,8 +148,18 @@ pub fn build_router(state: Arc<AppState>) -> Router {
             limits::middleware,
         ))
         .layer(TraceLayer::new_for_http())
-        .layer(CorsLayer::permissive())
-        .with_state(state)
+        .layer(CorsLayer::permissive());
+    let app = if state.call_log.is_some() {
+        app.layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            call_log::capture,
+        ))
+        .route("/llmsim/calls", get(call_log::calls))
+        .route("/llmsim/calls/reset", post(call_log::reset))
+    } else {
+        app
+    };
+    app.with_state(state)
 }
 
 /// Run the LLMSim server with the given configuration

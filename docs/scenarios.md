@@ -59,7 +59,7 @@ The starter library (also in `examples/scenarios/`):
 | `luna-agent` | `file-research` rounds timed like GPT-6 Luna (TTFT 2-4.5 s, 108 tokens/s) | Capacity at Luna speed |
 | `sol-agent` | Same turn timed like GPT-6 Sol (about 2 s, 46 tokens/s) | Capacity at Sol speed |
 | `muse-agent` | Same turn timed like Muse Spark (about 12.7 s, 136 tokens/s) | Very slow first tokens |
-| `coding-agent` | 48 steps: per area a listing, 3-8 parallel reads, 1-70 KB of shell output, an edit and a test run; skewed reasoning and answer sizes, Sol timing | Long agentic turns that hold executors and grow history fast |
+| `coding-agent` | 48 tool-call steps and a final answer. Per area, a listing, 3–8 parallel reads, 1–70 KB of shell output, an edit, and a test run | Long agentic turns with skewed reasoning and answer sizes and Sol timing |
 | `tool-trouble` | A command that exits 1, one that outlives its timeout, a missing file, each retried, then an answer | Tool failure and retry paths |
 
 ## Select a scenario
@@ -121,5 +121,7 @@ headers to help debug a run.
 
 Attempt counts for `fail_first` and cuts are kept per server process, so a
 retry that lands on a different llmsim instance may see the error again.
+For integration tests on a loopback server, enable the
+[call log](api.md#call-log) to assert on request bodies and retry sequences.
 
 The full specification is in `knowledge/simulation/scenarios.md`.

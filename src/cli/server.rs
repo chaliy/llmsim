@@ -41,6 +41,11 @@ pub enum ServerError {
 /// Build the application state for `config`, loading the script and
 /// scenario files it names.
 pub fn build_state(config: Config, stats: SharedStats) -> Result<AppState, ConfigError> {
+    if config.server.call_log && !super::call_log::is_loopback_ip(&config.server.host) {
+        return Err(ConfigError::Validation(
+            "server.call_log requires a loopback host".to_string(),
+        ));
+    }
     let mut state = AppState::new(config, stats);
     if let Some(path) = state.config.response.script_path.clone() {
         let script = Script::from_file(&path).map_err(|e| {
