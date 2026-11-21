@@ -12,6 +12,7 @@ mod jobs;
 pub mod limits;
 pub mod prompt_cache;
 mod realtime;
+mod response_store;
 mod scenario_handlers;
 mod server;
 mod state;

@@ -18,6 +18,7 @@ use crate::openai::{
     ItemStatus, OutputContentPart, OutputItem, OutputRole, ReasoningSummary, ResponseStatus,
     ResponsesResponse, ResponsesStreamEvent, ResponsesUsage,
 };
+use crate::responses_stream::ResponseCompleted;
 use crate::scenario_stream::StepFrames;
 use crate::script::SimToolCall;
 use serde_json::json;
@@ -156,6 +157,7 @@ pub struct ResponsesFrames {
     output: Vec<OutputItem>,
     calls: Vec<SimToolCall>,
     usage: ResponsesUsage,
+    on_completed: Option<ResponseCompleted>,
 }
 
 impl ResponsesFrames {
@@ -171,7 +173,14 @@ impl ResponsesFrames {
             output: Vec::new(),
             calls,
             usage,
+            on_completed: None,
         }
+    }
+
+    #[cfg(feature = "server")]
+    pub(crate) fn on_completed(mut self, callback: Option<ResponseCompleted>) -> Self {
+        self.on_completed = callback;
+        self
     }
 
     fn next(&mut self) -> u32 {
@@ -361,6 +370,9 @@ impl StepFrames for ResponsesFrames {
             std::mem::take(&mut self.output),
             self.usage.clone(),
         );
+        if let Some(callback) = self.on_completed.take() {
+            callback(&done);
+        }
         let seq = self.next();
         out.push(ResponsesStreamEvent::response_completed(done, seq));
         out

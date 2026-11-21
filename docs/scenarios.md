@@ -19,6 +19,9 @@ Send history back the way each API expects (Responses `function_call` and
 Keep the tool call ids llmsim issued (`call_llmsim_...`): they are how a step
 is counted when history is compacted.
 
+On the OpenAI Responses API, you can also send the previous response ID and
+only the new tool results. See [stored responses](api.md#stored-responses-and-continuation).
+
 ## Enable
 
 The starter library below is built in and on by default: just add a marker.

@@ -1,5 +1,10 @@
 # LLMSim Knowledge Update Log
 
+## 2026-11-20
+
+* **HTTP Responses continuation.** [Responses API](apis/responses-api.md) now stores
+  completed ordinary HTTP responses and resolves previous response IDs for tool loops.
+
 ## 2026-11-17
 
 * **Scenario sizes and agentic scenarios.** [Scenarios](simulation/scenarios.md): skewed `{median, p99}` sizes for answers and reasoning; built-in `coding-agent` and `tool-trouble` scenarios for long agentic turns and tool failures.

@@ -26,6 +26,7 @@ pub struct AppState {
     pub prompt_cache: Arc<PromptCache>,
     /// Background responses, files and batches.
     pub jobs: Arc<super::jobs::JobStore>,
+    pub(super) stored_responses: Arc<super::response_store::ResponseStore>,
     /// Router with instant timing and no injected errors, for work done on
     /// the server's behalf (batch lines, background responses).
     internal: OnceLock<axum::Router>,
@@ -46,6 +47,7 @@ impl AppState {
             scenarios: None,
             attempts: Arc::new(AttemptTracker::default()),
             jobs: Arc::default(),
+            stored_responses: Arc::default(),
             internal: OnceLock::new(),
         }
     }

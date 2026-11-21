@@ -14,6 +14,7 @@ use tokio::time::sleep;
 
 /// Type alias for on-complete callback
 type OnCompleteCallback = Box<dyn FnOnce() + Send>;
+pub(crate) type ResponseCompleted = Box<dyn FnOnce(&ResponsesResponse) + Send>;
 
 /// Ensures completion callback runs exactly once, including when stream is dropped early.
 struct CompletionGuard {
@@ -60,6 +61,7 @@ pub struct ResponsesTokenStream {
     reasoning_summary: Option<String>,
     /// Callback to invoke when stream completes
     on_complete: Option<OnCompleteCallback>,
+    on_response_completed: Option<ResponseCompleted>,
 }
 
 impl ResponsesTokenStream {
@@ -80,6 +82,7 @@ impl ResponsesTokenStream {
             include_reasoning: false,
             reasoning_summary: None,
             on_complete: None,
+            on_response_completed: None,
         }
     }
 
@@ -128,6 +131,7 @@ impl ResponsesTokenStream {
         let include_reasoning = self.include_reasoning;
         let reasoning_summary = self.reasoning_summary.clone();
         let on_complete = self.on_complete;
+        let on_response_completed = self.on_response_completed;
 
         Box::pin(stream! {
             let mut completion_guard = CompletionGuard::new(on_complete);
@@ -317,6 +321,9 @@ impl ResponsesTokenStream {
                 error: None,
                 metadata: None,
             };
+            if let Some(callback) = on_response_completed {
+                callback(&final_response);
+            }
             yield ResponsesStreamEvent::response_completed(final_response, seq);
 
             // Invoke completion callback
@@ -334,6 +341,7 @@ pub struct ResponsesTokenStreamBuilder {
     include_reasoning: bool,
     reasoning_summary: Option<String>,
     on_complete: Option<OnCompleteCallback>,
+    on_response_completed: Option<ResponseCompleted>,
 }
 
 impl ResponsesTokenStreamBuilder {
@@ -354,6 +362,7 @@ impl ResponsesTokenStreamBuilder {
             include_reasoning: false,
             reasoning_summary: None,
             on_complete: None,
+            on_response_completed: None,
         }
     }
 
@@ -390,10 +399,17 @@ impl ResponsesTokenStreamBuilder {
             ResponsesTokenStream::new(self.model, self.content, self.latency, self.usage);
         stream.include_reasoning = self.include_reasoning;
         stream.reasoning_summary = self.reasoning_summary;
+        stream.on_response_completed = self.on_response_completed;
         if let Some(on_complete) = self.on_complete {
             stream = stream.with_on_complete(on_complete);
         }
         stream
+    }
+
+    #[cfg(feature = "server")]
+    pub(crate) fn on_response_completed(mut self, callback: Option<ResponseCompleted>) -> Self {
+        self.on_response_completed = callback;
+        self
     }
 }
 

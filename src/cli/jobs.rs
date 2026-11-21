@@ -163,6 +163,7 @@ pub(super) async fn start_background_response(
     let mut body = serde_json::to_value(request).unwrap_or_default();
     body["background"] = json!(false);
     body["stream"] = json!(false);
+    body["store"] = json!(false);
     let (status, mut result) = dispatch(state, "/openai/v1/responses", &body).await;
     let id = prefixed_id("resp_");
     let ok = status == 200;
@@ -200,6 +201,9 @@ fn response_not_found(id: &str) -> Response {
 
 /// GET /openai/v1/responses/{id}
 pub async fn get_response(State(state): State<Arc<AppState>>, Path(id): Path<String>) -> Response {
+    if let Some(body) = state.stored_responses.get(&id) {
+        return ([(header::CONTENT_TYPE, "application/json")], body).into_response();
+    }
     let map = state
         .jobs
         .responses
@@ -240,16 +244,18 @@ pub async fn delete_response(
     State(state): State<Arc<AppState>>,
     Path(id): Path<String>,
 ) -> Response {
-    let mut map = state
-        .jobs
-        .responses
-        .lock()
-        .unwrap_or_else(|e| e.into_inner());
-    match map.remove(&id) {
-        Some(_) => {
-            Json(json!({"id": id, "object": "response.deleted", "deleted": true})).into_response()
-        }
-        None => response_not_found(&id),
+    let removed = state.stored_responses.delete(&id)
+        || state
+            .jobs
+            .responses
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .remove(&id)
+            .is_some();
+    if removed {
+        Json(json!({"id": id, "object": "response.deleted", "deleted": true})).into_response()
+    } else {
+        response_not_found(&id)
     }
 }
 

@@ -96,7 +96,15 @@ The OpenAI Responses API is a stateful API that unifies the Chat Completions and
 - `tool_choice`: Control tool usage
 - `reasoning`: Reasoning configuration for reasoning models (o-series and GPT-5)
 - `background`: Enable async processing for long-running tasks
+- `store`: Retain the completed HTTP response, enabled by default
 - `include`: Request additional data in response (e.g., `["reasoning.encrypted_content"]`)
+
+**R4.4**: Retain completed ordinary HTTP responses, including SSE, in a bounded
+in-memory store. Retrieval and deletion use the response ID. HTTP continuation
+merges the parent's input and output with the new input. Top-level instructions
+are per request. A missing parent returns `previous_response_not_found`.
+An interrupted stream has no completed response to retain. See the
+[public API reference](../../docs/api.md#stored-responses-and-continuation).
 
 ### R4.3: Reasoning Configuration
 
@@ -281,7 +289,7 @@ Nested format (also accepted for compatibility):
 - Image generation output (accepted but not produced)
 - Audio processing
 - Background processing polling (background flag accepted, returns immediately)
-- Cross-connection conversation persistence (previous_response_id is only cached per WebSocket connection, not persisted globally)
+- Durable conversation persistence beyond the process lifetime
 
 ## API Examples
 
