@@ -409,8 +409,8 @@ pub(super) async fn responses(
             reasoning_tokens: play.reasoning_tokens as u32,
         }),
     };
-    let frames = ResponsesFrames::new(&request.model, play.calls.clone(), usage.clone());
-    let model = request.model.clone();
+    let frames = ResponsesFrames::new(&request.model, play.calls.clone(), usage.clone())
+        .on_completed(state.stored_responses.on_completed(request));
     let response = deliver(
         state,
         request.stream,
@@ -423,11 +423,12 @@ pub(super) async fn responses(
                 responses_output(play.reasoning.as_deref(), play.text.as_deref(), &play.calls);
             let body = responses_body(
                 crate::ids::prefixed_id("resp_"),
-                &model,
+                &request.model,
                 crate::ids::unix_timestamp(),
                 output,
                 usage,
             );
+            state.stored_responses.save(request, &body);
             Json(body).into_response()
         },
     )

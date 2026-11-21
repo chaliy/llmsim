@@ -47,7 +47,7 @@ This specification defines the URL structure and routing conventions for LLMSim 
 | `GET/WS` | `/openai/v1/responses` | WebSocket mode for Responses API |
 | `POST` | `/openai/v1/embeddings` | Embeddings API |
 | `WS` | `/openai/v1/realtime` | Realtime API (voice sessions) |
-| `GET/DELETE` | `/openai/v1/responses/:id` | Retrieve or delete a background response |
+| `GET/DELETE` | `/openai/v1/responses/:id` | Retrieve or delete a stored response |
 | `POST` | `/openai/v1/responses/:id/cancel` | Cancel a background response |
 | `POST` | `/openai/v1/files` | Upload a file (multipart) |
 | `GET` | `/openai/v1/files/:id`, `/openai/v1/files/:id/content` | File metadata and content |

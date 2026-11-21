@@ -37,6 +37,7 @@ use axum::{
 };
 use futures_util::StreamExt;
 use rand::prelude::IndexedRandom;
+use serde_json::json;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -761,7 +762,7 @@ async fn handle_scripted_responses_api(
         id: prefixed_id("resp_"),
         object: "response".to_string(),
         created_at: unix_timestamp(),
-        model: request.model,
+        model: request.model.clone(),
         status: ResponseStatus::Completed,
         output,
         output_text: output_text_value,
@@ -770,6 +771,7 @@ async fn handle_scripted_responses_api(
         metadata: None,
     };
 
+    state.stored_responses.save(&request, &resp);
     Json(resp).into_response()
 }
 
@@ -1088,7 +1090,7 @@ pub async fn get_model(
 /// POST /openai/v1/responses
 pub async fn create_response(
     State(state): State<Arc<AppState>>,
-    Json(request): Json<ResponsesRequest>,
+    Json(mut request): Json<ResponsesRequest>,
 ) -> Result<Response, AppError> {
     let request_start = Instant::now();
 
@@ -1139,6 +1141,26 @@ pub async fn create_response(
         }
 
         return Ok(response);
+    }
+
+    if let Some(previous_id) = request.previous_response_id.take() {
+        let Some(input) = state
+            .stored_responses
+            .continue_input(&previous_id, &request.input)
+        else {
+            state.stats.record_error(404);
+            return Ok((
+                StatusCode::NOT_FOUND,
+                Json(json!({"error": {
+                    "type": "invalid_request_error",
+                    "message": format!("Previous response with id '{previous_id}' not found."),
+                    "param": "previous_response_id",
+                    "code": "previous_response_not_found"
+                }})),
+            )
+                .into_response());
+        };
+        request.input = input;
     }
 
     // Reject requests over the model's context window or output cap.
@@ -1208,6 +1230,7 @@ pub async fn create_response(
         let mut builder = ResponsesTokenStreamBuilder::new(&request.model, result.content)
             .latency(result.latency)
             .usage(result.usage)
+            .on_response_completed(state.stored_responses.on_completed(&request))
             .on_complete(move || {
                 stats.record_request_end(request_start.elapsed(), input_tok, output_tok);
             });
@@ -1251,6 +1274,7 @@ pub async fn create_response(
         } else {
             ResponsesResponse::new(request.model.clone(), result.content, result.usage)
         };
+        state.stored_responses.save(&request, &response);
         Ok(Json(response).into_response())
     }
 }

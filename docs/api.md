@@ -22,7 +22,7 @@ LLMSim provides multiple API providers with provider-namespaced routes.
 | `/openai/v1/chat/completions` | POST | Chat completions (streaming & non-streaming) |
 | `/openai/v1/responses` | POST | Responses API (streaming & non-streaming) |
 | `/openai/v1/responses` | WS | WebSocket mode for Responses API |
-| `/openai/v1/responses/{id}` | GET, DELETE | Retrieve or delete a background response |
+| `/openai/v1/responses/{id}` | GET, DELETE | Retrieve or delete a stored response |
 | `/openai/v1/responses/{id}/cancel` | POST | Cancel a background response |
 | `/openai/v1/files` | POST | Upload a file (multipart) |
 | `/openai/v1/files/{id}`, `/openai/v1/files/{id}/content` | GET | File metadata, file content |
@@ -160,6 +160,22 @@ curl http://localhost:8080/openai/v1/responses \
     "stream": false
   }'
 ```
+
+#### Stored responses and continuation
+
+Completed HTTP responses are stored by default, including responses delivered
+over SSE. Retrieve or delete them at `/openai/v1/responses/{id}`. Use
+`previous_response_id` to continue an ordinary response with only new input,
+such as one or more `function_call_output` items. LLMSim supplies the previous
+input and output. Send top-level `instructions` on each request that needs them.
+
+`store: false` skips storage for the current response. You can still continue
+from a stored parent on that request. A missing, deleted, or evicted parent
+returns HTTP 404 with code `previous_response_not_found`. The process keeps
+up to 1,000 ordinary responses or 32 MiB of response and history JSON, evicts
+oldest entries first, and skips entries larger than the budget.
+
+For requests running as background jobs, see [Background Responses](#background-responses).
 
 #### Reasoning (Thinking) Emulation
 
