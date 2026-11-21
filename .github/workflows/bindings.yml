@@ -48,6 +48,9 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@1.99.0
+        with:
+          # Install the repository's components before maturin invokes Cargo.
+          components: clippy, rustfmt
 
       - name: Cache cargo registry
         uses: actions/cache@v4
